@@ -121,11 +121,13 @@ func TestSLP011_TableDriven(t *testing.T) {
 			if len(got) != c.wantLen {
 				t.Fatalf("expected %d findings, got %d: %+v", c.wantLen, len(got), got)
 			}
-			if c.wantLine > 0 && got[0].Line != c.wantLine {
-				t.Errorf("line = %d, want %d", got[0].Line, c.wantLine)
-			}
-			if c.wantLen > 0 && got[0].File != "a/foo_test.go" {
-				t.Errorf("file = %q", got[0].File)
+			if c.wantLen > 0 && len(got) > 0 {
+				if c.wantLine > 0 && got[0].Line != c.wantLine {
+					t.Errorf("line = %d, want %d", got[0].Line, c.wantLine)
+				}
+				if got[0].File != "a/foo_test.go" {
+					t.Errorf("file = %q", got[0].File)
+				}
 			}
 		})
 	}

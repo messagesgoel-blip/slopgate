@@ -49,17 +49,21 @@ func containsStubKeyword(s string) bool {
 	return false
 }
 
-// extractStringLiteral extracts the content of a Go-style or JS-style
-// interpreted string literal from s. It returns ("", false) if no
-// string literal is found. Only handles basic "..." and '...' literals
-// — raw strings and template literals are out of scope for the stub
-// pattern.
-func extractStringLiteral(s string) (string, bool) {
-	// Look for the first opening quote after the panic/throw call.
-	i := strings.IndexAny(s, "\"'")
+// extractStringLiteralFrom extracts the content of a Go-style or JS-style
+// interpreted string literal from s, searching for the opening quote at or
+// after the start offset. It returns ("", false) if no string literal is found
+// after start. Only handles basic "..." and '...' literals — raw strings and
+// template literals are out of scope for the stub pattern.
+func extractStringLiteralFrom(s string, start int) (string, bool) {
+	if start >= len(s) {
+		return "", false
+	}
+	// Look for the first opening quote at or after start.
+	i := strings.IndexAny(s[start:], "\"'")
 	if i < 0 {
 		return "", false
 	}
+	i += start // absolute position in s
 	quote := s[i]
 	// Find the closing quote. Simple scan — does not handle escaped
 	// quotes, which are vanishingly rare in stub messages.
@@ -94,7 +98,8 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 
 			// Go: panic("...stub keyword...")
 			if isGo && slp006GoPanic.MatchString(stripped) {
-				lit, ok := extractStringLiteral(content)
+				loc := slp006GoPanic.FindStringIndex(stripped)
+				lit, ok := extractStringLiteralFrom(content, loc[0])
 				if ok && containsStubKeyword(lit) {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
@@ -110,7 +115,8 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 
 			// JS/TS: throw new Error("...stub keyword...")
 			if isJS && slp006JSThrow.MatchString(stripped) {
-				lit, ok := extractStringLiteral(content)
+				loc := slp006JSThrow.FindStringIndex(stripped)
+				lit, ok := extractStringLiteralFrom(content, loc[0])
 				if ok && containsStubKeyword(lit) {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
@@ -127,7 +133,8 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 			// Python: raise NotImplementedError
 			if isPy && slp006PyRaise.MatchString(stripped) {
 				msg := "Python raise NotImplementedError — implement or remove"
-				lit, ok := extractStringLiteral(content)
+				loc := slp006PyRaise.FindStringIndex(stripped)
+				lit, ok := extractStringLiteralFrom(content, loc[1])
 				if ok {
 					msg = fmt.Sprintf("Python raise NotImplementedError(%q) — implement or remove", lit)
 				}
