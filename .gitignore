@@ -3,3 +3,9 @@
 *.test
 *.out
 .DS_Store
+
+# Local git-hook symlinks installed by shared agent-toolkit.
+/.githooks/
+
+# Codero review gate artifacts (generated during pre-commit).
+/.codero/

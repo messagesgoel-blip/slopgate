@@ -1,0 +1,7 @@
+# slopgate's own rule test files contain intentional task-marker
+# fixtures inside Go raw-string literals. slopgate can't know those
+# markers are inside string literals without parsing Go, so we exempt
+# the rule test files from self-scanning. This is the canonical use
+# case for .slopgateignore.
+pkg/rules/slp*_test.go
+pkg/rules/slp_*_test.go
