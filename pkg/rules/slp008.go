@@ -50,7 +50,6 @@ var slp008SilentReturnPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\breturn\s+(undefined|null)\b`),
 	// Python: return None, bare return
 	regexp.MustCompile(`\breturn\s+None\b`),
-	regexp.MustCompile(`^\s*return\s*$`),
 }
 
 // slp008ErrorReturnPattern detects a return that actually propagates an

@@ -125,7 +125,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 			}
 
 			// Python: raise NotImplementedError
-			if isPy && slp006PyRaise.MatchString(content) {
+			if isPy && slp006PyRaise.MatchString(stripped) {
 				msg := "Python raise NotImplementedError — implement or remove"
 				lit, ok := extractStringLiteral(content)
 				if ok {

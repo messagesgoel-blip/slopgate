@@ -22,8 +22,9 @@ type RuleConfig struct {
 	IgnorePaths []string `toml:"ignore_paths"` // glob patterns, per-rule file ignores
 }
 
-// Load parses a TOML config file at path. Returns a nil Config without
-// error if the file exists but is empty.
+// Load parses a TOML config file at path. Returns a non-nil (empty)
+// *Config when the file exists but is empty. Callers should check the
+// returned error and treat a nil error with a non-nil Config as success.
 func Load(path string) (*Config, error) {
 	cfg := &Config{}
 	meta, err := toml.DecodeFile(path, cfg)
@@ -75,9 +76,13 @@ func Discover(dir string) (string, error) {
 		// Stop at repo root sentinel.
 		if _, err := os.Stat(filepath.Join(cur, ".git")); err == nil {
 			break
+		} else if !os.IsNotExist(err) {
+			return "", fmt.Errorf("stat %s: %w", filepath.Join(cur, ".git"), err)
 		}
 		if _, err := os.Stat(filepath.Join(cur, "go.mod")); err == nil {
 			break
+		} else if !os.IsNotExist(err) {
+			return "", fmt.Errorf("stat %s: %w", filepath.Join(cur, "go.mod"), err)
 		}
 
 		parent := filepath.Dir(cur)
