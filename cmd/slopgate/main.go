@@ -1,0 +1,179 @@
+// Command slopgate runs a pre-commit gate for AI-generated code slop.
+//
+// Typical usage:
+//
+//	slopgate --staged                  # pre-commit check on staged diff
+//	slopgate --base main               # scan a branch against main
+//	slopgate --format json --staged    # machine-readable output
+//
+// Exit codes:
+//
+//	0 - no blocking findings (clean or only warn/info)
+//	1 - at least one blocking finding
+//	2 - git or IO error
+package main
+
+import (
+	"bytes"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+
+	"github.com/messagesgoel-blip/slopgate/pkg/diff"
+	"github.com/messagesgoel-blip/slopgate/pkg/report"
+	"github.com/messagesgoel-blip/slopgate/pkg/rules"
+)
+
+func main() {
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("slopgate", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+
+	var (
+		staged  bool
+		base    string
+		repoDir string
+		noColor bool
+	)
+	fs.BoolVar(&staged, "staged", false, "scan the staged diff (pre-commit mode)")
+	fs.StringVar(&base, "base", "", "scan the diff against this base revision (e.g. main)")
+	fs.StringVar(&repoDir, "C", "", "run git from this directory instead of cwd")
+	fs.BoolVar(&noColor, "no-color", false, "disable ANSI colors in text output")
+
+	fs.Usage = func() {
+		fmt.Fprintln(stderr, "slopgate: catches AI-generated code slop on staged or branch diffs")
+		fmt.Fprintln(stderr, "")
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	if !staged && base == "" {
+		// Default to staged so that pre-commit hook config can just be `slopgate`.
+		staged = true
+	}
+
+	diffBytes, err := readGitDiff(repoDir, staged, base)
+	if err != nil {
+		fmt.Fprintf(stderr, "slopgate: %v\n", err)
+		return 2
+	}
+
+	parsed, err := diff.Parse(bytes.NewReader(diffBytes))
+	if err != nil {
+		fmt.Fprintf(stderr, "slopgate: diff parse: %v\n", err)
+		return 2
+	}
+
+	// Apply .slopgateignore if present at the repo root.
+	ignorePatterns, err := loadIgnorePatterns(repoDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "slopgate: %v\n", err)
+		return 2
+	}
+	parsed = diff.FilterIgnored(parsed, ignorePatterns)
+
+	findings := rules.Default().Run(parsed)
+
+	color := !noColor && isTerminal(stdout)
+	report.WriteText(stdout, findings, color)
+
+	for _, f := range findings {
+		if f.Severity == rules.SeverityBlock {
+			return 1
+		}
+	}
+	return 0
+}
+
+// readGitDiff shells out to git for the requested diff, returning the
+// raw bytes. We do not depend on a Go git library — git itself is the
+// source of truth, and every slopgate user has it.
+func readGitDiff(dir string, staged bool, base string) ([]byte, error) {
+	var gitArgs []string
+	if dir != "" {
+		gitArgs = append(gitArgs, "-C", dir)
+	}
+	gitArgs = append(gitArgs, "diff", "--no-color", "-U3")
+	switch {
+	case staged:
+		gitArgs = append(gitArgs, "--staged")
+	case base != "":
+		gitArgs = append(gitArgs, base+"...HEAD")
+	}
+
+	cmd := exec.Command("git", gitArgs...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		if stderr.Len() > 0 {
+			return nil, fmt.Errorf("git diff failed: %s", stderr.String())
+		}
+		return nil, fmt.Errorf("git diff failed: %w", err)
+	}
+	return out, nil
+}
+
+// loadIgnorePatterns reads .slopgateignore from the repo root and
+// returns the parsed glob list. A missing file is not an error.
+func loadIgnorePatterns(repoDir string) ([]string, error) {
+	root, err := repoRoot(repoDir)
+	if err != nil {
+		// No git / not a repo — fall back to empty ignore list.
+		return nil, nil
+	}
+	path := filepath.Join(root, ".slopgateignore")
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("open .slopgateignore: %w", err)
+	}
+	defer f.Close()
+	patterns, err := diff.ParseIgnoreFile(f)
+	if err != nil {
+		return nil, fmt.Errorf("parse .slopgateignore: %w", err)
+	}
+	return patterns, nil
+}
+
+// repoRoot returns the absolute path to the git repo root for the
+// given working directory, or an error if the directory is not a git
+// repository.
+func repoRoot(dir string) (string, error) {
+	var args []string
+	if dir != "" {
+		args = append(args, "-C", dir)
+	}
+	args = append(args, "rev-parse", "--show-toplevel")
+	cmd := exec.Command("git", args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(bytes.TrimSpace(out)), nil
+}
+
+// isTerminal reports whether w is a terminal. It is intentionally
+// naive — we only use it to decide whether to color output and getting
+// it wrong means uglier text in a file, never a functional failure.
+func isTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
+}
