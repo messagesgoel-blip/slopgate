@@ -6,7 +6,10 @@ package rules
 func Default() *Registry {
 	r := NewRegistry()
 	r.Register(SLP001{})
+	r.Register(SLP002{})
+	r.Register(SLP003{})
 	r.Register(SLP005{})
+	r.Register(SLP010{})
 	r.Register(SLP012{})
 	r.Register(SLP013{})
 	r.Register(SLP014{})
