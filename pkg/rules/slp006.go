@@ -85,11 +85,14 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
+		isGo := isGoFile(f.Path)
+		isJS := isJSOrTSFile(f.Path)
+		isPy := isPythonFile(f.Path)
 		for _, ln := range f.AddedLines() {
 			content := ln.Content
 
 			// Go: panic("...stub keyword...")
-			if slp006GoPanic.MatchString(content) {
+			if isGo && slp006GoPanic.MatchString(content) {
 				lit, ok := extractStringLiteral(content)
 				if ok && containsStubKeyword(lit) {
 					out = append(out, Finding{
@@ -105,7 +108,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 			}
 
 			// JS/TS: throw new Error("...stub keyword...")
-			if slp006JSThrow.MatchString(content) {
+			if isJS && slp006JSThrow.MatchString(content) {
 				lit, ok := extractStringLiteral(content)
 				if ok && containsStubKeyword(lit) {
 					out = append(out, Finding{
@@ -121,9 +124,8 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 			}
 
 			// Python: raise NotImplementedError
-			if slp006PyRaise.MatchString(content) {
+			if isPy && slp006PyRaise.MatchString(content) {
 				msg := "Python raise NotImplementedError — implement or remove"
-				// If there's a string argument, include it in the message.
 				lit, ok := extractStringLiteral(content)
 				if ok {
 					msg = fmt.Sprintf("Python raise NotImplementedError(%q) — implement or remove", lit)

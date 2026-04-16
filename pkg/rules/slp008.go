@@ -45,6 +45,8 @@ var slp008SilentReturnPatterns = []*regexp.Regexp{
 	// Go: return nil, err is NOT silent (returns the error) — handled below.
 	// Go: multiple return with nil first: return nil, nil, etc.
 	regexp.MustCompile(`\breturn\s+nil\s*,`),
+	// Go: zero-value literals followed by nil: return false, nil, return 0, nil, etc.
+	regexp.MustCompile(`\breturn\s+(false|0|0\.0|''|"")\s*,\s*nil\b`),
 	// JS/TS: return, return undefined, return null
 	regexp.MustCompile(`\breturn\s+(undefined|null)\b`),
 	// Python: return None, bare return

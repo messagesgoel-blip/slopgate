@@ -90,7 +90,7 @@ func TestSLP011_IgnoresGoTestWithTFatalError(t *testing.T) {
 	// t.Error/t.Fatal are also assertions - this test has logic.
 	d := parseDiff(t, `diff --git a/a/foo_test.go b/a/foo_test.go
 --- a/a/foo_test.go
-+++ a/a/foo_test.go
++++ b/a/foo_test.go
 @@ -1,2 +1,5 @@
  package a
 

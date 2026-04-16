@@ -128,7 +128,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		if searchDir == "" {
 			searchDir, _ = os.Getwd()
 		}
-		if discovered, err := config.Discover(searchDir); err == nil && discovered != "" {
+		discovered, err := config.Discover(searchDir)
+		if err != nil {
+			fmt.Fprintf(stderr, "slopgate: discover config: %v\n", err)
+			return 2
+		}
+		if discovered != "" {
 			cfg, err = config.Load(discovered)
 			if err != nil {
 				fmt.Fprintf(stderr, "slopgate: load config %s: %v\n", discovered, err)

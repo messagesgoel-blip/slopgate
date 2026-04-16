@@ -103,7 +103,7 @@ func (r *Registry) Run(d *diff.Diff, cfg *config.Config) []Finding {
 		ruleDiff := d
 		if cfg != nil {
 			if rc, ok := cfg.Rules[rule.ID()]; ok && len(rc.IgnorePaths) > 0 {
-				ruleDiff = filterDiff(d, rc.IgnorePaths)
+				ruleDiff = diff.FilterIgnored(d, rc.IgnorePaths)
 			}
 		}
 		def := rule.DefaultSeverity()
@@ -136,10 +136,4 @@ func (r *Registry) Run(d *diff.Diff, cfg *config.Config) []Finding {
 		}
 	}
 	return out
-}
-
-// filterDiff returns a copy of d with files matching any of the given
-// glob patterns removed. Wraps diff.FilterIgnored for use from Run().
-func filterDiff(d *diff.Diff, patterns []string) *diff.Diff {
-	return diff.FilterIgnored(d, patterns)
 }

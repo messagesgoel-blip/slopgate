@@ -32,6 +32,7 @@ func Load(path string) (*Config, error) {
 }
 
 // Discover walks up from dir to find .slopgate.toml.
+// Stops at the repository root (directory containing .git or go.mod).
 // Returns ("", nil) if not found.
 func Discover(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
@@ -41,9 +42,25 @@ func Discover(dir string) (string, error) {
 	cur := abs
 	for {
 		p := filepath.Join(cur, ".slopgate.toml")
-		if _, err := os.Stat(p); err == nil {
+		if _, err := os.Stat(p); err != nil {
+			if os.IsNotExist(err) {
+				// Not found here, continue upward.
+			} else {
+				// Real I/O error — surface it.
+				return "", err
+			}
+		} else {
 			return p, nil
 		}
+
+		// Stop at repo root sentinel.
+		if _, err := os.Stat(filepath.Join(cur, ".git")); err == nil {
+			break
+		}
+		if _, err := os.Stat(filepath.Join(cur, "go.mod")); err == nil {
+			break
+		}
+
 		parent := filepath.Dir(cur)
 		if parent == cur {
 			break // filesystem root
