@@ -4,6 +4,7 @@
 //
 //	slopgate --staged                  # pre-commit check on staged diff
 //	slopgate --base main               # scan a branch against main
+//	slopgate --format json --staged    # machine-readable output
 //
 // Exit codes:
 //
@@ -38,11 +39,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		staged  bool
 		base    string
 		repoDir string
+		format  string
 		noColor bool
 	)
 	fs.BoolVar(&staged, "staged", false, "scan the staged diff (pre-commit mode)")
 	fs.StringVar(&base, "base", "", "scan the diff against this base revision (e.g. main)")
 	fs.StringVar(&repoDir, "C", "", "run git from this directory instead of cwd")
+	fs.StringVar(&format, "format", "text", "output format: text or json")
 	fs.BoolVar(&noColor, "no-color", false, "disable ANSI colors in text output")
 
 	fs.Usage = func() {
@@ -56,6 +59,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	if staged && base != "" {
 		fmt.Fprintln(stderr, "slopgate: --staged and --base are mutually exclusive")
+		return 2
+	}
+
+	if format != "text" && format != "json" {
+		fmt.Fprintf(stderr, "slopgate: unknown format %q (expected text or json)\n", format)
 		return 2
 	}
 
@@ -86,8 +94,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	findings := rules.Default().Run(parsed)
 
-	color := !noColor && isTerminal(stdout)
-	report.WriteText(stdout, findings, color)
+	switch format {
+	case "json":
+		report.WriteJSON(stdout, findings)
+	default:
+		color := !noColor && isTerminal(stdout)
+		report.WriteText(stdout, findings, color)
+	}
 
 	for _, f := range findings {
 		if f.Severity == rules.SeverityBlock {

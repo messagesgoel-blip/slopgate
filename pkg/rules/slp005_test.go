@@ -80,6 +80,42 @@ func TestSLP005_IgnoresNonTestLookalikes(t *testing.T) {
 	}
 }
 
+func TestSLP005_IgnoresPythonTestsWithFitCall(t *testing.T) {
+	// Python data-science code uses fit() for model training.
+	// SLP005 must not flag these as focused tests.
+	d := parseDiff(t, `diff --git a/tests/test_model.py b/tests/test_model.py
+--- a/tests/test_model.py
++++ b/tests/test_model.py
+@@ -1,1 +1,5 @@
+ import pytest
++def test_training():
++    model = LinearRegression()
++    model.fit(X_train, y_train)
++    assert model.score(X_test, y_test) > 0.8
+`)
+	got := SLP005{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings on Python fit(), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP005_IgnoresPytestPrefixFiles(t *testing.T) {
+	// test_*.py pytest convention should also be excluded.
+	d := parseDiff(t, `diff --git a/test_pipeline.py b/test_pipeline.py
+--- a/test_pipeline.py
++++ b/test_pipeline.py
+@@ -1,1 +1,4 @@
+ import sklearn
++def test_fit():
++    pipe = Pipeline([('scaler', StandardScaler())])
++    pipe.fit(data)
+`)
+	got := SLP005{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings on pytest test_*.py with fit(), got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP005_Description(t *testing.T) {
 	r := SLP005{}
 	if r.ID() != "SLP005" {

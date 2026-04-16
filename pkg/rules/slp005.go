@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -32,27 +31,28 @@ var slp005Patterns = []*regexp.Regexp{
 	regexp.MustCompile(`\b(fdescribe|fit|ftest|fcontext)\s*\(`),
 }
 
-// isJSTestFilePath reports whether the path is a JS/TS/Python test file
-// where `.only` / `fdescribe` / `fit` are meaningful test-runner idioms.
+// isJSTestFilePath reports whether the path is a JS/TS test file
+// where `.only` / `fdescribe` / `fit` are meaningful test-runner
+// idioms (Jest, Mocha, Jasmine, Vitest).
 //
-// Go test files are deliberately excluded: Go's testing package has no
-// `.only` concept, and Go test source files commonly contain *string
-// literals* (fixtures, expected outputs, error messages) that happen to
-// match JS test-runner patterns. Checking them would produce false
-// positives in any linter written in Go that tests itself.
+// Python is deliberately excluded: `fit(` is a common legitimate
+// function call in Python data-science code (sklearn model.fit(),
+// scaler.fit(), pipeline.fit_transform()), and Python's focus
+// mechanisms (@pytest.mark.only, -k flag) don't use the same
+// syntax as JS test runners. Including Python would cause blocking
+// false positives on any ML test that calls .fit().
+//
+// Go test files are also excluded: Go's testing package has no
+// `.only` concept, and Go test sources often embed JS fixtures in
+// raw string literals.
 func isJSTestFilePath(path string) bool {
 	lower := strings.ToLower(path)
-	baseLower := strings.ToLower(filepath.Base(path))
 	switch {
 	case strings.Contains(lower, ".test."):
 		return true
 	case strings.Contains(lower, ".spec."):
 		return true
 	case strings.Contains(lower, "/__tests__/"):
-		return true
-	case strings.HasSuffix(lower, "_test.py"):
-		return true
-	case strings.HasPrefix(baseLower, "test_") && strings.HasSuffix(baseLower, ".py"):
 		return true
 	}
 	return false

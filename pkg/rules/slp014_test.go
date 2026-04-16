@@ -175,6 +175,39 @@ func TestSLP014_IgnoresPrintInsideGoRawString(t *testing.T) {
 	}
 }
 
+func TestSLP014_IgnoresBlockComments(t *testing.T) {
+	// C-style block comments: /* fmt.Println("x") */ should be stripped.
+	d := parseDiff(t, `diff --git a/pkg/x/x.go b/pkg/x/x.go
+--- a/pkg/x/x.go
++++ b/pkg/x/x.go
+@@ -1,1 +1,4 @@
+ package x
++/* fmt.Println("debug") */
++var y = 1 /* fmt.Printf("inline block comment") */ + 2
++/* console.log("also a block comment") */
+`)
+	got := SLP014{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings on block comments, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP014_IgnoresFullLineBlockComment(t *testing.T) {
+	// A full line starting with /* should be treated like a comment.
+	d := parseDiff(t, `diff --git a/pkg/x/x.go b/pkg/x/x.go
+--- a/pkg/x/x.go
++++ b/pkg/x/x.go
+@@ -1,1 +1,3 @@
+ package x
++  /* this line has fmt.Println("debug") inside */
++  /* and print("also blocked") */
+`)
+	got := SLP014{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings on full-line block comments, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP014_IgnoresConsoleWarnAndError(t *testing.T) {
 	// Real false positive: console.warn / console.error in catch blocks
 	// are legitimate logging, not debug slop.

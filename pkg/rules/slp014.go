@@ -82,16 +82,17 @@ func isSuppressedDebugFile(path string) bool {
 	return false
 }
 
-// stripCommentAndStrings removes line-end comments and the contents
-// of all three common string-literal kinds (double-quoted, single-
-// quoted, backtick/raw) from a line so the debug-print patterns can't
-// match inside them. It is intentionally simple — multi-line strings
-// are out of scope for a single-line linter, and perfect escape
-// handling is unnecessary.
+// stripCommentAndStrings removes comments (both line-end `//` and
+// inline `/* ... */` block comments) and the contents of all three
+// common string-literal kinds (double-quoted, single-quoted,
+// backtick/raw) from a line so the debug-print patterns can't match
+// inside them. It is intentionally simple — multi-line strings and
+// unclosed block comments are out of scope for a single-line linter,
+// and perfect escape handling is unnecessary.
 func stripCommentAndStrings(s string) string {
 	// Strip full-line comments first.
 	trimmed := strings.TrimLeft(s, " \t")
-	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "*") {
+	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "* ") {
 		return ""
 	}
 
@@ -116,7 +117,18 @@ func stripCommentAndStrings(s string) string {
 			quote = c
 			b.WriteByte(c)
 		case c == '/' && i+1 < len(s) && s[i+1] == '/':
+			// Line comment — discard rest of line.
 			return b.String()
+		case c == '/' && i+1 < len(s) && s[i+1] == '*':
+			// Block comment — skip until closing */.
+			i += 2
+			for i < len(s)-1 {
+				if s[i] == '*' && s[i+1] == '/' {
+					i++ // advance past the '/'
+					break
+				}
+				i++
+			}
 		case c == '#':
 			return b.String()
 		default:
