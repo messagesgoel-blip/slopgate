@@ -9,7 +9,12 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 		"SLP002": false,
 		"SLP003": false,
 		"SLP005": false,
+		"SLP006": false,
+		"SLP007": false,
+		"SLP008": false,
+		"SLP009": false,
 		"SLP010": false,
+		"SLP011": false,
 		"SLP012": false,
 		"SLP013": false,
 		"SLP014": false,
@@ -28,7 +33,7 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 
 func TestDefault_NoExtraRules(t *testing.T) {
 	r := Default()
-	if got := len(r.All()); got != 8 {
-		t.Errorf("Default registry has %d rules, want 8", got)
+	if got := len(r.All()); got != 13 {
+		t.Errorf("Default registry has %d rules, want 13", got)
 	}
 }
