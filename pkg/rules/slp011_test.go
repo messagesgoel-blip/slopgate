@@ -86,7 +86,7 @@ func TestSLP011_IgnoresGoTestWithSeparateVariableDeclaration(t *testing.T) {
 	}
 }
 
-func TestSLP011_IgnoresGoTestWithTFatalError(t *testing.T) {
+func TestSLP011_IgnoresGoTestWithErrorf(t *testing.T) {
 	// t.Error/t.Fatal are also assertions - this test has logic.
 	d := parseDiff(t, `diff --git a/a/foo_test.go b/a/foo_test.go
 --- a/a/foo_test.go
@@ -100,7 +100,7 @@ func TestSLP011_IgnoresGoTestWithTFatalError(t *testing.T) {
 `)
 	got := SLP011{}.Check(d)
 	if len(got) != 0 {
-		t.Fatalf("expected 0 findings (has t.Error), got %d: %+v", len(got), got)
+		t.Fatalf("expected 0 findings (has t.Errorf), got %d: %+v", len(got), got)
 	}
 }
 
@@ -130,7 +130,7 @@ func TestSLP011_IgnoresNonTestFiles(t *testing.T) {
 @@ -1,2 +1,5 @@
  package a
 
-+func TestHelper() {
++func TestHelper(t *testing.T) {
 +	assert.True(t, true)
 +}
 `)

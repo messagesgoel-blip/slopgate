@@ -3,6 +3,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -25,10 +26,28 @@ type RuleConfig struct {
 // error if the file exists but is empty.
 func Load(path string) (*Config, error) {
 	cfg := &Config{}
-	if _, err := toml.DecodeFile(path, cfg); err != nil {
+	meta, err := toml.DecodeFile(path, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if undecoded := meta.Undecoded(); len(undecoded) > 0 {
+		return nil, fmt.Errorf("config: unknown keys: %v", undecoded)
+	}
+	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// Validate checks that the Config values are valid.
+func (c *Config) Validate() error {
+	validSeverity := map[string]bool{"block": true, "warn": true, "info": true, "off": true}
+	for ruleID, rule := range c.Rules {
+		if rule.Severity != "" && !validSeverity[rule.Severity] {
+			return fmt.Errorf("config: rule %q: invalid severity %q (want block|warn|info|off)", ruleID, rule.Severity)
+		}
+	}
+	return nil
 }
 
 // Discover walks up from dir to find .slopgate.toml.

@@ -90,9 +90,10 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 		isPy := isPythonFile(f.Path)
 		for _, ln := range f.AddedLines() {
 			content := ln.Content
+			stripped := stripCommentAndStrings(content)
 
 			// Go: panic("...stub keyword...")
-			if isGo && slp006GoPanic.MatchString(content) {
+			if isGo && slp006GoPanic.MatchString(stripped) {
 				lit, ok := extractStringLiteral(content)
 				if ok && containsStubKeyword(lit) {
 					out = append(out, Finding{
@@ -108,7 +109,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 			}
 
 			// JS/TS: throw new Error("...stub keyword...")
-			if isJS && slp006JSThrow.MatchString(content) {
+			if isJS && slp006JSThrow.MatchString(stripped) {
 				lit, ok := extractStringLiteral(content)
 				if ok && containsStubKeyword(lit) {
 					out = append(out, Finding{

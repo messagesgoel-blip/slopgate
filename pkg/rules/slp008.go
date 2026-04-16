@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -129,7 +128,7 @@ func (r SLP008) Check(d *diff.Diff) []Finding {
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
-					Message:  fmt.Sprintf("error logged then silently returned — propagate the error or handle it"),
+					Message:  "error logged then silently returned — propagate the error or handle it",
 					Snippet:  strings.TrimSpace(ln.Content),
 				})
 				continue
@@ -146,7 +145,7 @@ func (r SLP008) Check(d *diff.Diff) []Finding {
 						Severity: r.DefaultSeverity(),
 						File:     f.Path,
 						Line:     next.NewLineNo,
-						Message:  fmt.Sprintf("error logged then silently returned — propagate the error or handle it"),
+						Message:  "error logged then silently returned — propagate the error or handle it",
 						Snippet:  strings.TrimSpace(next.Content),
 					})
 				}
@@ -159,8 +158,10 @@ func (r SLP008) Check(d *diff.Diff) []Finding {
 // sameLineReturn checks whether a line that contains a logging call also
 // contains a silent return on the same line (e.g. after a semicolon).
 func sameLineReturn(line string) bool {
-	// Split on semicolons to check for a return after the log call.
-	parts := strings.Split(line, ";")
+	// Strip comments and string literals to avoid false splits on semicolons
+	// inside strings or comments.
+	clean := stripCommentAndStrings(line)
+	parts := strings.Split(clean, ";")
 	if len(parts) < 2 {
 		return false
 	}
