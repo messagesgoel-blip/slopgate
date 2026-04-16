@@ -1,6 +1,0 @@
---- CODERO FIRST PASS (LiteLLM: review) ---
-curl: (28) Operation timed out after 45002 milliseconds with 0 bytes received
-LiteLLM unavailable or unauthenticated; running local self-hosted fallback checks.
-BLOCK: staged diff sanity check failed
-pkg/rules/slp014_test.go:14: space before tab in indent.
-+ 	x := 1
