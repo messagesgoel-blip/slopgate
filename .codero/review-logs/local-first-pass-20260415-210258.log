@@ -1,0 +1,5 @@
+--- CODERO FIRST PASS (LiteLLM: review) ---
+curl: (28) Operation timed out after 45002 milliseconds with 0 bytes received
+LiteLLM unavailable or unauthenticated; running local self-hosted fallback checks.
+Local fallback checks passed (self-hosted deterministic gate).
+--- CODERO FIRST PASS END (fallback) ---

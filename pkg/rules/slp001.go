@@ -41,21 +41,30 @@ func isSafetyTestName(name string) bool {
 // testFuncSignature matches an added line that opens a top-level Go
 // test function. The opening brace must be on the same line — the
 // canonical gofmt style — which makes brace-depth tracking below safe.
-var testFuncSignature = regexp.MustCompile(`^func\s+(Test\w+)\s*\(\s*\w+\s*\*testing\.T\s*\)\s*\{`)
+// Group 1 captures the function name; group 2 captures the testing.T
+// parameter name (usually "t" but could be anything).
+var testFuncSignature = regexp.MustCompile(`^func\s+(Test\w+)\s*\(\s*(\w+)\s*\*testing\.T\s*\)\s*\{`)
 
-// assertTokens are substrings that count as an assertion. If any added
-// line of a test function's body contains one of these, the test is
-// considered to have at least one assertion.
-var assertTokens = []string{
-	".Error(", ".Errorf(", ".Fatal(", ".Fatalf(", ".FailNow(", ".Fail(",
+// libraryAssertTokens are assertion tokens that come from third-party
+// test libraries and do not depend on the testing.T parameter name.
+var libraryAssertTokens = []string{
 	"assert.", "require.",
 	"Expect(", "Eventually(", "Consistently(",
 	"So(",
 }
 
-// hasAssertion reports whether the line contains at least one assertion token.
-func hasAssertion(line string) bool {
-	for _, tok := range assertTokens {
+// hasAssertion reports whether the line contains at least one assertion.
+// tVar is the testing.T parameter name captured from the function
+// signature (usually "t"). Only calls on that specific variable count
+// as assertions — `err.Error()` does not.
+func hasAssertion(line, tVar string) bool {
+	tSuffixes := []string{".Error(", ".Errorf(", ".Fatal(", ".Fatalf(", ".FailNow(", ".Fail("}
+	for _, s := range tSuffixes {
+		if strings.Contains(line, tVar+s) {
+			return true
+		}
+	}
+	for _, tok := range libraryAssertTokens {
 		if strings.Contains(line, tok) {
 			return true
 		}
@@ -63,16 +72,16 @@ func hasAssertion(line string) bool {
 	return false
 }
 
-// skipCallPattern matches an added line that starts (after whitespace)
-// with a top-level test-skip call. The leading-whitespace anchor means
-// `if cond { t.Skip("x") }` does not match — only statement-level skips
-// at the outer block of the function body.
-var skipCallPattern = regexp.MustCompile(`^[ \t]*\w+\.(Skip|SkipNow|Skipf)\s*\(`)
-
 // isTopLevelSkipStatement reports whether the given added line is a
-// bare test-skip statement at the statement level.
-func isTopLevelSkipStatement(line string) bool {
-	return skipCallPattern.MatchString(line)
+// bare test-skip statement at the statement level, scoped to the
+// actual testing.T parameter. The leading-whitespace anchor means
+// `if cond { t.Skip("x") }` does not match — only statement-level
+// skips at the outer block of the function body.
+func isTopLevelSkipStatement(line, tVar string) bool {
+	trimmed := strings.TrimLeft(line, " \t")
+	return strings.HasPrefix(trimmed, tVar+".Skip(") ||
+		strings.HasPrefix(trimmed, tVar+".SkipNow(") ||
+		strings.HasPrefix(trimmed, tVar+".Skipf(")
 }
 
 func (r SLP001) Check(d *diff.Diff) []Finding {
@@ -112,7 +121,7 @@ func scanHunkForTests(path string, h diff.Hunk, sev Severity, ruleID string) []F
 		// lines. Any non-added line before the closing brace disqualifies
 		// the detection — we can only reason about test bodies that are
 		// wholly new.
-		funcName := m[1]
+		funcName, tVar := m[1], m[2]
 		if isSafetyTestName(funcName) {
 			// Intentional no-assertion test — advance past the signature
 			// and continue.
@@ -122,7 +131,7 @@ func scanHunkForTests(path string, h diff.Hunk, sev Severity, ruleID string) []F
 
 		depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
 		startLine := ln.NewLineNo
-		sawAssertion := hasAssertion(ln.Content)
+		sawAssertion := hasAssertion(ln.Content, tVar)
 		sawTopLevelSkip := false
 		bodyAllAdded := true
 
@@ -133,13 +142,13 @@ func scanHunkForTests(path string, h diff.Hunk, sev Severity, ruleID string) []F
 				bodyAllAdded = false
 				break
 			}
-			if hasAssertion(bl.Content) {
+			if hasAssertion(bl.Content, tVar) {
 				sawAssertion = true
 			}
 			// A top-level t.Skip(...) at brace depth 1 (directly
 			// inside the function body) marks the test as an
 			// intentional scaffold — inert by design, not slop.
-			if depth == 1 && isTopLevelSkipStatement(bl.Content) {
+			if depth == 1 && isTopLevelSkipStatement(bl.Content, tVar) {
 				sawTopLevelSkip = true
 			}
 			depth += strings.Count(bl.Content, "{") - strings.Count(bl.Content, "}")

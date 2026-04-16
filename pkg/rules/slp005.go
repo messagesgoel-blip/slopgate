@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -41,6 +42,7 @@ var slp005Patterns = []*regexp.Regexp{
 // positives in any linter written in Go that tests itself.
 func isJSTestFilePath(path string) bool {
 	lower := strings.ToLower(path)
+	baseLower := strings.ToLower(filepath.Base(path))
 	switch {
 	case strings.Contains(lower, ".test."):
 		return true
@@ -49,6 +51,8 @@ func isJSTestFilePath(path string) bool {
 	case strings.Contains(lower, "/__tests__/"):
 		return true
 	case strings.HasSuffix(lower, "_test.py"):
+		return true
+	case strings.HasPrefix(baseLower, "test_") && strings.HasSuffix(baseLower, ".py"):
 		return true
 	}
 	return false

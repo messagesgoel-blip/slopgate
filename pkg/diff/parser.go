@@ -12,6 +12,18 @@ import (
 	"strings"
 )
 
+// unquoteGitPath attempts to unquote a git C-style quoted path.
+// Git quotes paths containing spaces, non-ASCII, or special characters.
+// If the input is not quoted, it is returned unchanged.
+func unquoteGitPath(p string) string {
+	if len(p) >= 2 && p[0] == '"' && p[len(p)-1] == '"' {
+		if unquoted, err := strconv.Unquote(p); err == nil {
+			return unquoted
+		}
+	}
+	return p
+}
+
 // LineKind tags each line within a hunk.
 type LineKind int
 
@@ -236,6 +248,7 @@ func parseGitDiffPaths(line string) (string, string, bool) {
 // --- and +++ lines. It also drops any trailing timestamp that may
 // appear on non-git diffs.
 func stripPathPrefix(p string) string {
+	p = unquoteGitPath(p)
 	// Some non-git diffs have a tab-separated timestamp after the path.
 	if tab := strings.IndexByte(p, '\t'); tab >= 0 {
 		p = p[:tab]

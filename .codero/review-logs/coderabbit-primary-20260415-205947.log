@@ -1,0 +1,9 @@
+Starting CodeRabbit review in plain text mode...
+
+Review directory: /srv/storage/repo/slopgate
+
+Connecting to review service
+[2026-04-16T00:59:48.856Z] ❌ CONNECTION ERROR: Connection failed: User API keys are not supported for the CLI. Please generate an agentic API key from your CodeRabbit settings.
+Failed to start review: Review failed
+[error] stopping cli
+[2026-04-16T00:59:48.862Z] ❌ REVIEW ERROR: Review failed: Unknown error

@@ -188,7 +188,10 @@ index 1..2 100644
 -line8_old
 +new9
 `
-	d, _ := Parse(strings.NewReader(input))
+	d, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
 	h := d.Files[0].Hunks[0]
 
 	var got [][2]any
@@ -226,7 +229,10 @@ func TestAddedLines_Helper(t *testing.T) {
 +new2
  keep2
 `
-	d, _ := Parse(strings.NewReader(input))
+	d, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
 	added := d.Files[0].AddedLines()
 	if len(added) != 2 {
 		t.Fatalf("expected 2 added lines, got %d", len(added))

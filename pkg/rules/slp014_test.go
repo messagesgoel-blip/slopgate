@@ -126,9 +126,9 @@ func TestSLP014_FiresOnPkgFileEvenIfNameLooksCLI(t *testing.T) {
 func TestSLP014_IgnoresCommentsAndStrings(t *testing.T) {
 	// Mentioning fmt.Println inside a comment or a doc string is not a real
 	// debug call.
-	d := parseDiff(t, `diff --git a/pkg/x/doc.go b/pkg/x/doc.go
---- a/pkg/x/doc.go
-+++ b/pkg/x/doc.go
+	d := parseDiff(t, `diff --git a/pkg/x/x.go b/pkg/x/x.go
+--- a/pkg/x/x.go
++++ b/pkg/x/x.go
 @@ -1,1 +1,3 @@
  package x
 +// This helper replaces fmt.Println calls in the migration path.

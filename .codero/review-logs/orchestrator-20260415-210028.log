@@ -1,0 +1,6 @@
+[2026-04-15T21:00:28-0400] CR rate check: 11/12 remaining in window
+[2026-04-15T21:00:28-0400] GATE coderabbit-primary start (timeout=180s, tier=small, files=0, lines=0)
+[2026-04-15T21:00:28-0400] GATE coderabbit-primary infra-fail: unrecognized error (exit 1)
+[2026-04-15T21:00:28-0400] CodeRabbit unavailable (infra_fail), falling through to LiteLLM/Copilot
+[2026-04-15T21:00:28-0400] GATE local-first-pass start (timeout=120s)
+[2026-04-15T21:01:14-0400] GATE local-first-pass BLOCKED by findings

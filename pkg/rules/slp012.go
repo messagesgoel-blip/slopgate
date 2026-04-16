@@ -31,10 +31,12 @@ func (SLP012) Description() string {
 // is not slop, but "// TODO: fix this" is.
 var slp012Pattern = regexp.MustCompile(`^\s*(?://|/\*|\*|#)\s*(TODO|FIXME|HACK|XXX)\b`)
 
-// slp012TrackedPattern matches a TODO/FIXME/HACK marker that is
-// followed by a parenthetical ticket or issue reference. These are
-// considered tracked work, not slop.
-var slp012TrackedPattern = regexp.MustCompile(`\b(TODO|FIXME|HACK|XXX)\([^)]+\)`)
+// slp012TrackedPattern matches a TODO/FIXME/HACK marker that is the
+// leading marker at comment start AND is followed by a parenthetical
+// ticket or issue reference. These are considered tracked work, not
+// slop. Anchored to the comment prefix so a trailing TODO(TICKET) in
+// the same line cannot mask an untracked leading TODO.
+var slp012TrackedPattern = regexp.MustCompile(`^\s*(?://|/\*|\*|#)\s*(TODO|FIXME|HACK|XXX)\([^)]+\)`)
 
 // docExtensions marks file types where TODO markers are part of normal
 // writing, not slop.

@@ -37,7 +37,7 @@ const slp013MinBlockSize = 3
 // line start collides with CSS custom properties (e.g. `--bg-base: …`)
 // and `;` collides with statement terminators on wrapped diff lines.
 // Support for those languages is a v0.0.2 concern.
-var slp013CommentPrefix = regexp.MustCompile(`^\s*(?://|#|\*)\s?(.*)$`)
+var slp013CommentPrefix = regexp.MustCompile(`^\s*(?://\s?|#\s?|\*\s+)(.*)$`)
 
 // strongAnywhereTokens are substrings that strongly suggest code even
 // when they appear mid-line. We keep this list short and discriminating;
@@ -166,7 +166,7 @@ func (r SLP013) Check(d *diff.Diff) []Finding {
 				}
 				// Require a majority of the block to look code-shaped
 				// so prose blocks of the same length don't fire.
-				if codey*2 < len(run) {
+				if codey*2 <= len(run) {
 					return
 				}
 				out = append(out, Finding{

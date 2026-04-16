@@ -4,7 +4,6 @@
 //
 //	slopgate --staged                  # pre-commit check on staged diff
 //	slopgate --base main               # scan a branch against main
-//	slopgate --format json --staged    # machine-readable output
 //
 // Exit codes:
 //
@@ -52,6 +51,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	if staged && base != "" {
+		fmt.Fprintln(stderr, "slopgate: --staged and --base are mutually exclusive")
 		return 2
 	}
 

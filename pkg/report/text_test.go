@@ -48,4 +48,7 @@ func TestText_CountsBlockingVsWarn(t *testing.T) {
 	if !strings.Contains(out, "1 block") {
 		t.Errorf("expected block count: %q", out)
 	}
+	if !strings.Contains(out, "1 warn") {
+		t.Errorf("expected warn count: %q", out)
+	}
 }
