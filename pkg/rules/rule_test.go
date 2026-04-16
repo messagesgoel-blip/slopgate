@@ -3,6 +3,7 @@ package rules
 import (
 	"testing"
 
+	"github.com/messagesgoel-blip/slopgate/pkg/config"
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
@@ -57,7 +58,7 @@ func TestRegistry_RunCollectsAllFindings(t *testing.T) {
 			{RuleID: "SLP101", Message: "third"},
 		},
 	})
-	found := r.Run(&diff.Diff{})
+	found := r.Run(&diff.Diff{}, nil)
 	if len(found) != 3 {
 		t.Fatalf("expected 3 findings, got %d", len(found))
 	}
@@ -78,5 +79,46 @@ func TestSeverity_String(t *testing.T) {
 		if got := s.String(); got != want {
 			t.Errorf("Severity(%d).String() = %q, want %q", s, got, want)
 		}
+	}
+}
+
+func TestRegistry_RunConfigIgnoresRule(t *testing.T) {
+	r := NewRegistry()
+	r.Register(fakeRule{id: "SLP100", severity: SeverityBlock, findings: []Finding{
+		{RuleID: "SLP100", Message: "should be skipped"},
+	}})
+	r.Register(fakeRule{id: "SLP101", severity: SeverityBlock, findings: []Finding{
+		{RuleID: "SLP101", Message: "should appear"},
+	}})
+	cfg := &config.Config{
+		Rules: map[string]config.RuleConfig{
+			"SLP100": {Ignore: true},
+		},
+	}
+	found := r.Run(&diff.Diff{}, cfg)
+	if len(found) != 1 {
+		t.Fatalf("expected 1 finding (SLP100 ignored), got %d", len(found))
+	}
+	if found[0].RuleID != "SLP101" {
+		t.Errorf("expected SLP101, got %s", found[0].RuleID)
+	}
+}
+
+func TestRegistry_RunConfigOverridesSeverity(t *testing.T) {
+	r := NewRegistry()
+	r.Register(fakeRule{id: "SLP200", severity: SeverityBlock, findings: []Finding{
+		{RuleID: "SLP200", Severity: SeverityBlock, Message: "downgrade me"},
+	}})
+	cfg := &config.Config{
+		Rules: map[string]config.RuleConfig{
+			"SLP200": {Severity: "warn"},
+		},
+	}
+	found := r.Run(&diff.Diff{}, cfg)
+	if len(found) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(found))
+	}
+	if found[0].Severity != SeverityWarn {
+		t.Errorf("expected warn severity, got %s", found[0].Severity)
 	}
 }

@@ -6,6 +6,7 @@ package rules
 import (
 	"fmt"
 
+	"github.com/messagesgoel-blip/slopgate/pkg/config"
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
@@ -87,21 +88,58 @@ func (r *Registry) All() []Rule {
 }
 
 // Run applies every registered rule to the diff and returns the concatenated
-// findings. Each finding has its Severity populated from the rule's default
-// if the rule itself did not set it.
-func (r *Registry) Run(d *diff.Diff) []Finding {
+// findings. If cfg is non-nil, per-rule severity overrides, ignores, and
+// path ignores are applied. A nil cfg means all rules run with their defaults.
+func (r *Registry) Run(d *diff.Diff, cfg *config.Config) []Finding {
 	var out []Finding
 	for _, rule := range r.rules {
+		// Check if rule is globally ignored via config.
+		if cfg != nil {
+			if rc, ok := cfg.Rules[rule.ID()]; ok && rc.Ignore {
+				continue
+			}
+		}
+		// Apply per-rule path ignores: filter files this rule shouldn't see.
+		ruleDiff := d
+		if cfg != nil {
+			if rc, ok := cfg.Rules[rule.ID()]; ok && len(rc.IgnorePaths) > 0 {
+				ruleDiff = filterDiff(d, rc.IgnorePaths)
+			}
+		}
 		def := rule.DefaultSeverity()
-		for _, f := range rule.Check(d) {
+		for _, f := range rule.Check(ruleDiff) {
 			if f.RuleID == "" {
 				f.RuleID = rule.ID()
 			}
-			if f.Severity == SeverityInfo && def != SeverityInfo {
+			// Apply config severity override.
+			if cfg != nil {
+				if rc, ok := cfg.Rules[rule.ID()]; ok && rc.Severity != "" {
+					switch rc.Severity {
+					case "block":
+						f.Severity = SeverityBlock
+					case "warn":
+						f.Severity = SeverityWarn
+					case "info":
+						f.Severity = SeverityInfo
+					case "off":
+						continue // skip this finding
+					default:
+						// Unknown severity string — fall through to default.
+					}
+				} else if f.Severity == SeverityInfo && def != SeverityInfo {
+					f.Severity = def
+				}
+			} else if f.Severity == SeverityInfo && def != SeverityInfo {
 				f.Severity = def
 			}
 			out = append(out, f)
 		}
 	}
 	return out
+}
+
+// filterDiff returns a copy of d with files matching any of the given
+// glob patterns removed. Wraps diff.FilterIgnored for use from Run().
+func filterDiff(d *diff.Diff, patterns []string) *diff.Diff {
+	return diff.FilterIgnored(d, patterns)
 }
