@@ -65,10 +65,12 @@ func TestSLP005_IgnoresContextLines(t *testing.T) {
 
 func TestSLP005_IgnoresNonTestLookalikes(t *testing.T) {
 	// `foo.only` is legitimate for any object method named `only`.
-	// We match only test-runner prefixes.
-	d := parseDiff(t, `diff --git a/app.ts b/app.ts
---- a/app.ts
-+++ b/app.ts
+	// We match only test-runner prefixes (it, describe, test, context).
+	// The fixture MUST use a test-file path so the regex is actually
+	// exercised — a non-test path would be filtered before patterns run.
+	d := parseDiff(t, `diff --git a/app.test.ts b/app.test.ts
+--- a/app.test.ts
++++ b/app.test.ts
 @@ -1,1 +1,3 @@
  const x = 1;
 +const y = someObject.only;

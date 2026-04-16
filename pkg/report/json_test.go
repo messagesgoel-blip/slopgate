@@ -3,10 +3,23 @@ package report
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/rules"
 )
+
+type failingWriter struct{ err error }
+
+func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
+
+func TestWriteJSON_PropagatesWriteError(t *testing.T) {
+	wantErr := fmt.Errorf("broken pipe")
+	err := WriteJSON(failingWriter{err: wantErr}, nil)
+	if err == nil {
+		t.Fatal("expected error from WriteJSON with failing writer, got nil")
+	}
+}
 
 func TestWriteJSON_NoFindings(t *testing.T) {
 	var buf bytes.Buffer

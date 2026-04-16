@@ -183,14 +183,20 @@ func loadIgnorePatterns(repoDir string) ([]string, error) {
 // given working directory, or an error if the directory is not a git
 // repository.
 func repoRoot(dir string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+
 	var args []string
 	if dir != "" {
 		args = append(args, "-C", dir)
 	}
 	args = append(args, "rev-parse", "--show-toplevel")
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	out, err := cmd.Output()
 	if err != nil {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("git rev-parse timed out after %v", gitTimeout)
+		}
 		return "", err
 	}
 	return string(bytes.TrimSpace(out)), nil
