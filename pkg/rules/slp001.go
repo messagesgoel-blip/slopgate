@@ -48,9 +48,18 @@ var testFuncSignature = regexp.MustCompile(`^func\s+(Test\w+)\s*\(\s*(\w+)\s*\*t
 // libraryAssertTokens are assertion tokens that come from third-party
 // test libraries and do not depend on the testing.T parameter name.
 var libraryAssertTokens = []string{
+	// testify
 	"assert.", "require.",
+	// gomega
 	"Expect(", "Eventually(", "Consistently(",
+	// goconvey
 	"So(",
+	// matryer/is
+	"is.",
+	// quicktest
+	"qt.",
+	// gopkg.in/check.v1
+	"c.Check(", "c.Assert(",
 }
 
 // hasAssertion reports whether the line contains at least one assertion.
@@ -129,6 +138,15 @@ func scanHunkForTests(path string, h diff.Hunk, sev Severity, ruleID string) []F
 			continue
 		}
 
+		// Limitation: brace-depth tracking uses strings.Count which
+		// miscounts braces inside string literals, runes, or comments
+		// (e.g. `s := "}"` adds a phantom closing brace). Full Go
+		// parsing is out of scope for v0.0.1. In practice this rarely
+		// causes problems because test function bodies seldom contain
+		// brace characters in top-level string literals. If depth
+		// tracking is wrong, the worst outcome is a missed finding
+		// (bodyAllAdded stays true but depth never reaches 0, so the
+		// loop exits without emitting) — never a false positive.
 		depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
 		startLine := ln.NewLineNo
 		sawAssertion := hasAssertion(ln.Content, tVar)

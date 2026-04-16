@@ -15,17 +15,24 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 	"github.com/messagesgoel-blip/slopgate/pkg/report"
 	"github.com/messagesgoel-blip/slopgate/pkg/rules"
 )
+
+// gitTimeout caps how long readGitDiff waits for git to finish. No
+// legitimate git-diff on a local repo takes this long; if it does,
+// something is wrong (lock file, broken index, NFS hang).
+const gitTimeout = 30 * time.Second
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -96,7 +103,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	switch format {
 	case "json":
-		report.WriteJSON(stdout, findings)
+		if err := report.WriteJSON(stdout, findings); err != nil {
+			fmt.Fprintf(stderr, "slopgate: write json: %v\n", err)
+			return 2
+		}
 	default:
 		color := !noColor && isTerminal(stdout)
 		report.WriteText(stdout, findings, color)
@@ -114,6 +124,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 // raw bytes. We do not depend on a Go git library — git itself is the
 // source of truth, and every slopgate user has it.
 func readGitDiff(dir string, staged bool, base string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+
 	var gitArgs []string
 	if dir != "" {
 		gitArgs = append(gitArgs, "-C", dir)
@@ -126,11 +139,14 @@ func readGitDiff(dir string, staged bool, base string) ([]byte, error) {
 		gitArgs = append(gitArgs, base+"...HEAD")
 	}
 
-	cmd := exec.Command("git", gitArgs...)
+	cmd := exec.CommandContext(ctx, "git", gitArgs...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("git diff timed out after %v", gitTimeout)
+		}
 		if stderr.Len() > 0 {
 			return nil, fmt.Errorf("git diff failed: %s", stderr.String())
 		}

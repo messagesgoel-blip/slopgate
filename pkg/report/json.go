@@ -31,8 +31,9 @@ type JSONReport struct {
 	Summary  JSONSummary   `json:"summary"`
 }
 
-// WriteJSON writes machine-readable JSON to w.
-func WriteJSON(w io.Writer, findings []rules.Finding) {
+// WriteJSON writes machine-readable JSON to w. It returns an error
+// if the write fails (e.g., broken pipe).
+func WriteJSON(w io.Writer, findings []rules.Finding) error {
 	r := JSONReport{
 		Findings: make([]JSONFinding, 0, len(findings)),
 	}
@@ -58,5 +59,5 @@ func WriteJSON(w io.Writer, findings []rules.Finding) {
 	r.Summary.Total = len(findings)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	enc.Encode(r)
+	return enc.Encode(r)
 }

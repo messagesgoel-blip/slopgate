@@ -10,7 +10,9 @@ import (
 
 func TestWriteJSON_NoFindings(t *testing.T) {
 	var buf bytes.Buffer
-	WriteJSON(&buf, nil)
+	if err := WriteJSON(&buf, nil); err != nil {
+		t.Fatalf("WriteJSON error: %v", err)
+	}
 	var out JSONReport
 	if err := json.Unmarshal(buf.Bytes(), &out); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
@@ -25,10 +27,12 @@ func TestWriteJSON_NoFindings(t *testing.T) {
 
 func TestWriteJSON_WithFindings(t *testing.T) {
 	var buf bytes.Buffer
-	WriteJSON(&buf, []rules.Finding{
+	if err := WriteJSON(&buf, []rules.Finding{
 		{RuleID: "SLP012", Severity: rules.SeverityBlock, File: "a.go", Line: 3, Message: "todo", Snippet: "// TODO: fix"},
 		{RuleID: "SLP001", Severity: rules.SeverityWarn, File: "b.go", Line: 7, Message: "test", Snippet: "func TestX(t *testing.T) {"},
-	})
+	}); err != nil {
+		t.Fatalf("WriteJSON error: %v", err)
+	}
 	var out JSONReport
 	if err := json.Unmarshal(buf.Bytes(), &out); err != nil {
 		t.Fatalf("invalid JSON: %v\n%s", err, buf.String())
