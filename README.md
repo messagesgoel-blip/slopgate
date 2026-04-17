@@ -100,7 +100,7 @@ ignore_paths = ["**/*_test.go"]
 
 Add a `.slopgateignore` file (one glob per line) to skip files entirely:
 
-```
+```text
 vendor/**
 **/migrations/**
 ```
