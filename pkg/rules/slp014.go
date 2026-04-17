@@ -38,6 +38,11 @@ var debugPrintPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bconsole\.(log|debug|trace)\s*\(`),
 	// Python
 	regexp.MustCompile(`(^|\W)print\s*\(`),
+	// Java
+	regexp.MustCompile(`\bSystem\.(out|err)\.(println|printf|print)\s*\(`),
+	// Rust
+	regexp.MustCompile(`\b(println|eprintln|print|eprint)!\s*\(`),
+	regexp.MustCompile(`\bdbg!\s*\(`),
 }
 
 // isSuppressedDebugFile reports whether the file path is a location
@@ -57,6 +62,14 @@ func isSuppressedDebugFile(path string) bool {
 	}
 	// Python test files.
 	if strings.HasPrefix(base, "test_") || strings.HasSuffix(base, "_test.py") {
+		return true
+	}
+	// Java/Kotlin test files (JUnit convention: *Test.java, *Tests.java).
+	if isJavaFile(path) && (strings.Contains(base, "Test") || strings.Contains(base, "test")) {
+		return true
+	}
+	// Rust test files.
+	if isRustTestFile(path) {
 		return true
 	}
 	// Doc files.

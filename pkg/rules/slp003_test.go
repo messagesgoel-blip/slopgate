@@ -326,3 +326,158 @@ func TestSLP003_Description(t *testing.T) {
 		t.Errorf("default severity = %v, want warn", r.DefaultSeverity())
 	}
 }
+
+// --- Java tests ---
+
+func TestSLP003_JavaEmptyCatch(t *testing.T) {
+	// } catch (Exception e) { } — empty block, should fire.
+	d := parseDiff(t, `diff --git a/a.java b/a.java
+--- a/a.java
++++ b/a.java
+@@ -1,1 +1,4 @@
+ // a
++public void foo() {
++    try { bar(); } catch (Exception e) {}
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if got[0].File != "a.java" {
+		t.Errorf("file = %q, want a.java", got[0].File)
+	}
+}
+
+func TestSLP003_JavaCatchReturnNull(t *testing.T) {
+	// } catch (Exception e) { return null; } — bail-only, should fire.
+	d := parseDiff(t, `diff --git a/Foo.java b/Foo.java
+--- a/Foo.java
++++ b/Foo.java
+@@ -1,1 +1,5 @@
+ // a
++public Object foo() {
++    try { bar(); }
++    catch (Exception e) { return null; }
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "swallow") {
+		t.Errorf("message should mention swallow: %q", got[0].Message)
+	}
+}
+
+func TestSLP003_JavaCatchLogger_NoFinding(t *testing.T) {
+	// } catch (Exception e) { logger.error(e.getMessage()); } — logged, NOT a finding.
+	d := parseDiff(t, `diff --git a/Foo.java b/Foo.java
+--- a/Foo.java
++++ b/Foo.java
+@@ -1,1 +1,5 @@
+ // a
++public void foo() {
++    try { bar(); }
++    catch (Exception e) { logger.error(e.getMessage()); }
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (logger.error), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP003_JavaCatchThrow_NoFinding(t *testing.T) {
+	// } catch (Exception e) { throw new RuntimeException(e); } — re-thrown, NOT a finding.
+	d := parseDiff(t, `diff --git a/Foo.java b/Foo.java
+--- a/Foo.java
++++ b/Foo.java
+@@ -1,1 +1,5 @@
+ // a
++public void foo() {
++    try { bar(); }
++    catch (Exception e) { throw new RuntimeException(e); }
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (throw), got %d: %+v", len(got), got)
+	}
+}
+
+// --- Rust tests ---
+
+func TestSLP003_RustMatchErrEmpty(t *testing.T) {
+	// Err(e) => {} — empty match arm, should fire.
+	d := parseDiff(t, `diff --git a/a.rs b/a.rs
+--- a/a.rs
++++ b/a.rs
+@@ -1,1 +1,4 @@
+ // a
++match result {
++    Err(e) => {}
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if got[0].File != "a.rs" {
+		t.Errorf("file = %q, want a.rs", got[0].File)
+	}
+}
+
+func TestSLP003_RustIfLetErrReturnNone(t *testing.T) {
+	// if let Err(e) = result { return None } — bail-only, should fire.
+	d := parseDiff(t, `diff --git a/a.rs b/a.rs
+--- a/a.rs
++++ b/a.rs
+@@ -1,1 +1,4 @@
+ // a
++if let Err(e) = result {
++    return None;
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "swallow") {
+		t.Errorf("message should mention swallow: %q", got[0].Message)
+	}
+}
+
+func TestSLP003_RustMatchErrLog_NoFinding(t *testing.T) {
+	// Err(e) => { error!("fail: {e}"); return None } — logged, NOT a finding.
+	d := parseDiff(t, `diff --git a/a.rs b/a.rs
+--- a/a.rs
++++ b/a.rs
+@@ -1,1 +1,4 @@
+ // a
++match result {
++    Err(e) => { error!("fail: {e}"); return None; }
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (error!), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP003_RustMatchErrReturnErr_NoFinding(t *testing.T) {
+	// Err(e) => Err(e) — propagated, NOT a finding.
+	d := parseDiff(t, `diff --git a/a.rs b/a.rs
+--- a/a.rs
++++ b/a.rs
+@@ -1,1 +1,4 @@
+ // a
++match result {
++    Err(e) => { return Err(e); }
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (Err), got %d: %+v", len(got), got)
+	}
+}

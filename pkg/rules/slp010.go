@@ -6,11 +6,14 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
-// SLP010 flags pre-existing Go test functions where the ADDED lines
+// SLP010 flags pre-existing test functions where the ADDED lines
 // contain no assertion. Unlike SLP001 (which catches entirely-new test
 // functions with no assertions), SLP010 handles the incremental case:
 // the AI edited an existing test and added setup/arrange code without
 // adding a corresponding assertion.
+//
+// Languages: Go (full function-span tracking), JS/TS, Python, Java, Rust
+// (simpler per-hunk assertion check).
 //
 // Example: an existing TestFoo gets a new line `result := Foo()` added,
 // but no line checks the result. The test still compiles, coverage goes
@@ -26,22 +29,31 @@ func (SLP010) Description() string {
 func (r SLP010) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
-		if f.IsDelete || !strings.HasSuffix(f.Path, "_test.go") {
+		if f.IsDelete {
+			continue
+		}
+		lang := testFileLang(f.Path)
+		if lang == "" {
 			continue
 		}
 		for _, h := range f.Hunks {
-			findings := scanHunkForIncrementalTests(f.Path, h, r.DefaultSeverity(), r.ID())
+			var findings []Finding
+			if lang == "go" {
+				findings = scanHunkForIncrementalGoTests(f.Path, h, r.DefaultSeverity(), r.ID())
+			} else {
+				findings = scanHunkForIncrementalNonGoTests(f.Path, h, r.DefaultSeverity(), r.ID(), lang)
+			}
 			out = append(out, findings...)
 		}
 	}
 	return out
 }
 
-// scanHunkForIncrementalTests walks a single hunk looking for ADDED lines
+// scanHunkForIncrementalGoTests walks a single hunk looking for ADDED lines
 // inside EXISTING Go test functions (functions whose signature is NOT on an
 // added line). If none of the added lines inside the test body contain an
 // assertion, it emits a finding.
-func scanHunkForIncrementalTests(path string, h diff.Hunk, sev Severity, ruleID string) []Finding {
+func scanHunkForIncrementalGoTests(path string, h diff.Hunk, sev Severity, ruleID string) []Finding {
 	var out []Finding
 	lines := h.Lines
 
@@ -142,4 +154,59 @@ func scanHunkForIncrementalTests(path string, h diff.Hunk, sev Severity, ruleID 
 	}
 
 	return out
+}
+
+// scanHunkForIncrementalNonGoTests checks if added lines in test files
+// (JS/TS/Python/Java/Rust) contain any assertion tokens. For non-Go
+// languages, we use a simpler approach: check all added lines in the
+// test file for assertion presence.
+func scanHunkForIncrementalNonGoTests(path string, h diff.Hunk, sev Severity, ruleID string, lang string) []Finding {
+	var out []Finding
+	var addedLines []diff.Line
+	for _, ln := range h.Lines {
+		if ln.Kind == diff.LineAdd {
+			addedLines = append(addedLines, ln)
+		}
+	}
+	if len(addedLines) == 0 {
+		return out
+	}
+
+	// Check if any added line contains an assertion for this language.
+	sawAssertion := false
+	for _, ln := range addedLines {
+		if langHasAssertion(ln.Content, lang) {
+			sawAssertion = true
+			break
+		}
+	}
+
+	if !sawAssertion {
+		out = append(out, Finding{
+			RuleID:   ruleID,
+			Severity: sev,
+			File:     path,
+			Line:     addedLines[0].NewLineNo,
+			Message:  "added lines in test file contain no assertion -- add an assertion or remove them",
+			Snippet:  strings.TrimSpace(addedLines[0].Content),
+		})
+	}
+
+	return out
+}
+
+// langHasAssertion reports whether a line contains an assertion token
+// for the given language.
+func langHasAssertion(line string, lang string) bool {
+	switch lang {
+	case "js":
+		return jsHasAssertion(line)
+	case "py":
+		return pyHasAssertion(line)
+	case "java":
+		return javaHasAssertion(line)
+	case "rust":
+		return rustHasAssertion(line)
+	}
+	return false
 }

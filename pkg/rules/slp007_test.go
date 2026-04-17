@@ -331,8 +331,8 @@ func TestSLP007_JSNamedImportWithAliasUnused(t *testing.T) {
 	}
 }
 
-func TestSLP007_IgnoresNonGoNonJSFiles(t *testing.T) {
-	// Python file — rule should not fire.
+func TestSLP007_PythonUnusedImport(t *testing.T) {
+	// Python file — import os is unused => finding.
 	d := parseDiff(t, `diff --git a/app.py b/app.py
 --- a/app.py
 +++ b/app.py
@@ -342,8 +342,113 @@ func TestSLP007_IgnoresNonGoNonJSFiles(t *testing.T) {
 +def main(): pass
 `)
 	got := SLP007{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Python, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "os") {
+		t.Errorf("message should mention os: %q", got[0].Message)
+	}
+}
+
+func TestSLP007_PythonUnusedFromImport(t *testing.T) {
+	// Python: from datetime import datetime — unused => finding.
+	d := parseDiff(t, `diff --git a/app.py b/app.py
+--- a/app.py
++++ b/app.py
+@@ -1,1 +1,3 @@
+ # app
++from datetime import datetime
++def main(): pass
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Python from-import, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_PythonUsedImport_NoFinding(t *testing.T) {
+	// Python: import os used as os.getenv => no finding.
+	d := parseDiff(t, `diff --git a/app.py b/app.py
+--- a/app.py
++++ b/app.py
+@@ -1,1 +1,3 @@
+ # app
++import os
++x = os.getenv("HOME")
+`)
+	got := SLP007{}.Check(d)
 	if len(got) != 0 {
-		t.Fatalf("expected 0 findings for Python, got %d: %+v", len(got), got)
+		t.Fatalf("expected 0 findings (os used), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_JavaUnusedImport(t *testing.T) {
+	// Java: import java.util.ArrayList — unused => finding.
+	d := parseDiff(t, `diff --git a/Foo.java b/Foo.java
+--- a/Foo.java
++++ b/Foo.java
+@@ -1,1 +1,3 @@
+ // foo
++import java.util.ArrayList;
++public class Foo {}
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Java, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "ArrayList") {
+		t.Errorf("message should mention ArrayList: %q", got[0].Message)
+	}
+}
+
+func TestSLP007_JavaUsedImport_NoFinding(t *testing.T) {
+	// Java: import java.util.ArrayList used as new ArrayList<>() => no finding.
+	d := parseDiff(t, `diff --git a/Foo.java b/Foo.java
+--- a/Foo.java
++++ b/Foo.java
+@@ -1,1 +1,3 @@
+ // foo
++import java.util.ArrayList;
++public class Foo { ArrayList<String> list = new ArrayList<>(); }
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (ArrayList used), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_RustUnusedUse(t *testing.T) {
+	// Rust: use std::collections::HashMap — unused => finding.
+	d := parseDiff(t, `diff --git a/src/main.rs b/src/main.rs
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,1 +1,3 @@
+ // main
++use std::collections::HashMap;
++fn main() {}
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Rust, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "HashMap") {
+		t.Errorf("message should mention HashMap: %q", got[0].Message)
+	}
+}
+
+func TestSLP007_RustUsedUse_NoFinding(t *testing.T) {
+	// Rust: use std::collections::HashMap used in code => no finding.
+	d := parseDiff(t, `diff --git a/src/main.rs b/src/main.rs
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,1 +1,3 @@
+ // main
++use std::collections::HashMap;
++fn main() { let m: HashMap<String, i32> = HashMap::new(); }
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (HashMap used), got %d: %+v", len(got), got)
 	}
 }
 

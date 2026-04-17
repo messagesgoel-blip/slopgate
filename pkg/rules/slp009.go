@@ -14,7 +14,7 @@ import (
 // the new code fragile and dependent on external state that may not
 // exist.
 //
-// Languages: Go, JS/TS.
+// Languages: Go, JS/TS, Python, Java, Rust.
 //
 // Scope: this rule only looks within the diff itself. It does NOT
 // check .env files, CI config, or pre-existing code.
@@ -51,6 +51,32 @@ var slp009JSDotAssign = regexp.MustCompile(`process\.env\.([A-Za-z_][A-Za-z0-9_]
 // slp009JSBracketAssign matches process.env["NAME"] = (bracket assignment).
 var slp009JSBracketAssign = regexp.MustCompile(`process\.env\[\s*"([^"]+)"\s*\]\s*=`)
 
+// --- Python regexes ---
+
+// slp009PyGetenv matches os.getenv("NAME") and os.environ["NAME"] (lookups).
+var slp009PyGetenv = regexp.MustCompile(`os\.getenv\s*\(\s*"([^"]+)"\s*[,\)]`)
+var slp009PyEnvironDot = regexp.MustCompile(`os\.environ\[\s*"([^"]+)"\s*\]`)
+
+// slp009PySetenv matches os.environ["NAME"] = (assignment).
+var slp009PySetenv = regexp.MustCompile(`os\.environ\[\s*"([^"]+)"\s*\]\s*=`)
+
+// --- Java regexes ---
+
+// slp009JavaGetenv matches System.getenv("NAME") (lookup).
+var slp009JavaGetenv = regexp.MustCompile(`System\.getenv\s*\(\s*"([^"]+)"\s*\)`)
+
+// slp009JavaSetenv matches System.setProperty("NAME", ...) (setup).
+var slp009JavaSetenv = regexp.MustCompile(`System\.setProperty\s*\(\s*"([^"]+)"\s*,`)
+
+// --- Rust regexes ---
+
+// slp009RustEnvVar matches std::env::var("NAME") and env!("NAME") (lookups).
+var slp009RustEnvVar = regexp.MustCompile(`std::env::var\s*\(\s*"([^"]+)"\s*\)`)
+var slp009RustEnvMacro = regexp.MustCompile(`env!\s*\(\s*"([^"]+)"\s*\)`)
+
+// slp009RustSetVar matches std::env::set_var("NAME", ...) (write).
+var slp009RustSetVar = regexp.MustCompile(`std::env::set_var\s*\(\s*"([^"]+)"\s*,`)
+
 // --- envLoc tracks a single env-var access site in the diff. ---
 
 type envLoc struct {
@@ -73,7 +99,10 @@ func (r SLP009) Check(d *diff.Diff) []Finding {
 		}
 		isGo := isGoFile(f.Path)
 		isJS := isJSOrTSFile(f.Path)
-		if !isGo && !isJS {
+		isPy := isPythonFile(f.Path)
+		isJava := isJavaFile(f.Path)
+		isRust := isRustFile(f.Path)
+		if !isGo && !isJS && !isPy && !isJava && !isRust {
 			continue
 		}
 
@@ -116,6 +145,48 @@ func (r SLP009) Check(d *diff.Diff) []Finding {
 				}
 				// Collect writes: process.env["NAME"] = ...
 				for _, m := range slp009JSBracketAssign.FindAllStringSubmatch(ln.Content, -1) {
+					setVars[m[1]] = true
+				}
+			}
+			if isPy {
+				// Collect reads: os.getenv("NAME")
+				for _, m := range slp009PyGetenv.FindAllStringSubmatch(ln.Content, -1) {
+					reads = append(reads, envLoc{name: m[1], file: f.Path, line: ln.NewLineNo})
+				}
+				// Collect reads: os.environ["NAME"]
+				for _, m := range slp009PyEnvironDot.FindAllStringSubmatch(ln.Content, -1) {
+					// Skip assignments — os.environ["NAME"] = ...
+					if slp009PySetenv.MatchString(ln.Content) {
+						continue
+					}
+					reads = append(reads, envLoc{name: m[1], file: f.Path, line: ln.NewLineNo})
+				}
+				// Collect writes: os.environ["NAME"] = ...
+				for _, m := range slp009PySetenv.FindAllStringSubmatch(ln.Content, -1) {
+					setVars[m[1]] = true
+				}
+			}
+			if isJava {
+				// Collect reads: System.getenv("NAME")
+				for _, m := range slp009JavaGetenv.FindAllStringSubmatch(ln.Content, -1) {
+					reads = append(reads, envLoc{name: m[1], file: f.Path, line: ln.NewLineNo})
+				}
+				// Collect writes: System.setProperty("NAME", ...)
+				for _, m := range slp009JavaSetenv.FindAllStringSubmatch(ln.Content, -1) {
+					setVars[m[1]] = true
+				}
+			}
+			if isRust {
+				// Collect reads: std::env::var("NAME")
+				for _, m := range slp009RustEnvVar.FindAllStringSubmatch(ln.Content, -1) {
+					reads = append(reads, envLoc{name: m[1], file: f.Path, line: ln.NewLineNo})
+				}
+				// Collect reads: env!("NAME")
+				for _, m := range slp009RustEnvMacro.FindAllStringSubmatch(ln.Content, -1) {
+					reads = append(reads, envLoc{name: m[1], file: f.Path, line: ln.NewLineNo})
+				}
+				// Collect writes: std::env::set_var("NAME", ...)
+				for _, m := range slp009RustSetVar.FindAllStringSubmatch(ln.Content, -1) {
 					setVars[m[1]] = true
 				}
 			}

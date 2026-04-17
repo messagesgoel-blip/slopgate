@@ -7,8 +7,8 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
-// SLP001 flags Go test functions added wholesale in the current diff
-// that contain no assertion token anywhere in their body.
+// SLP001 flags test functions added wholesale in the current diff that
+// contain no assertion token anywhere in their body.
 //
 // Rationale: AI agents asked to "write a test for X" often produce
 // functions that call X, collect the result into `_`, and stop. The
@@ -16,15 +16,15 @@ import (
 // worst kind of test, because it convinces everyone the function is
 // covered.
 //
-// v0.0.1 scope: Go only, standalone test functions (not testify suite
-// methods), and only test functions whose entire body was added in
-// this diff. Other languages and incremental changes land in v0.0.2.
+// Languages: Go, JS/TS, Python, Java, Rust.
+//
+// Scope: only test functions whose entire body was added in this diff.
 type SLP001 struct{}
 
 func (SLP001) ID() string                { return "SLP001" }
 func (SLP001) DefaultSeverity() Severity { return SeverityWarn }
 func (SLP001) Description() string {
-	return "Go test function added with no assertion in its body"
+	return "test function added with no assertion in its body"
 }
 
 // safetyTestNamePattern matches common test-name suffixes that signal
@@ -96,21 +96,37 @@ func isTopLevelSkipStatement(line, tVar string) bool {
 func (r SLP001) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
-		if f.IsDelete || !strings.HasSuffix(f.Path, "_test.go") {
+		if f.IsDelete {
+			continue
+		}
+		lang := testFileLang(f.Path)
+		if lang == "" {
 			continue
 		}
 		for _, h := range f.Hunks {
-			findings := scanHunkForTests(f.Path, h, r.DefaultSeverity(), r.ID())
+			var findings []Finding
+			switch lang {
+			case "go":
+				findings = scanHunkForGoTests(f.Path, h, r.DefaultSeverity(), r.ID())
+			case "js":
+				findings = scanHunkForJSTests(f.Path, h, r.DefaultSeverity(), r.ID())
+			case "py":
+				findings = scanHunkForPyTests(f.Path, h, r.DefaultSeverity(), r.ID())
+			case "java":
+				findings = scanHunkForJavaTests(f.Path, h, r.DefaultSeverity(), r.ID())
+			case "rust":
+				findings = scanHunkForRustTests(f.Path, h, r.DefaultSeverity(), r.ID())
+			}
 			out = append(out, findings...)
 		}
 	}
 	return out
 }
 
-// scanHunkForTests walks a single hunk looking for added Go test
+// scanHunkForGoTests walks a single hunk looking for added Go test
 // function bodies and emits a finding for each one that lacks an
 // assertion.
-func scanHunkForTests(path string, h diff.Hunk, sev Severity, ruleID string) []Finding {
+func scanHunkForGoTests(path string, h diff.Hunk, sev Severity, ruleID string) []Finding {
 	var out []Finding
 	lines := h.Lines
 
@@ -192,4 +208,384 @@ func scanHunkForTests(path string, h diff.Hunk, sev Severity, ruleID string) []F
 		}
 	}
 	return out
+}
+
+// --- JS/TS test function scanning ---
+
+// jsTestFuncSignature matches describe("...", it("...", or test("...".
+var jsTestFuncSignature = regexp.MustCompile(`(?:describe|it|test)\s*\(\s*["']`)
+
+// jsAssertTokens are assertion tokens for JS/TS test frameworks.
+var jsAssertTokens = []string{
+	// Jest/Vitest
+	"expect(", "assert.", "assert(",
+	// Chai
+	"should.",
+}
+
+// scanHunkForJSTests walks a single hunk looking for added JS/TS test
+// function bodies and emits a finding for each one that lacks an assertion.
+func scanHunkForJSTests(path string, h diff.Hunk, sev Severity, ruleID string) []Finding {
+	var out []Finding
+	lines := h.Lines
+	i := 0
+	for i < len(lines) {
+		ln := lines[i]
+		if ln.Kind != diff.LineAdd {
+			i++
+			continue
+		}
+		trimmed := strings.TrimSpace(ln.Content)
+		if !jsTestFuncSignature.MatchString(trimmed) {
+			i++
+			continue
+		}
+		// Check if the line has the opening brace.
+		hasBrace := strings.Contains(trimmed, "{")
+		if !hasBrace && i+1 < len(lines) && lines[i+1].Kind == diff.LineAdd {
+			hasBrace = strings.Contains(lines[i+1].Content, "{")
+		}
+		if !hasBrace {
+			i++
+			continue
+		}
+		startLine := ln.NewLineNo
+		// Build body content from the test function line + subsequent added lines.
+		depth := strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
+		if depth <= 0 && i+1 < len(lines) && lines[i+1].Kind == diff.LineAdd {
+			depth += strings.Count(lines[i+1].Content, "{") - strings.Count(lines[i+1].Content, "}")
+		}
+		if depth <= 0 {
+			// Single-line test: check for assertions.
+			sawAssertion := jsHasAssertion(trimmed)
+			if !sawAssertion {
+				out = append(out, Finding{
+					RuleID:   ruleID,
+					Severity: sev,
+					File:     path,
+					Line:     startLine,
+					Message:  "JS/TS test function has no assertion -- add expect()/assert.* or delete it",
+					Snippet:  strings.TrimSpace(ln.Content),
+				})
+			}
+			i++
+			continue
+		}
+		// Multi-line: scan body until brace depth reaches 0.
+		sawAssertion := jsHasAssertion(trimmed)
+		bodyAllAdded := true
+		j := i + 1
+		for j < len(lines) && depth > 0 {
+			bl := lines[j]
+			if bl.Kind != diff.LineAdd {
+				bodyAllAdded = false
+				break
+			}
+			if jsHasAssertion(bl.Content) {
+				sawAssertion = true
+			}
+			depth += strings.Count(bl.Content, "{") - strings.Count(bl.Content, "}")
+			j++
+		}
+		if bodyAllAdded && depth == 0 && !sawAssertion {
+			out = append(out, Finding{
+				RuleID:   ruleID,
+				Severity: sev,
+				File:     path,
+				Line:     startLine,
+				Message:  "JS/TS test function has no assertion -- add expect()/assert.* or delete it",
+				Snippet:  strings.TrimSpace(ln.Content),
+			})
+		}
+		if j > i {
+			i = j
+		} else {
+			i++
+		}
+	}
+	return out
+}
+
+func jsHasAssertion(line string) bool {
+	for _, tok := range jsAssertTokens {
+		if strings.Contains(line, tok) {
+			return true
+		}
+	}
+	return false
+}
+
+// --- Python test function scanning ---
+
+// pyTestFuncSignature matches def test_xxx(self): or def test_xxx():.
+var pyTestFuncSignature = regexp.MustCompile(`^\s*def\s+(test\w+)\s*\(`)
+
+// pyAssertTokens are assertion tokens for Python test frameworks.
+var pyAssertTokens = []string{
+	"assert ", "self.assert", "self.assertEqual", "self.assertTrue",
+	"self.assertFalse", "self.assertIsNone", "self.assertIsNotNone",
+	"self.assertIn", "self.assertRaises",
+}
+
+// scanHunkForPyTests walks a hunk looking for added Python test function
+// bodies with no assertion. Python uses indentation, not braces.
+func scanHunkForPyTests(path string, h diff.Hunk, sev Severity, ruleID string) []Finding {
+	var out []Finding
+	lines := h.Lines
+	i := 0
+	for i < len(lines) {
+		ln := lines[i]
+		if ln.Kind != diff.LineAdd {
+			i++
+			continue
+		}
+		m := pyTestFuncSignature.FindStringSubmatch(ln.Content)
+		if m == nil {
+			i++
+			continue
+		}
+		funcName := m[1]
+		startLine := ln.NewLineNo
+		funcIndent := leadingSpaces(ln.Content)
+		// Collect body: all subsequent added lines indented deeper.
+		sawAssertion := false
+		bodyAllAdded := true
+		j := i + 1
+		for j < len(lines) {
+			bl := lines[j]
+			if bl.Kind != diff.LineAdd {
+				bodyAllAdded = false
+				break
+			}
+			blTrimmed := strings.TrimSpace(bl.Content)
+			if blTrimmed == "" {
+				j++
+				continue
+			}
+			blIndent := leadingSpaces(bl.Content)
+			if blIndent <= funcIndent {
+				break
+			}
+			if pyHasAssertion(bl.Content) {
+				sawAssertion = true
+			}
+			j++
+		}
+		if bodyAllAdded && !sawAssertion {
+			out = append(out, Finding{
+				RuleID:   ruleID,
+				Severity: sev,
+				File:     path,
+				Line:     startLine,
+				Message:  "Python test function " + funcName + " has no assertion -- add assert/self.assert.* or delete it",
+				Snippet:  strings.TrimSpace(ln.Content),
+			})
+		}
+		if j > i {
+			i = j
+		} else {
+			i++
+		}
+	}
+	return out
+}
+
+func pyHasAssertion(line string) bool {
+	for _, tok := range pyAssertTokens {
+		if strings.Contains(line, tok) {
+			return true
+		}
+	}
+	return false
+}
+
+// --- Java test function scanning ---
+
+// javaTestAnnotation matches @Test annotation.
+var javaTestAnnotation = regexp.MustCompile(`@\s*Test\b`)
+
+// javaTestMethod matches JUnit 3-style test methods.
+var javaTestMethod = regexp.MustCompile(`^\s*(public\s+)?(static\s+)?void\s+(test\w+)\s*\(`)
+
+// javaAssertTokens are assertion tokens for Java test frameworks.
+var javaAssertTokens = []string{
+	"assertEquals(", "assertTrue(", "assertFalse(", "assertNotNull(",
+	"assertNull(", "assertSame(", "assertThat(", "Assertions.",
+	"assert ", "fail(", "Mockito.",
+}
+
+// scanHunkForJavaTests walks a hunk looking for added Java test methods.
+func scanHunkForJavaTests(path string, h diff.Hunk, sev Severity, ruleID string) []Finding {
+	var out []Finding
+	lines := h.Lines
+	i := 0
+	for i < len(lines) {
+		ln := lines[i]
+		if ln.Kind != diff.LineAdd {
+			i++
+			continue
+		}
+		trimmed := strings.TrimSpace(ln.Content)
+		isTest := javaTestAnnotation.MatchString(trimmed) || javaTestMethod.MatchString(trimmed)
+		if !isTest {
+			i++
+			continue
+		}
+		funcName := "testMethod"
+		if m := javaTestMethod.FindStringSubmatch(trimmed); m != nil {
+			funcName = m[3]
+		}
+		// Find the opening brace.
+		depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
+		startLine := ln.NewLineNo
+		if depth <= 0 && i+1 < len(lines) && lines[i+1].Kind == diff.LineAdd {
+			next := lines[i+1]
+			depth += strings.Count(next.Content, "{") - strings.Count(next.Content, "}")
+			if m := javaTestMethod.FindStringSubmatch(strings.TrimSpace(next.Content)); m != nil {
+				funcName = m[3]
+			}
+		}
+		if depth <= 0 {
+			i++
+			continue
+		}
+		sawAssertion := javaHasAssertion(ln.Content)
+		bodyAllAdded := true
+		j := i + 1
+		for j < len(lines) && depth > 0 {
+			bl := lines[j]
+			if bl.Kind != diff.LineAdd {
+				bodyAllAdded = false
+				break
+			}
+			if javaHasAssertion(bl.Content) {
+				sawAssertion = true
+			}
+			depth += strings.Count(bl.Content, "{") - strings.Count(bl.Content, "}")
+			j++
+		}
+		if bodyAllAdded && depth == 0 && !sawAssertion {
+			out = append(out, Finding{
+				RuleID:   ruleID,
+				Severity: sev,
+				File:     path,
+				Line:     startLine,
+				Message:  "Java test method " + funcName + " has no assertion -- add assert* or delete it",
+				Snippet:  strings.TrimSpace(ln.Content),
+			})
+		}
+		if j > i {
+			i = j
+		} else {
+			i++
+		}
+	}
+	return out
+}
+
+func javaHasAssertion(line string) bool {
+	for _, tok := range javaAssertTokens {
+		if strings.Contains(line, tok) {
+			return true
+		}
+	}
+	return false
+}
+
+// --- Rust test function scanning ---
+
+// rustTestAttr matches #[test] attribute.
+var rustTestAttr = regexp.MustCompile(`#\[\s*test\s*\]`)
+
+// rustTestFunc matches fn test_xxx(.
+var rustTestFunc = regexp.MustCompile(`^\s*fn\s+(test\w+)\s*\(`)
+
+// rustAssertTokens are assertion tokens for Rust test frameworks.
+var rustAssertTokens = []string{
+	"assert!(", "assert_eq!(", "assert_ne!",
+	"panic!(", "should_panic",
+}
+
+// scanHunkForRustTests walks a hunk looking for added Rust test functions.
+func scanHunkForRustTests(path string, h diff.Hunk, sev Severity, ruleID string) []Finding {
+	var out []Finding
+	lines := h.Lines
+	i := 0
+	for i < len(lines) {
+		ln := lines[i]
+		if ln.Kind != diff.LineAdd {
+			i++
+			continue
+		}
+		// Check for #[test] attribute.
+		if !rustTestAttr.MatchString(strings.TrimSpace(ln.Content)) {
+			i++
+			continue
+		}
+		// Next added line should be the function signature.
+		if i+1 >= len(lines) || lines[i+1].Kind != diff.LineAdd {
+			i++
+			continue
+		}
+		sigLine := lines[i+1]
+		m := rustTestFunc.FindStringSubmatch(strings.TrimSpace(sigLine.Content))
+		if m == nil {
+			i++
+			continue
+		}
+		funcName := m[1]
+		startLine := ln.NewLineNo
+		// Collect body by brace counting from the signature line.
+		depth := strings.Count(sigLine.Content, "{") - strings.Count(sigLine.Content, "}")
+		if depth <= 0 {
+			// Opening brace on a separate line.
+			if i+2 < len(lines) && lines[i+2].Kind == diff.LineAdd {
+				depth += strings.Count(lines[i+2].Content, "{") - strings.Count(lines[i+2].Content, "}")
+			}
+		}
+		if depth <= 0 {
+			i++
+			continue
+		}
+		sawAssertion := rustHasAssertion(sigLine.Content)
+		bodyAllAdded := true
+		j := i + 2
+		for j < len(lines) && depth > 0 {
+			bl := lines[j]
+			if bl.Kind != diff.LineAdd {
+				bodyAllAdded = false
+				break
+			}
+			if rustHasAssertion(bl.Content) {
+				sawAssertion = true
+			}
+			depth += strings.Count(bl.Content, "{") - strings.Count(bl.Content, "}")
+			j++
+		}
+		if bodyAllAdded && depth == 0 && !sawAssertion {
+			out = append(out, Finding{
+				RuleID:   ruleID,
+				Severity: sev,
+				File:     path,
+				Line:     startLine,
+				Message:  "Rust test function " + funcName + " has no assertion -- add assert!()/assert_eq!() or delete it",
+				Snippet:  strings.TrimSpace(ln.Content),
+			})
+		}
+		if j > i {
+			i = j
+		} else {
+			i++
+		}
+	}
+	return out
+}
+
+func rustHasAssertion(line string) bool {
+	for _, tok := range rustAssertTokens {
+		if strings.Contains(line, tok) {
+			return true
+		}
+	}
+	return false
 }

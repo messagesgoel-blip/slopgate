@@ -18,6 +18,9 @@ import (
 //   - JS/TS:       expect(x).toBe(x), expect(x).toEqual(x),
 //     assert.strictEqual(x, x)
 //   - Python:      self.assertEqual(a, a), self.assertIs(a, a)
+//   - Java/JUnit:  assertEquals(x, x), assertTrue(true), assertFalse(false),
+//     assertThat(x).isEqualTo(x)
+//   - Rust:        assert_eq!(x, x), assert!(true)
 type SLP002 struct{}
 
 func (SLP002) ID() string                { return "SLP002" }
@@ -94,6 +97,42 @@ var pySelfAssertRe = regexp.MustCompile(
 )
 
 // ---------------------------------------------------------------------------
+// Java / JUnit patterns
+// ---------------------------------------------------------------------------
+
+// javaAssertEqualsRe matches assertEquals(x, x), assertSame(x, x), etc.
+// Group 1: method, Group 2: first arg, Group 3: second arg.
+var javaAssertEqualsRe = regexp.MustCompile(
+	`\b(assertEquals|assertSame|assertArrayEquals|assertLinesMatch)\(\s*(\w+)\s*,\s*(\w+)\s*[,)]`,
+)
+
+// javaAssertTrueFalseRe matches assertTrue(true) / assertFalse(false).
+var javaAssertTrueFalseRe = regexp.MustCompile(
+	`\b(assertTrue|assertFalse)\(\s*(true|false)\s*\)`,
+)
+
+// javaAssertThatRe matches assertThat(x).isEqualTo(x) / assertThat(x).isSameInstanceAs(x).
+// Group 1: first x, Group 2: matcher, Group 3: second x.
+var javaAssertThatRe = regexp.MustCompile(
+	`\bassertThat\(\s*(\w+)\s*\)\.(isEqualTo|isSameInstanceAs|isSameAs)\(\s*(\w+)\s*\)`,
+)
+
+// ---------------------------------------------------------------------------
+// Rust patterns
+// ---------------------------------------------------------------------------
+
+// rustAssertEqRe matches assert_eq!(x, x).
+// Group 1: first arg, Group 2: second arg.
+var rustAssertEqRe = regexp.MustCompile(
+	`\bassert_eq!\(\s*(\w+)\s*,\s*(\w+)\s*[,)]`,
+)
+
+// rustAssertTrueRe matches assert!(true).
+var rustAssertTrueRe = regexp.MustCompile(
+	`\bassert!\(\s*(true|false)\s*\)`,
+)
+
+// ---------------------------------------------------------------------------
 // Check
 // ---------------------------------------------------------------------------
 
@@ -115,7 +154,7 @@ func (r SLP002) Check(d *diff.Diff) []Finding {
 	return out
 }
 
-// testFileLang returns "go", "js", or "py" if the path is a test file,
+// testFileLang returns the test-file language if the path is a test file,
 // otherwise an empty string.
 func testFileLang(path string) string {
 	if isGoTestFile(path) {
@@ -126,6 +165,12 @@ func testFileLang(path string) string {
 	}
 	if isPythonTestFile(path) {
 		return "py"
+	}
+	if isJavaTestFile(path) {
+		return "java"
+	}
+	if isRustTestFile(path) {
+		return "rust"
 	}
 	return ""
 }
@@ -143,6 +188,10 @@ func checkLine(file string, ln diff.Line, lang string, sev Severity) []Finding {
 		out = append(out, checkJSLine(file, ln, trimmed, sev)...)
 	case "py":
 		out = append(out, checkPYLine(file, ln, trimmed, sev)...)
+	case "java":
+		out = append(out, checkJavaLine(file, ln, trimmed, sev)...)
+	case "rust":
+		out = append(out, checkRustLine(file, ln, trimmed, sev)...)
 	}
 	return out
 }
@@ -231,6 +280,92 @@ func checkPYLine(file string, ln diff.Line, trimmed string, sev Severity) []Find
 				File:     file,
 				Line:     ln.NewLineNo,
 				Message:  "self.assert" + m[1] + "(): both sides are the same identifier " + m[2],
+				Snippet:  trimmed,
+			})
+		}
+	}
+
+	return out
+}
+
+func checkJavaLine(file string, ln diff.Line, trimmed string, sev Severity) []Finding {
+	var out []Finding
+
+	// assertEquals(x, x) / assertSame(x, x) / etc.
+	if m := javaAssertEqualsRe.FindStringSubmatch(trimmed); m != nil {
+		if m[2] == m[3] {
+			out = append(out, Finding{
+				RuleID:   "SLP002",
+				Severity: sev,
+				File:     file,
+				Line:     ln.NewLineNo,
+				Message:  m[1] + "(): both sides are the same identifier " + m[2],
+				Snippet:  trimmed,
+			})
+		}
+	}
+
+	// assertTrue(true) / assertFalse(false)
+	if m := javaAssertTrueFalseRe.FindStringSubmatch(trimmed); m != nil {
+		expected := "true"
+		if m[1] == "assertFalse" {
+			expected = "false"
+		}
+		if m[2] == expected {
+			out = append(out, Finding{
+				RuleID:   "SLP002",
+				Severity: sev,
+				File:     file,
+				Line:     ln.NewLineNo,
+				Message:  m[1] + "(): tautological assertion with literal " + m[2],
+				Snippet:  trimmed,
+			})
+		}
+	}
+
+	// assertThat(x).isEqualTo(x)
+	if m := javaAssertThatRe.FindStringSubmatch(trimmed); m != nil {
+		if m[1] == m[3] {
+			out = append(out, Finding{
+				RuleID:   "SLP002",
+				Severity: sev,
+				File:     file,
+				Line:     ln.NewLineNo,
+				Message:  "assertThat()." + m[2] + "(): both sides are the same identifier " + m[1],
+				Snippet:  trimmed,
+			})
+		}
+	}
+
+	return out
+}
+
+func checkRustLine(file string, ln diff.Line, trimmed string, sev Severity) []Finding {
+	var out []Finding
+
+	// assert_eq!(x, x)
+	if m := rustAssertEqRe.FindStringSubmatch(trimmed); m != nil {
+		if m[1] == m[2] {
+			out = append(out, Finding{
+				RuleID:   "SLP002",
+				Severity: sev,
+				File:     file,
+				Line:     ln.NewLineNo,
+				Message:  "assert_eq!(): both sides are the same identifier " + m[1],
+				Snippet:  trimmed,
+			})
+		}
+	}
+
+	// assert!(true) / assert!(false)
+	if m := rustAssertTrueRe.FindStringSubmatch(trimmed); m != nil {
+		if m[1] == "true" {
+			out = append(out, Finding{
+				RuleID:   "SLP002",
+				Severity: sev,
+				File:     file,
+				Line:     ln.NewLineNo,
+				Message:  "assert!(): tautological assertion with literal true",
 				Snippet:  trimmed,
 			})
 		}

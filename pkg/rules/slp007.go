@@ -15,10 +15,15 @@ import (
 // Supported languages:
 //   - Go: import "pkg" / import alias "pkg" / import ( ... ) groups
 //   - JS/TS: import { X } from 'y' / import X from 'y'
+//   - Python: import X / from Y import X
+//   - Java: import com.foo.Bar;
+//   - Rust: use crate::foo::Bar; / use std::foo::Bar;
 //
 // Exempt:
 //   - Go blank imports: import _ "pkg" (side-effect imports)
 //   - Go dot imports: import . "pkg" (too ambiguous)
+//   - Java wildcard imports: import com.foo.*; (too ambiguous)
+//   - Rust glob imports: use foo::*; (too ambiguous)
 //   - Pre-existing imports (only newly added import lines are checked)
 type SLP007 struct{}
 
@@ -69,6 +74,26 @@ var slp007JSStarImport = regexp.MustCompile(`^\s*import\s*\*\s*as\s+([A-Za-z_$][
 
 // slp007JSNamedItem matches a single item inside braces: X or X as Y.
 var slp007JSNamedItem = regexp.MustCompile(`(\w+)\s*(?:as\s+(\w+))?`)
+
+// --- Python import patterns ---
+
+// slp007PyPlainImport matches `import X` or `import X, Y`.
+var slp007PyPlainImport = regexp.MustCompile(`^\s*import\s+([\w.]+(?:\s*,\s*[\w.]+)*)`)
+
+// slp007PyFromImport matches `from X import Y` (or `from X import Y as Z`).
+// Group 1: module path, Group 2: the items after import.
+var slp007PyFromImport = regexp.MustCompile(`^\s*from\s+([\w.]+)\s+import\s+(.+)`)
+
+// --- Java import patterns ---
+
+// slp007JavaImport matches `import com.foo.Bar;`. Captures the fully-qualified name.
+var slp007JavaImport = regexp.MustCompile(`^\s*import\s+([\w.]+)\s*;`)
+
+// --- Rust use patterns ---
+
+// slp007RustUse matches `use foo::bar::Baz;` or `use foo::bar::Baz as Qux;`.
+// Captures the last segment (or the alias if present).
+var slp007RustUse = regexp.MustCompile(`^\s*use\s+([\w:]+)::(\w+)\s*(?:as\s+(\w+))?\s*;`)
 
 // goImportIdent returns the identifier to search for given a Go import path
 // and optional alias. If the import is blank or dot, it returns ("", false).
@@ -221,6 +246,137 @@ func parseJSNamedItems(braces string) []string {
 	return items
 }
 
+// --- Python import parsing ---
+
+// parsePythonImports extracts newly added Python import identifiers from
+// the added lines of a file.
+func parsePythonImports(added []diff.Line) []importInfo {
+	var result []importInfo
+	for _, ln := range added {
+		content := ln.Content
+
+		// from X import Y [as Z], A [as B]
+		if m := slp007PyFromImport.FindStringSubmatch(content); m != nil {
+			modulePath := m[1]
+			items := m[2]
+			for _, item := range strings.Split(items, ",") {
+				item = strings.TrimSpace(item)
+				if item == "" {
+					continue
+				}
+				// Handle "X as Y" — the local name is Y.
+				parts := strings.SplitN(item, " as ", 2)
+				localName := strings.TrimSpace(parts[0])
+				if len(parts) == 2 {
+					localName = strings.TrimSpace(parts[1])
+				}
+				result = append(result, importInfo{
+					content: content,
+					lineNo:  ln.NewLineNo,
+					ident:   localName,
+					pkgPath: modulePath,
+				})
+			}
+			continue
+		}
+
+		// import X, Y
+		if m := slp007PyPlainImport.FindStringSubmatch(content); m != nil {
+			names := strings.Split(m[1], ",")
+			for _, name := range names {
+				name = strings.TrimSpace(name)
+				if name == "" {
+					continue
+				}
+				// Handle "import X as Y".
+				parts := strings.SplitN(name, " as ", 2)
+				localName := strings.TrimSpace(parts[0])
+				if len(parts) == 2 {
+					localName = strings.TrimSpace(parts[1])
+				}
+				// For bare "import os.path", the local name is the first segment.
+				if idx := strings.Index(localName, "."); idx >= 0 {
+					localName = localName[:idx]
+				}
+				result = append(result, importInfo{
+					content: content,
+					lineNo:  ln.NewLineNo,
+					ident:   localName,
+					pkgPath: name,
+				})
+			}
+			continue
+		}
+	}
+	return result
+}
+
+// --- Java import parsing ---
+
+// parseJavaImports extracts newly added Java import identifiers from the
+// added lines of a file.
+func parseJavaImports(added []diff.Line) []importInfo {
+	var result []importInfo
+	for _, ln := range added {
+		content := ln.Content
+		m := slp007JavaImport.FindStringSubmatch(content)
+		if m == nil {
+			continue
+		}
+		fqn := m[1]
+		// Skip wildcard imports (import com.foo.*;) — too ambiguous.
+		if strings.HasSuffix(fqn, ".*") {
+			continue
+		}
+		// The identifier is the last segment: com.foo.Bar -> Bar.
+		lastDot := strings.LastIndex(fqn, ".")
+		if lastDot < 0 || lastDot == len(fqn)-1 {
+			continue
+		}
+		ident := fqn[lastDot+1:]
+		result = append(result, importInfo{
+			content: content,
+			lineNo:  ln.NewLineNo,
+			ident:   ident,
+			pkgPath: fqn,
+		})
+	}
+	return result
+}
+
+// --- Rust use parsing ---
+
+// parseRustImports extracts newly added Rust use identifiers from the
+// added lines of a file.
+func parseRustImports(added []diff.Line) []importInfo {
+	var result []importInfo
+	for _, ln := range added {
+		content := ln.Content
+		m := slp007RustUse.FindStringSubmatch(content)
+		if m == nil {
+			continue
+		}
+		// m[1]: path (e.g. "std::collections"), m[2]: name (e.g. "HashMap"),
+		// m[3]: optional alias (e.g. "MyMap")
+		ident := m[2]
+		if m[3] != "" {
+			ident = m[3]
+		}
+		// Skip glob imports: use foo::*; won't match the regex, but be safe.
+		if ident == "*" {
+			continue
+		}
+		pkgPath := m[1] + "::" + m[2]
+		result = append(result, importInfo{
+			content: content,
+			lineNo:  ln.NewLineNo,
+			ident:   ident,
+			pkgPath: pkgPath,
+		})
+	}
+	return result
+}
+
 // identUsedInAddedLines reports whether any added line (other than import
 // lines themselves) contains a reference to the given identifier.
 // For Go: looks for "ident." (package qualifier).
@@ -311,13 +467,23 @@ func (r SLP007) Check(d *diff.Diff) []Finding {
 		var imports []importInfo
 		var goMode bool
 
-		if isGoFile(f.Path) {
+		switch {
+		case isGoFile(f.Path):
 			imports = parseGoImports(added)
 			goMode = true
-		} else if isJSOrTSFile(f.Path) {
+		case isJSOrTSFile(f.Path):
 			imports = parseJSImports(added)
 			goMode = false
-		} else {
+		case isPythonFile(f.Path):
+			imports = parsePythonImports(added)
+			goMode = false
+		case isJavaFile(f.Path):
+			imports = parseJavaImports(added)
+			goMode = false
+		case isRustFile(f.Path):
+			imports = parseRustImports(added)
+			goMode = false
+		default:
 			continue
 		}
 

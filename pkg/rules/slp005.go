@@ -8,19 +8,21 @@ import (
 )
 
 // SLP005 flags test-runner exclusivity markers (it.only, describe.only,
-// fdescribe, fit, test.only) committed on added lines. These markers
-// are harmless in a local workflow — they let you focus one test while
-// debugging — but catastrophic if merged: they silently skip the rest
-// of your suite.
+// fdescribe, fit, test.only) and test-disabling annotations (@Disabled,
+// @Ignore) committed on added lines. These markers are harmless in a
+// local workflow but catastrophic if merged: .only silently skips the
+// rest of the suite, while @Disabled/@Ignore silently skips the test.
 //
 // AI-generated tests commonly emit .only during focused iteration and
 // leave the marker in when the task was "get this test passing".
+// AI agents also add @Disabled to skip failing tests instead of fixing
+// them.
 type SLP005 struct{}
 
 func (SLP005) ID() string                { return "SLP005" }
 func (SLP005) DefaultSeverity() Severity { return SeverityBlock }
 func (SLP005) Description() string {
-	return "test-runner focus marker (.only / fdescribe / fit) committed"
+	return "test-runner focus marker (.only / fdescribe / fit) or @Disabled committed"
 }
 
 // slp005Patterns must match only test-runner idioms, not arbitrary
@@ -29,6 +31,14 @@ func (SLP005) Description() string {
 var slp005Patterns = []*regexp.Regexp{
 	regexp.MustCompile(`\b(it|describe|test|context)\.only\s*\(`),
 	regexp.MustCompile(`\b(fdescribe|fit|ftest|fcontext)\s*\(`),
+}
+
+// slp005JavaPatterns match JUnit test-disabling annotations.
+var slp005JavaPatterns = []*regexp.Regexp{
+	// JUnit 5: @Disabled("reason")
+	regexp.MustCompile(`@Disabled\b`),
+	// JUnit 4: @Ignore
+	regexp.MustCompile(`@Ignore\b`),
 }
 
 // isJSTestFilePath reports whether the path is a JS/TS test file
@@ -61,21 +71,44 @@ func isJSTestFilePath(path string) bool {
 func (r SLP005) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
-		if f.IsDelete || !isJSTestFilePath(f.Path) {
+		if f.IsDelete {
 			continue
 		}
-		for _, ln := range f.AddedLines() {
-			for _, p := range slp005Patterns {
-				if p.MatchString(ln.Content) {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "test focus marker committed — other tests will be silently skipped",
-						Snippet:  strings.TrimSpace(ln.Content),
-					})
-					break
+
+		// JS/TS test focus markers.
+		if isJSTestFilePath(f.Path) {
+			for _, ln := range f.AddedLines() {
+				for _, p := range slp005Patterns {
+					if p.MatchString(ln.Content) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  "test focus marker committed -- other tests will be silently skipped",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+						break
+					}
+				}
+			}
+		}
+
+		// Java test-disabling annotations.
+		if isJavaTestFile(f.Path) {
+			for _, ln := range f.AddedLines() {
+				for _, p := range slp005JavaPatterns {
+					if p.MatchString(ln.Content) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  "test-disabling annotation committed -- fix the test or remove the annotation",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+						break
+					}
 				}
 			}
 		}
