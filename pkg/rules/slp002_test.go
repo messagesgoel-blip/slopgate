@@ -233,3 +233,172 @@ func TestSLP002_Description(t *testing.T) {
 		t.Errorf("default severity should be block")
 	}
 }
+
+// Java tests
+
+func TestSLP002_JavaAssertEqualsTautological(t *testing.T) {
+	// assertEquals(result, result) — same identifier → finding.
+	d := parseDiff(t, `diff --git a/FooTest.java b/FooTest.java
+--- a/FooTest.java
++++ b/FooTest.java
+@@ -1,1 +1,2 @@
+ // test
++assertEquals(result, result);
+`)
+	got := SLP002{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "result") {
+		t.Errorf("message should mention identifier: %q", got[0].Message)
+	}
+}
+
+func TestSLP002_JavaAssertTrueWithTrue(t *testing.T) {
+	// assertTrue(true) — tautological → finding.
+	d := parseDiff(t, `diff --git a/FooTest.java b/FooTest.java
+--- a/FooTest.java
++++ b/FooTest.java
+@@ -1,1 +1,2 @@
+ // test
++assertTrue(true);
+`)
+	got := SLP002{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "tautological") {
+		t.Errorf("message should mention tautological: %q", got[0].Message)
+	}
+}
+
+func TestSLP002_JavaAssertFalseWithFalse(t *testing.T) {
+	// assertFalse(false) — tautological → finding.
+	d := parseDiff(t, `diff --git a/FooTest.java b/FooTest.java
+--- a/FooTest.java
++++ b/FooTest.java
+@@ -1,1 +1,2 @@
+ // test
++assertFalse(false);
+`)
+	got := SLP002{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP002_JavaAssertThatIsEqualTo(t *testing.T) {
+	// assertThat(x).isEqualTo(x) — same identifier → finding.
+	d := parseDiff(t, `diff --git a/FooTest.java b/FooTest.java
+--- a/FooTest.java
++++ b/FooTest.java
+@@ -1,1 +1,2 @@
+ // test
++assertThat(result).isEqualTo(result);
+`)
+	got := SLP002{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "result") {
+		t.Errorf("message should mention identifier: %q", got[0].Message)
+	}
+}
+
+func TestSLP002_JavaDifferentIdentifiers_NoFinding(t *testing.T) {
+	// assertEquals(actual, expected) — different identifiers → no finding.
+	d := parseDiff(t, `diff --git a/FooTest.java b/FooTest.java
+--- a/FooTest.java
++++ b/FooTest.java
+@@ -1,1 +1,2 @@
+ // test
++assertEquals(actual, expected);
+`)
+	got := SLP002{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP002_JavaNonTestFile_NoFinding(t *testing.T) {
+	// A tautological assertion in a non-test Java file should not fire.
+	d := parseDiff(t, `diff --git a/Foo.java b/Foo.java
+--- a/Foo.java
++++ b/Foo.java
+@@ -1,1 +1,2 @@
+ // class
++assertEquals(x, x);
+`)
+	got := SLP002{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings in non-test file, got %d", len(got))
+	}
+}
+
+// Rust tests
+
+func TestSLP002_RustAssertEqTautological(t *testing.T) {
+	// assert_eq!(result, result) — same identifier → finding.
+	d := parseDiff(t, `diff --git a/tests/integration_test.rs b/tests/integration_test.rs
+--- a/tests/integration_test.rs
++++ b/tests/integration_test.rs
+@@ -1,1 +1,2 @@
+ // test
++    assert_eq!(result, result);
+`)
+	got := SLP002{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "result") {
+		t.Errorf("message should mention identifier: %q", got[0].Message)
+	}
+}
+
+func TestSLP002_RustAssertTrueLiteral(t *testing.T) {
+	// assert!(true) — tautological → finding.
+	d := parseDiff(t, `diff --git a/foo_test.rs b/foo_test.rs
+--- a/foo_test.rs
++++ b/foo_test.rs
+@@ -1,1 +1,2 @@
+ // test
++    assert!(true);
+`)
+	got := SLP002{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "tautological") {
+		t.Errorf("message should mention tautological: %q", got[0].Message)
+	}
+}
+
+func TestSLP002_RustDifferentIdentifiers_NoFinding(t *testing.T) {
+	// assert_eq!(got, want) — different identifiers → no finding.
+	d := parseDiff(t, `diff --git a/tests/integration_test.rs b/tests/integration_test.rs
+--- a/tests/integration_test.rs
++++ b/tests/integration_test.rs
+@@ -1,1 +1,2 @@
+ // test
++    assert_eq!(got, want);
+`)
+	got := SLP002{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP002_RustNonTestFile_NoFinding(t *testing.T) {
+	// A tautological assertion in a non-test Rust file should not fire.
+	d := parseDiff(t, `diff --git a/src/main.rs b/src/main.rs
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,1 +1,2 @@
+ // main
++    assert_eq!(x, x);
+`)
+	got := SLP002{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings in non-test file, got %d", len(got))
+	}
+}

@@ -17,6 +17,8 @@ import (
 //   - Go:    panic("not implemented"), panic("TODO"), panic(fmt.Sprintf("TODO: ..."))
 //   - JS/TS: throw new Error("not implemented"), throw new Error("TODO")
 //   - Python: raise NotImplementedError, raise NotImplementedError("msg")
+//   - Java:  throw new UnsupportedOperationException("not implemented")
+//   - Rust:  todo!("..."), unimplemented!("..."), panic!("TODO")
 //
 // Non-stub panics like panic(err) or panic("buffer too small") are
 // deliberately excluded — they don't contain a stub keyword.
@@ -83,6 +85,21 @@ var slp006JSThrow = regexp.MustCompile(`\bthrow\s+new\s+Error\s*\(`)
 // slp006PyRaise matches Python raise NotImplementedError
 var slp006PyRaise = regexp.MustCompile(`\braise\s+NotImplementedError\b`)
 
+// slp006JavaThrow matches Java throw new UnsupportedOperationException(
+var slp006JavaThrow = regexp.MustCompile(`\bthrow\s+new\s+UnsupportedOperationException\s*\(`)
+
+// slp006RustMacro matches Rust todo!(), unimplemented!(), panic!()
+var slp006RustMacro = regexp.MustCompile(`\b(todo|unimplemented|panic)!\s*\(`)
+
+// isMethodCall reports whether the match at loc[0] in content is preceded by
+// a dot, indicating a method call like obj.panic(...) rather than a built-in.
+func isMethodCall(content string, loc []int) bool {
+	if loc[0] > 0 && content[loc[0]-1] == '.' {
+		return true
+	}
+	return false
+}
+
 func (r SLP006) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -92,15 +109,20 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 		isGo := isGoFile(f.Path)
 		isJS := isJSOrTSFile(f.Path)
 		isPy := isPythonFile(f.Path)
+		isJava := isJavaFile(f.Path)
+		isRust := isRustFile(f.Path)
 		for _, ln := range f.AddedLines() {
 			content := ln.Content
+			// Mask comments and strings so regex matches don't fire
+			// inside quoted text or annotations, but preserve byte
+			// offsets so we can still extract string literals from
+			// the original content.
+			masked := maskCommentAndStrings(content)
 
 			// Go: panic("...stub keyword...")
-			// Run regex on content so byte offsets are consistent with
-			// extractStringLiteralFrom.
 			if isGo {
-				loc := slp006GoPanic.FindStringIndex(content)
-				if loc != nil {
+				loc := slp006GoPanic.FindStringIndex(masked)
+				if loc != nil && !isMethodCall(content, loc) {
 					lit, ok := extractStringLiteralFrom(content, loc[0])
 					if ok && containsStubKeyword(lit) {
 						out = append(out, Finding{
@@ -108,7 +130,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 							Severity: r.DefaultSeverity(),
 							File:     f.Path,
 							Line:     ln.NewLineNo,
-							Message:  fmt.Sprintf("Go panic with stub keyword %q — implement or remove", lit),
+							Message:  fmt.Sprintf("Go panic with stub keyword %q -- implement or remove", lit),
 							Snippet:  strings.TrimSpace(content),
 						})
 						continue
@@ -118,7 +140,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 
 			// JS/TS: throw new Error("...stub keyword...")
 			if isJS {
-				loc := slp006JSThrow.FindStringIndex(content)
+				loc := slp006JSThrow.FindStringIndex(masked)
 				if loc != nil {
 					lit, ok := extractStringLiteralFrom(content, loc[0])
 					if ok && containsStubKeyword(lit) {
@@ -127,7 +149,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 							Severity: r.DefaultSeverity(),
 							File:     f.Path,
 							Line:     ln.NewLineNo,
-							Message:  fmt.Sprintf("JS throw with stub keyword %q — implement or remove", lit),
+							Message:  fmt.Sprintf("JS throw with stub keyword %q -- implement or remove", lit),
 							Snippet:  strings.TrimSpace(content),
 						})
 						continue
@@ -137,12 +159,12 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 
 			// Python: raise NotImplementedError
 			if isPy {
-				loc := slp006PyRaise.FindStringIndex(content)
+				loc := slp006PyRaise.FindStringIndex(masked)
 				if loc != nil {
-					msg := "Python raise NotImplementedError — implement or remove"
+					msg := "Python raise NotImplementedError -- implement or remove"
 					lit, ok := extractStringLiteralFrom(content, loc[1])
 					if ok {
-						msg = fmt.Sprintf("Python raise NotImplementedError(%q) — implement or remove", lit)
+						msg = fmt.Sprintf("Python raise NotImplementedError(%q) -- implement or remove", lit)
 					}
 					out = append(out, Finding{
 						RuleID:   r.ID(),
@@ -153,6 +175,77 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 						Snippet:  strings.TrimSpace(content),
 					})
 					continue
+				}
+			}
+
+			// Java: throw new UnsupportedOperationException("stub keyword...")
+			if isJava {
+				loc := slp006JavaThrow.FindStringIndex(masked)
+				if loc != nil {
+					lit, ok := extractStringLiteralFrom(content, loc[1])
+					if ok && containsStubKeyword(lit) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  fmt.Sprintf("Java throw UnsupportedOperationException with stub keyword %q -- implement or remove", lit),
+							Snippet:  strings.TrimSpace(content),
+						})
+						continue
+					}
+					// Bare throw new UnsupportedOperationException() without a stub
+					// keyword is also slop -- the exception type itself signals
+					// unimplemented code.
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "Java throw UnsupportedOperationException -- implement or remove",
+						Snippet:  strings.TrimSpace(content),
+					})
+					continue
+				}
+			}
+
+			// Rust: todo!("..."), unimplemented!("..."), panic!("stub keyword...")
+			if isRust {
+				loc := slp006RustMacro.FindStringIndex(masked)
+				if loc != nil {
+					macro := slp006RustMacro.FindStringSubmatch(masked)[1]
+					// todo!() and unimplemented!() are always stubs.
+					if macro == "todo" || macro == "unimplemented" {
+						msg := fmt.Sprintf("Rust %s!() -- implement or remove", macro)
+						lit, ok := extractStringLiteralFrom(content, loc[1])
+						if ok {
+							msg = fmt.Sprintf("Rust %s!(%q) -- implement or remove", macro, lit)
+						}
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  msg,
+							Snippet:  strings.TrimSpace(content),
+						})
+						continue
+					}
+					// panic!("...stub keyword...") -- only flag with stub keyword.
+					if macro == "panic" {
+						lit, ok := extractStringLiteralFrom(content, loc[1])
+						if ok && containsStubKeyword(lit) {
+							out = append(out, Finding{
+								RuleID:   r.ID(),
+								Severity: r.DefaultSeverity(),
+								File:     f.Path,
+								Line:     ln.NewLineNo,
+								Message:  fmt.Sprintf("Rust panic! with stub keyword %q -- implement or remove", lit),
+								Snippet:  strings.TrimSpace(content),
+							})
+							continue
+						}
+					}
 				}
 			}
 		}

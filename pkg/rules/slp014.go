@@ -38,6 +38,11 @@ var debugPrintPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bconsole\.(log|debug|trace)\s*\(`),
 	// Python
 	regexp.MustCompile(`(^|\W)print\s*\(`),
+	// Java
+	regexp.MustCompile(`\bSystem\.(out|err)\.(println|printf|print)\s*\(`),
+	// Rust
+	regexp.MustCompile(`\b(println|eprintln|print|eprint)!\s*\(`),
+	regexp.MustCompile(`\bdbg!\s*\(`),
 }
 
 // isSuppressedDebugFile reports whether the file path is a location
@@ -57,6 +62,14 @@ func isSuppressedDebugFile(path string) bool {
 	}
 	// Python test files.
 	if strings.HasPrefix(base, "test_") || strings.HasSuffix(base, "_test.py") {
+		return true
+	}
+	// Java/Kotlin test files (JUnit convention: *Test.java, *Tests.java).
+	if isJavaTestFile(path) {
+		return true
+	}
+	// Rust test files.
+	if isRustTestFile(path) {
 		return true
 	}
 	// Doc files.
@@ -89,6 +102,11 @@ func isSuppressedDebugFile(path string) bool {
 // inside them. It is intentionally simple — multi-line strings and
 // unclosed block comments are out of scope for a single-line linter,
 // and perfect escape handling is unnecessary.
+//
+// The returned string may be shorter than the input because line
+// comments truncate at the comment start. For rules that need
+// byte-offset alignment with the original string, use
+// maskCommentAndStrings instead.
 func stripCommentAndStrings(s string) string {
 	// Strip full-line comments first.
 	trimmed := strings.TrimLeft(s, " \t")
@@ -136,6 +154,83 @@ func stripCommentAndStrings(s string) string {
 		}
 	}
 	return b.String()
+}
+
+// maskCommentAndStrings replaces comments and string contents with spaces
+// while preserving the exact byte length of the input. This ensures that
+// regex match indices from the masked string map directly to positions in
+// the original string. Callers can use FindStringIndex on the masked string
+// and then use those offsets to extract from the original string.
+//
+//   - String contents (between quotes) become spaces; the quotes themselves
+//     are preserved so the structural shape of the line stays recognizable.
+//   - Line comments (// and #) and block comments (/* ... */) are replaced
+//     with spaces from the comment start to end of line/end of comment.
+//   - The result always has len(masked) == len(s).
+func maskCommentAndStrings(s string) string {
+	out := []byte(s)
+	var quote byte
+	for i := 0; i < len(out); i++ {
+		c := out[i]
+		if quote != 0 {
+			if quote != '`' && c == '\\' && i+1 < len(out) {
+				// Escape sequence — blank the escaped char.
+				out[i+1] = ' '
+				continue
+			}
+			if c == quote {
+				quote = 0
+				// Closing quote stays.
+			} else {
+				out[i] = ' '
+			}
+			continue
+		}
+		switch {
+		case c == '"' || c == '\'' || c == '`':
+			quote = c
+			// Opening quote stays.
+		case c == '/' && i+1 < len(out) && out[i+1] == '/':
+			// Line comment — blank rest of line.
+			for j := i; j < len(out); j++ {
+				out[j] = ' '
+			}
+			return string(out)
+		case c == '/' && i+1 < len(out) && out[i+1] == '*':
+			// Block comment — blank until closing */.
+			out[i] = ' '
+			out[i+1] = ' '
+			j := i + 2
+			closed := false
+			for j < len(out)-1 {
+				if out[j] == '*' && out[j+1] == '/' {
+					out[j] = ' '
+					out[j+1] = ' '
+					j += 2
+					closed = true
+					break
+				}
+				out[j] = ' '
+				j++
+			}
+			if closed {
+				i = j - 1 // -1 because the loop will i++
+			} else {
+				// No closing */ — blank rest.
+				for k := i; k < len(out); k++ {
+					out[k] = ' '
+				}
+				return string(out)
+			}
+		case c == '#':
+			// Python/shell comment — blank rest of line.
+			for j := i; j < len(out); j++ {
+				out[j] = ' '
+			}
+			return string(out)
+		}
+	}
+	return string(out)
 }
 
 func (r SLP014) Check(d *diff.Diff) []Finding {

@@ -11,7 +11,7 @@ import (
 // empty error handlers where the error is neither logged, wrapped, nor
 // re-raised.
 //
-// Languages: Go, JS/TS, Python.
+// Languages: Go, JS/TS, Python, Java, Rust.
 //
 // Rationale: AI agents often write `if err != nil { return nil }` or
 // `except: pass` to satisfy the type checker without actually handling
@@ -27,8 +27,14 @@ func (SLP003) Description() string {
 
 // --- Go patterns ---
 
-// slp003GoErrCheck matches `if err != nil {` on an added line.
+// slp003GoErrCheck matches `if err != nil {` on an added line (multi-line block).
 var slp003GoErrCheck = regexp.MustCompile(`^\s*if\s+err\s*!=\s*nil\s*\{\s*$`)
+
+// slp003GoSingleLineErrCheck matches single-line Go error handlers like
+// `if err != nil { return nil }` or `if err != nil { return }`.
+// Also matches when preceded by other code (e.g., inside a function body).
+// Captures the content between the braces in group 1.
+var slp003GoSingleLineErrCheck = regexp.MustCompile(`if\s+err\s*!=\s*nil\s*\{\s*(.*?)\s*\}`)
 
 // slp003LogTokens are substrings that indicate the error is being
 // logged rather than silently swallowed.
@@ -143,6 +149,95 @@ func slp003PythonIsBailLine(content string) bool {
 	return trimmed == "pass" || trimmed == "return" || trimmed == "return None"
 }
 
+// --- Java patterns ---
+
+// slp003JavaCatch matches Java catch clauses on an added line.
+// Supports: simple types (Exception), fully-qualified types (java.io.IOException),
+// multi-catch (IOException | SQLException), final modifier, and optional variable names.
+var slp003JavaCatch = regexp.MustCompile(`catch\s*\(\s*(?:final\s+)?[\w.]+(?:\s*\|\s*[\w.]+)*(?:\s+\w+)?\s*\)\s*\{`)
+
+// slp003JavaLogTokens are substrings that indicate the error is being
+// logged in a Java catch block.
+var slp003JavaLogTokens = []string{
+	"log.", "logger.", "LOG.", "Logger.",
+}
+
+// slp003JavaHasHandling reports whether a Java catch block body
+// contains logging or error re-throwing.
+func slp003JavaHasHandling(content string) bool {
+	for _, tok := range slp003JavaLogTokens {
+		if strings.Contains(content, tok) {
+			return true
+		}
+	}
+	return strings.Contains(content, "throw")
+}
+
+// javaIsBailOnly reports whether the body, after stripping the closing
+// brace, contains only bare return / return null statements.
+func javaIsBailOnly(body string) bool {
+	lines := strings.Split(body, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(stripCommentAndStrings(line))
+		if trimmed == "" || trimmed == "}" {
+			continue
+		}
+		if trimmed == "return;" || trimmed == "return null;" || trimmed == "return null" {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// --- Rust patterns ---
+
+// slp003RustMatchErr matches `match Err(e) =>` or `Err(e) =>` arms.
+var slp003RustMatchErr = regexp.MustCompile(`^\s*Err\s*\(\s*\w+\s*\)\s*=>`)
+
+// slp003RustIfLetErr matches `if let Err(e) = ... {`.
+var slp003RustIfLetErr = regexp.MustCompile(`^\s*if\s+let\s+Err\s*\(\s*\w+\s*\)\s*=\s*`)
+
+// slp003RustLogTokens are substrings that indicate the error is being
+// logged in a Rust error handler.
+var slp003RustLogTokens = []string{
+	"error!(", "warn!(", "log::", "tracing::",
+}
+
+// slp003RustHasHandling reports whether a Rust error-handler body
+// contains logging or error propagation (e/Err(e) in return).
+func slp003RustHasHandling(content string) bool {
+	for _, tok := range slp003RustLogTokens {
+		if strings.Contains(content, tok) {
+			return true
+		}
+	}
+	// Returning the error value (e.g., `return Err(e)`) is proper handling.
+	if strings.Contains(content, "Err(") {
+		return true
+	}
+	return false
+}
+
+// rustIsBailOnly reports whether the body, after stripping the closing
+// brace/comma, contains only bare return / return None statements.
+func rustIsBailOnly(body string) bool {
+	lines := strings.Split(body, "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(stripCommentAndStrings(line))
+		if trimmed == "" || trimmed == "}" || trimmed == "}," {
+			continue
+		}
+		if trimmed == "return None;" || trimmed == "return;" || trimmed == "return None," ||
+			trimmed == "None" || trimmed == "None;" || trimmed == "None," ||
+			trimmed == "return None" {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 // --- Check ---
 
 func (r SLP003) Check(d *diff.Diff) []Finding {
@@ -158,6 +253,10 @@ func (r SLP003) Check(d *diff.Diff) []Finding {
 			out = append(out, r.checkJS(f)...)
 		case isPythonFile(f.Path):
 			out = append(out, r.checkPython(f)...)
+		case isJavaFile(f.Path):
+			out = append(out, r.checkJava(f)...)
+		case isRustFile(f.Path):
+			out = append(out, r.checkRust(f)...)
 		}
 	}
 	return out
@@ -172,7 +271,40 @@ func (r SLP003) checkGo(f diff.File) []Finding {
 		i := 0
 		for i < len(lines) {
 			ln := lines[i]
-			if ln.Kind != diff.LineAdd || !slp003GoErrCheck.MatchString(ln.Content) {
+			if ln.Kind != diff.LineAdd {
+				i++
+				continue
+			}
+
+			// Check for single-line error handler: if err != nil { return nil }
+			if m := slp003GoSingleLineErrCheck.FindStringSubmatch(ln.Content); m != nil {
+				body := m[1]
+				trimmed := strings.TrimSpace(body)
+				if trimmed == "" {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "if err != nil block is empty — log, wrap, or return the error",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				} else if isGoBailOnlySingleLine(trimmed) && !slp003GoHasHandling(body) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "if err != nil block swallows the error — log, wrap, or return the error",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				}
+				i++
+				continue
+			}
+
+			// Check for multi-line error handler: if err != nil {
+			if !slp003GoErrCheck.MatchString(ln.Content) {
 				i++
 				continue
 			}
@@ -236,7 +368,7 @@ func (r SLP003) checkGo(f diff.File) []Finding {
 func isGoBailOnly(body string) bool {
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(stripCommentAndStrings(line))
 		if trimmed == "" || trimmed == "}" {
 			continue
 		}
@@ -244,6 +376,27 @@ func isGoBailOnly(body string) bool {
 			continue
 		}
 		// Any other non-trivial statement means the block does something.
+		return false
+	}
+	return true
+}
+
+// isGoBailOnlySingleLine reports whether a single-line Go error handler
+// body (the content between { and }) contains only bail statements like
+// `return nil`, `return`, or `return false, nil`. Semicolons are used as
+// statement separators.
+func isGoBailOnlySingleLine(body string) bool {
+	// Mask comments and strings to avoid splitting on semicolons inside strings.
+	clean := maskCommentAndStrings(body)
+	parts := strings.Split(clean, ";")
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		if isSilentReturn(trimmed) {
+			continue
+		}
 		return false
 	}
 	return true
@@ -295,6 +448,12 @@ func (r SLP003) checkJS(f diff.File) []Finding {
 			}
 
 			depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
+			// If the catch header line has a closing brace (e.g. "} catch (e) {"),
+			// depth can be 0 even though the opening brace for the catch body
+			// is on this line. Ensure depth is at least 1 so the body loop enters.
+			if depth < 1 && strings.Contains(ln.Content, "{") {
+				depth = 1
+			}
 			bodyAllAdded := true
 			var bodyContent strings.Builder
 
@@ -383,7 +542,7 @@ func extractSingleLineCatchBody(content string) (string, bool) {
 func jsIsBailOnly(body string) bool {
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(stripCommentAndStrings(line))
 		if trimmed == "" || trimmed == "}" {
 			continue
 		}
@@ -475,7 +634,7 @@ func (r SLP003) checkPython(f diff.File) []Finding {
 func pythonIsBailOnly(body string) bool {
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(stripCommentAndStrings(line))
 		if trimmed == "" {
 			continue
 		}
@@ -500,4 +659,276 @@ func leadingSpaces(s string) int {
 		}
 	}
 	return n
+}
+
+// checkJava scans Java files for `catch (Exception e) { ... }` blocks
+// that silently swallow the error.
+func (r SLP003) checkJava(f diff.File) []Finding {
+	var out []Finding
+	for _, h := range f.Hunks {
+		lines := h.Lines
+		i := 0
+		for i < len(lines) {
+			ln := lines[i]
+			if ln.Kind != diff.LineAdd || !slp003JavaCatch.MatchString(ln.Content) {
+				i++
+				continue
+			}
+			startLine := ln.NewLineNo
+
+			// Check if this is a single-line catch block.
+			if strings.Contains(ln.Content, "catch") && strings.Contains(ln.Content, "{") {
+				if singleLineBody, ok := extractSingleLineCatchBody(ln.Content); ok {
+					if singleLineBody == "" {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     startLine,
+							Message:  "catch block is empty -- log or re-throw the error",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+					} else if javaIsBailOnly(singleLineBody+"\n}") && !slp003JavaHasHandling(singleLineBody) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     startLine,
+							Message:  "catch block swallows the error -- log or re-throw the error",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+					}
+					i++
+					continue
+				}
+			}
+
+			depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
+			// If the catch header line has a closing brace (e.g. "} catch (e) {"),
+			// depth can be 0 even though the opening brace for the catch body
+			// is on this line. Ensure depth is at least 1 so the body loop enters.
+			if depth < 1 && strings.Contains(ln.Content, "{") {
+				depth = 1
+			}
+			bodyAllAdded := true
+			var bodyContent strings.Builder
+
+			j := i + 1
+			for j < len(lines) && depth > 0 {
+				bl := lines[j]
+				if bl.Kind != diff.LineAdd {
+					bodyAllAdded = false
+					break
+				}
+				bodyContent.WriteString(bl.Content)
+				bodyContent.WriteByte('\n')
+				depth += strings.Count(bl.Content, "{") - strings.Count(bl.Content, "}")
+				j++
+			}
+
+			if bodyAllAdded && depth == 0 {
+				body := bodyContent.String()
+				if slp003JavaHasHandling(body) {
+					i = j
+					continue
+				}
+				trimmed := strings.TrimSpace(body)
+				if trimmed == "}" || trimmed == "" {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     startLine,
+						Message:  "catch block is empty -- log or re-throw the error",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				} else if javaIsBailOnly(body) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     startLine,
+						Message:  "catch block swallows the error -- log or re-throw the error",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				}
+			}
+
+			if j > i {
+				i = j
+			} else {
+				i++
+			}
+		}
+	}
+	return out
+}
+
+// checkRust scans Rust files for `Err(e) => { ... }` match arms and
+// `if let Err(e) = ... { ... }` blocks that silently swallow the error.
+func (r SLP003) checkRust(f diff.File) []Finding {
+	var out []Finding
+	for _, h := range f.Hunks {
+		lines := h.Lines
+		i := 0
+		for i < len(lines) {
+			ln := lines[i]
+			if ln.Kind != diff.LineAdd {
+				i++
+				continue
+			}
+			var startLine int
+			var isMatch bool
+
+			if slp003RustMatchErr.MatchString(ln.Content) {
+				startLine = ln.NewLineNo
+				isMatch = true
+			} else if slp003RustIfLetErr.MatchString(ln.Content) {
+				startLine = ln.NewLineNo
+				isMatch = true
+			}
+
+			if !isMatch {
+				i++
+				continue
+			}
+
+			// Try unbraced match arm: Err(e) => expr,
+			// These don't have braces so extractRustSingleLineBody won't match,
+			// but they are common slop patterns like Err(e) => return None,
+			if strings.Contains(ln.Content, "=>") && !strings.Contains(ln.Content, "{") {
+				arrow := strings.Index(ln.Content, "=>")
+				if arrow >= 0 {
+					rhs := strings.TrimSpace(ln.Content[arrow+2:])
+					rhs = strings.TrimRight(rhs, ",;")
+					rhs = strings.TrimSpace(rhs)
+					if rhs == "" {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     startLine,
+							Message:  "error handler is empty -- log or return the error",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+					} else if rustIsBailOnly(rhs+"\n}") && !slp003RustHasHandling(rhs) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     startLine,
+							Message:  "error handler swallows the error -- log or return the error",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+					}
+					i++
+					continue
+				}
+			}
+
+			// Try single-line match arm body extraction.
+			if singleLineBody, ok := extractRustSingleLineBody(ln.Content); ok {
+				if singleLineBody == "" {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     startLine,
+						Message:  "error handler is empty -- log or return the error",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				} else if rustIsBailOnly(singleLineBody+"\n}") && !slp003RustHasHandling(singleLineBody) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     startLine,
+						Message:  "error handler swallows the error -- log or return the error",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				}
+				i++
+				continue
+			}
+
+			depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
+			// Handle `if let Err(...) = expr()` where the opening `{` is on the
+			// next line: depth is 0 here but the body loop must still run.
+			if depth < 1 && i+1 < len(lines) && strings.Contains(lines[i+1].Content, "{") {
+				depth = 1
+			}
+			bodyAllAdded := true
+			var bodyContent strings.Builder
+
+			j := i + 1
+			for j < len(lines) && depth > 0 {
+				bl := lines[j]
+				if bl.Kind != diff.LineAdd {
+					bodyAllAdded = false
+					break
+				}
+				bodyContent.WriteString(bl.Content)
+				bodyContent.WriteByte('\n')
+				depth += strings.Count(bl.Content, "{") - strings.Count(bl.Content, "}")
+				j++
+			}
+
+			if bodyAllAdded && depth == 0 {
+				body := bodyContent.String()
+				if slp003RustHasHandling(body) {
+					i = j
+					continue
+				}
+				trimmed := strings.TrimSpace(body)
+				if trimmed == "}" || trimmed == "" || trimmed == "}," {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     startLine,
+						Message:  "error handler is empty -- log or return the error",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				} else if rustIsBailOnly(body) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     startLine,
+						Message:  "error handler swallows the error -- log or return the error",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				}
+			}
+
+			if j > i {
+				i = j
+			} else {
+				i++
+			}
+		}
+	}
+	return out
+}
+
+// extractRustSingleLineBody extracts the body content from a single-line
+// Rust match arm or if-let block like `Err(e) => { return None; }`.
+// Returns ("", true) if empty braces, ("content", true) if has content,
+// or ("", false) if not a single-line block.
+func extractRustSingleLineBody(content string) (string, bool) {
+	// Find the first `{` after Err or if let.
+	start := strings.Index(content, "{")
+	if start < 0 {
+		return "", false
+	}
+	end := strings.LastIndex(content, "}")
+	if end < 0 || end < start+1 {
+		return "", false
+	}
+	body := content[start+1 : end]
+	trimmed := strings.TrimSpace(body)
+	if strings.Contains(trimmed, "\n") {
+		return "", false
+	}
+	return trimmed, true
 }

@@ -236,3 +236,82 @@ func TestSLP014_Description(t *testing.T) {
 		t.Errorf("description should mention debug: %q", r.Description())
 	}
 }
+
+func TestMaskCommentAndStrings(t *testing.T) {
+	// Key invariant: len(maskCommentAndStrings(s)) == len(s) for all s.
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "preserves code around strings",
+			input: `fmt.Println("hello")`,
+			want:  `fmt.Println("     ")`,
+		},
+		{
+			name:  "masks line comment to end",
+			input: `x := 1 // panic("TODO")`,
+			want:  `x := 1                 `,
+		},
+		{
+			name:  "masks hash comment to end",
+			input: `x = 1 # raise NotImplementedError`,
+			want:  `x = 1                            `,
+		},
+		{
+			name:  "masks block comment inline",
+			input: `x = 1 /* panic("TODO") */ + 2`,
+			want:  `x = 1                     + 2`,
+		},
+		{
+			name:  "masks string contents keeping quotes",
+			input: `msg := "not implemented"`,
+			want:  `msg := "               "`,
+		},
+		{
+			name:  "masks single-quoted string",
+			input: `ch := 'x'`,
+			want:  `ch := ' '`,
+		},
+		{
+			name:  "masks raw string",
+			input: "msg := `raise NotImplementedError`",
+			want:  "msg := `                         `",
+		},
+		{
+			name:  "preserves plain code length",
+			input: `abcdef`,
+			want:  `abcdef`,
+		},
+		{
+			name:  "empty string stays empty",
+			input: ``,
+			want:  ``,
+		},
+		{
+			name:  "multi-statement masks string contents",
+			input: `x := 1; panic("TODO")`,
+			want:  `x := 1; panic("    ")`,
+		},
+		{
+			name: "masks escaped quotes in string preserves length",
+			// Escaped quotes inside a string get blanked. The key
+			// invariant is that maskCommentAndStrings preserves
+			// byte length; we just check that and that the outer
+			// structure is preserved.
+			input: `s := "hello \"world\""`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := maskCommentAndStrings(tt.input)
+			if len(got) != len(tt.input) {
+				t.Errorf("maskCommentAndStrings length mismatch: got %d, want %d\n  got  = %q\n  input = %q", len(got), len(tt.input), got, tt.input)
+			}
+			if tt.want != "" && got != tt.want {
+				t.Errorf("maskCommentAndStrings(%q)\n  got  = %q\n  want = %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

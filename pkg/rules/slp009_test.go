@@ -170,8 +170,8 @@ func TestSLP009_JSBracketAccessWithAssignment(t *testing.T) {
 	}
 }
 
-func TestSLP009_IgnoresNonGoJSFiles(t *testing.T) {
-	// Python file with os.getenv should not trigger — rule is Go+JS only.
+func TestSLP009_PythonEnvVarDrift(t *testing.T) {
+	// Python file with os.getenv("FOO") — no corresponding setup => finding.
 	d := parseDiff(t, `diff --git a/app.py b/app.py
 --- a/app.py
 +++ b/app.py
@@ -181,8 +181,84 @@ func TestSLP009_IgnoresNonGoJSFiles(t *testing.T) {
 +print(val)
 `)
 	got := SLP009{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Python, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "FOO") {
+		t.Errorf("message should mention FOO: %q", got[0].Message)
+	}
+}
+
+func TestSLP009_JavaEnvVarDrift(t *testing.T) {
+	// Java file with System.getenv("DB_URL") — no setup => finding.
+	d := parseDiff(t, `diff --git a/App.java b/App.java
+--- a/App.java
++++ b/App.java
+@@ -1,1 +1,2 @@
+ // app
++String db = System.getenv("DB_URL");
+`)
+	got := SLP009{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Java, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "DB_URL") {
+		t.Errorf("message should mention DB_URL: %q", got[0].Message)
+	}
+}
+
+func TestSLP009_JavaEnvVarDrift_EvenWithSetProperty(t *testing.T) {
+	// Java: System.setProperty sets JVM properties, not OS env vars.
+	// System.getenv reads OS env vars. They are different namespaces, so
+	// setProperty does NOT suppress the getenv finding.
+	d := parseDiff(t, `diff --git a/App.java b/App.java
+--- a/App.java
++++ b/App.java
+@@ -1,1 +1,3 @@
+ // app
++System.setProperty("DB_URL", "localhost");
++String db = System.getenv("DB_URL");
+`)
+	got := SLP009{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding (setProperty is not a real env-var write), got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "DB_URL") {
+		t.Errorf("message should mention DB_URL: %q", got[0].Message)
+	}
+}
+
+func TestSLP009_RustEnvVarDrift(t *testing.T) {
+	// Rust file with std::env::var("API_KEY") — no setup => finding.
+	d := parseDiff(t, `diff --git a/src/main.rs b/src/main.rs
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,1 +1,2 @@
+ // main
++let key = std::env::var("API_KEY");
+`)
+	got := SLP009{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Rust, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "API_KEY") {
+		t.Errorf("message should mention API_KEY: %q", got[0].Message)
+	}
+}
+
+func TestSLP009_RustEnvVarWithSetVar_NoFinding(t *testing.T) {
+	// Rust: std::env::var("API_KEY") with std::env::set_var("API_KEY") => no finding.
+	d := parseDiff(t, `diff --git a/src/main.rs b/src/main.rs
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,1 +1,3 @@
+ // main
++std::env::set_var("API_KEY", "test");
++let key = std::env::var("API_KEY");
+`)
+	got := SLP009{}.Check(d)
 	if len(got) != 0 {
-		t.Fatalf("expected 0 findings for Python file, got %d", len(got))
+		t.Fatalf("expected 0 findings (env var set), got %d: %+v", len(got), got)
 	}
 }
 

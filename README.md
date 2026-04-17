@@ -48,23 +48,24 @@ Exit codes:
 - `1` - blocking findings present
 - `2` - configuration or tool error
 
-## Rules (v0.0.2)
+## Rules (v0.0.3)
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
-| SLP001 | Test function with no assertion | warn | Go |
-| SLP002 | Tautological assertion (e.g. `assert.Equal(t, x, x)`) | block | Go, JS/TS, Python |
-| SLP003 | Empty error handler (catch/except with no handling) | warn | Go, JS/TS, Python |
-| SLP005 | `.only` / `fdescribe` / `fit` committed | block | TypeScript, JavaScript |
-| SLP006 | Panic/throw stub body (`panic("not implemented")`) | block | Go, JS/TS, Python |
-| SLP007 | Import added in diff but never used | warn | Go, JS/TS |
-| SLP008 | Error logged but silently returned without recovery | warn | Go, JS/TS, Python |
-| SLP009 | Env-var lookup without corresponding setup in diff | info | Go, JS/TS |
-| SLP010 | Added lines in existing test contain no assertion | warn | Go |
-| SLP011 | Test body is only assertions, no arrange/act | warn | Go, JS/TS, Python |
+| SLP001 | Test function with no assertion | warn | Go, JS/TS, Python, Java, Rust |
+| SLP002 | Tautological assertion (e.g. `assert.Equal(t, x, x)`) | block | Go, JS/TS, Python, Java, Rust |
+| SLP003 | Empty error handler (catch/except with no handling) | warn | Go, JS/TS, Python, Java, Rust |
+| SLP005 | `.only` / `fdescribe` / `fit` / `@Disabled` / `@Ignore` committed | block | JS/TS, Java |
+| SLP006 | Panic/throw stub body (`panic("not implemented")`) | block | Go, JS/TS, Python, Java, Rust |
+| SLP007 | Import added in diff but never used | warn | Go, JS/TS, Python, Java, Rust |
+| SLP008 | Error logged but silently returned without recovery | warn | Go, JS/TS, Python, Java, Rust |
+| SLP009 | Env-var lookup without corresponding setup in diff | info | Go, JS/TS, Python, Java, Rust |
+| SLP010 | Added lines in existing test contain no assertion | warn | Go, JS/TS, Python, Java, Rust |
+| SLP011 | Test body is only assertions, no arrange/act | warn | Go |
 | SLP012 | TODO/FIXME/HACK comment added in diff | block | all |
 | SLP013 | Commented-out code block added in diff | block | all |
-| SLP014 | Debug print left in non-test file | block | Go, TypeScript, JavaScript, Python |
+| SLP014 | Debug print left in non-test file | block | Go, JS/TS, Python, Java, Rust |
+| SLP015 | Linter-suppression comment added instead of fixing the issue | warn | Go, JS/TS, Python, Java, Rust |
 
 ## Configuration
 
@@ -102,7 +103,7 @@ vendor/**
 ## Adding a new rule
 
 1. Create `pkg/rules/slpXXX.go` implementing the `Rule` interface:
-   - `ID() string` — return the stable rule ID (e.g. `"SLP015"`)
+   - `ID() string` — return the stable rule ID (e.g. `"SLP016"`)
    - `Description() string` — one-line human description
    - `DefaultSeverity() Severity` — `SeverityBlock`, `SeverityWarn`, or `SeverityInfo`
    - `Check(d *diff.Diff) []Finding` — run detection, return findings

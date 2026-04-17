@@ -156,6 +156,87 @@ func TestSLP003_GoMixedBodyNotAllAdded_NoFinding(t *testing.T) {
 	}
 }
 
+func TestSLP003_GoSingleLineReturnNil(t *testing.T) {
+	// if err != nil { return nil } — single-line swallow.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++if err != nil { return nil }
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for single-line return nil, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "swallow") {
+		t.Errorf("message should mention swallow: %q", got[0].Message)
+	}
+}
+
+func TestSLP003_GoSingleLineEmptyBlock(t *testing.T) {
+	// if err != nil { } — single-line empty block.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++if err != nil { }
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for single-line empty block, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "empty") {
+		t.Errorf("message should mention empty: %q", got[0].Message)
+	}
+}
+
+func TestSLP003_GoSingleLineWithLog_NoFinding(t *testing.T) {
+	// if err != nil { log.Println(err); return nil } — logged, NOT a finding.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++if err != nil { log.Println(err); return nil }
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (logged), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP003_GoSingleLineReturnErr_NoFinding(t *testing.T) {
+	// if err != nil { return err } — propagates the error, NOT a finding.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++if err != nil { return err }
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (return err), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP003_GoSingleLineReturnFalseNil(t *testing.T) {
+	// if err != nil { return false, nil } — silent multi-return.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++if err != nil { return false, nil }
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for single-line return false, nil, got %d: %+v", len(got), got)
+	}
+}
+
 // --- JS/TS tests ---
 
 func TestSLP003_JSEmptyCatch(t *testing.T) {
@@ -324,5 +405,160 @@ func TestSLP003_Description(t *testing.T) {
 	}
 	if r.DefaultSeverity() != SeverityWarn {
 		t.Errorf("default severity = %v, want warn", r.DefaultSeverity())
+	}
+}
+
+// --- Java tests ---
+
+func TestSLP003_JavaEmptyCatch(t *testing.T) {
+	// } catch (Exception e) { } — empty block, should fire.
+	d := parseDiff(t, `diff --git a/a.java b/a.java
+--- a/a.java
++++ b/a.java
+@@ -1,1 +1,4 @@
+ // a
++public void foo() {
++    try { bar(); } catch (Exception e) {}
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if got[0].File != "a.java" {
+		t.Errorf("file = %q, want a.java", got[0].File)
+	}
+}
+
+func TestSLP003_JavaCatchReturnNull(t *testing.T) {
+	// } catch (Exception e) { return null; } — bail-only, should fire.
+	d := parseDiff(t, `diff --git a/Foo.java b/Foo.java
+--- a/Foo.java
++++ b/Foo.java
+@@ -1,1 +1,5 @@
+ // a
++public Object foo() {
++    try { bar(); }
++    catch (Exception e) { return null; }
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "swallow") {
+		t.Errorf("message should mention swallow: %q", got[0].Message)
+	}
+}
+
+func TestSLP003_JavaCatchLogger_NoFinding(t *testing.T) {
+	// } catch (Exception e) { logger.error(e.getMessage()); } — logged, NOT a finding.
+	d := parseDiff(t, `diff --git a/Foo.java b/Foo.java
+--- a/Foo.java
++++ b/Foo.java
+@@ -1,1 +1,5 @@
+ // a
++public void foo() {
++    try { bar(); }
++    catch (Exception e) { logger.error(e.getMessage()); }
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (logger.error), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP003_JavaCatchThrow_NoFinding(t *testing.T) {
+	// } catch (Exception e) { throw new RuntimeException(e); } — re-thrown, NOT a finding.
+	d := parseDiff(t, `diff --git a/Foo.java b/Foo.java
+--- a/Foo.java
++++ b/Foo.java
+@@ -1,1 +1,5 @@
+ // a
++public void foo() {
++    try { bar(); }
++    catch (Exception e) { throw new RuntimeException(e); }
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (throw), got %d: %+v", len(got), got)
+	}
+}
+
+// --- Rust tests ---
+
+func TestSLP003_RustMatchErrEmpty(t *testing.T) {
+	// Err(e) => {} — empty match arm, should fire.
+	d := parseDiff(t, `diff --git a/a.rs b/a.rs
+--- a/a.rs
++++ b/a.rs
+@@ -1,1 +1,4 @@
+ // a
++match result {
++    Err(e) => {}
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if got[0].File != "a.rs" {
+		t.Errorf("file = %q, want a.rs", got[0].File)
+	}
+}
+
+func TestSLP003_RustIfLetErrReturnNone(t *testing.T) {
+	// if let Err(e) = result { return None } — bail-only, should fire.
+	d := parseDiff(t, `diff --git a/a.rs b/a.rs
+--- a/a.rs
++++ b/a.rs
+@@ -1,1 +1,4 @@
+ // a
++if let Err(e) = result {
++    return None;
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "swallow") {
+		t.Errorf("message should mention swallow: %q", got[0].Message)
+	}
+}
+
+func TestSLP003_RustMatchErrLog_NoFinding(t *testing.T) {
+	// Err(e) => { error!("fail: {e}"); return None } — logged, NOT a finding.
+	d := parseDiff(t, `diff --git a/a.rs b/a.rs
+--- a/a.rs
++++ b/a.rs
+@@ -1,1 +1,4 @@
+ // a
++match result {
++    Err(e) => { error!("fail: {e}"); return None; }
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (error!), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP003_RustMatchErrReturnErr_NoFinding(t *testing.T) {
+	// Err(e) => Err(e) — propagated, NOT a finding.
+	d := parseDiff(t, `diff --git a/a.rs b/a.rs
+--- a/a.rs
++++ b/a.rs
+@@ -1,1 +1,4 @@
+ // a
++match result {
++    Err(e) => { return Err(e); }
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (Err), got %d: %+v", len(got), got)
 	}
 }

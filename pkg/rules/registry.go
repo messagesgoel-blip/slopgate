@@ -18,5 +18,6 @@ func Default() *Registry {
 	r.Register(SLP012{})
 	r.Register(SLP013{})
 	r.Register(SLP014{})
+	r.Register(SLP015{})
 	return r
 }

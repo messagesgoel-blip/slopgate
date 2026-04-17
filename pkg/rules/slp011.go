@@ -11,6 +11,9 @@ import (
 // with no meaningful arrange/logic. This catches AI-generated tests that
 // look like "assert.Equal(t, 1, 1)" with no actual test logic.
 //
+// Languages: Go only. Non-Go languages don't have the same function-span
+// detection needed for assert-only test body analysis.
+//
 // The key distinction from SLP010 (incremental no-assertion):
 //   - SLP010: AI edited an existing test, added setup but no assertion
 //   - SLP011: Entire test body is only assertions (assert-only test body)
@@ -45,7 +48,17 @@ func isSingleVariableAssign(line string) bool {
 func (r SLP011) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
-		if f.IsDelete || !strings.HasSuffix(f.Path, "_test.go") {
+		if f.IsDelete {
+			continue
+		}
+		lang := testFileLang(f.Path)
+		if lang == "" {
+			continue
+		}
+		// SLP011 currently only handles Go test functions.
+		// Non-Go languages don't have the same function-span detection
+		// needed for assert-only test body analysis.
+		if lang != "go" {
 			continue
 		}
 		for _, h := range f.Hunks {

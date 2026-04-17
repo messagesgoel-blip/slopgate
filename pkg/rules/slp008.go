@@ -10,6 +10,8 @@ import (
 // SLP008 flags error handlers that log the error but then silently return
 // without recovery — the error is acknowledged but never acted on.
 //
+// Languages: Go, JS/TS, Python, Java, Rust.
+//
 // Rationale: AI code generators frequently produce error-handling blocks
 // that log.Printf/slog.Error the error and then return nil (or bare return).
 // This swallows the error: the caller has no idea anything went wrong, and
@@ -33,6 +35,12 @@ var slp008LogPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bconsole\.(error|warn)\s*\(`),
 	// Python: logging.error, logging.warning, logger.error, log.error, etc.
 	regexp.MustCompile(`\b(logging|logger|log)\.(error|warning|critical|exception)\s*\(`),
+	// Java: log.error, log.warn, logger.error, LOG.error, etc.
+	regexp.MustCompile(`\b(log|logger|LOG|Logger)\.(error|warn|warning|severe)\s*\(`),
+	// Rust: error!, warn!, log::error!, tracing::error!
+	regexp.MustCompile(`\b(error|warn)!\s*\(`),
+	regexp.MustCompile(`\blog::(error|warn)!\s*\(`),
+	regexp.MustCompile(`\btracing::(error|warn)!\s*\(`),
 }
 
 // slp008SilentReturnPatterns matches return statements that silently
@@ -50,6 +58,12 @@ var slp008SilentReturnPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\breturn\s+(undefined|null)\b`),
 	// Python: return None, bare return
 	regexp.MustCompile(`\breturn\s+None\b`),
+	// Java: return null
+	regexp.MustCompile(`\breturn\s+null\s*;`),
+	// Java & Rust: bare return; optionally followed by an inline comment
+	regexp.MustCompile(`\breturn\s*;\s*(?://.*|/\*.*\*/)?\s*$`),
+	// Rust: return None
+	regexp.MustCompile(`\breturn\s+None\s*;`),
 }
 
 // slp008ErrorReturnPattern detects a return that actually propagates an
@@ -62,11 +76,13 @@ var slp008ErrorReturnPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\breturn\s+errors\.(Wrap|Wrapf|New)\s*\(`),
 	// Go: return ..., err (multi-return propagating error)
 	regexp.MustCompile(`\breturn\s+.*,\s*err\b`),
-	// JS/TS: return err, throw err, return new Error
+	// JS/TS & Java: return err, throw (propagates error)
 	regexp.MustCompile(`\breturn\s+err\b`),
 	regexp.MustCompile(`\bthrow\b`),
 	// Python: raise, return err
 	regexp.MustCompile(`\braise\b`),
+	// Rust: return Err(...), return err
+	regexp.MustCompile(`\breturn\s+Err\s*\(`),
 }
 
 // isSilentReturn checks whether a return statement silently swallows
@@ -157,9 +173,10 @@ func (r SLP008) Check(d *diff.Diff) []Finding {
 // sameLineReturn checks whether a line that contains a logging call also
 // contains a silent return on the same line (e.g. after a semicolon).
 func sameLineReturn(line string) bool {
-	// Strip comments and string literals to avoid false splits on semicolons
-	// inside strings or comments.
-	clean := stripCommentAndStrings(line)
+	// Mask comments and strings to avoid false splits on semicolons
+	// inside strings or comments. maskCommentAndStrings preserves byte
+	// offsets so we can still identify return patterns accurately.
+	clean := maskCommentAndStrings(line)
 	parts := strings.Split(clean, ";")
 	if len(parts) < 2 {
 		return false
