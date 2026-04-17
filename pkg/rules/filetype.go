@@ -16,7 +16,7 @@ func isJSOrTSFile(path string) bool {
 	return ext == ".js" || ext == ".ts" || ext == ".tsx" || ext == ".jsx" || ext == ".mjs" || ext == ".cjs"
 }
 
-// isPythonFile reports whether path ends with .py.
+// isPythonFile reports whether path is a Python file (.py, .pyi, .pyw).
 func isPythonFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
 	return ext == ".py" || ext == ".pyi" || ext == ".pyw"

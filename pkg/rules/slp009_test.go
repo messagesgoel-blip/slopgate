@@ -207,8 +207,10 @@ func TestSLP009_JavaEnvVarDrift(t *testing.T) {
 	}
 }
 
-func TestSLP009_JavaEnvVarWithSetProperty_NoFinding(t *testing.T) {
-	// Java: System.getenv("DB_URL") with System.setProperty("DB_URL") => no finding.
+func TestSLP009_JavaEnvVarDrift_EvenWithSetProperty(t *testing.T) {
+	// Java: System.setProperty sets JVM properties, not OS env vars.
+	// System.getenv reads OS env vars. They are different namespaces, so
+	// setProperty does NOT suppress the getenv finding.
 	d := parseDiff(t, `diff --git a/App.java b/App.java
 --- a/App.java
 +++ b/App.java
@@ -218,8 +220,11 @@ func TestSLP009_JavaEnvVarWithSetProperty_NoFinding(t *testing.T) {
 +String db = System.getenv("DB_URL");
 `)
 	got := SLP009{}.Check(d)
-	if len(got) != 0 {
-		t.Fatalf("expected 0 findings (env var set), got %d: %+v", len(got), got)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding (setProperty is not a real env-var write), got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "DB_URL") {
+		t.Errorf("message should mention DB_URL: %q", got[0].Message)
 	}
 }
 

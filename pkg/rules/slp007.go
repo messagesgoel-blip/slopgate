@@ -93,6 +93,11 @@ var slp007JavaImport = regexp.MustCompile(`^\s*import\s+([\w.]+)\s*;`)
 
 // slp007RustUse matches `use foo::bar::Baz;` or `use foo::bar::Baz as Qux;`.
 // Captures the last segment (or the alias if present).
+//
+// Limitation: grouped imports (use std::{collections::HashMap, io::Read};)
+// and self imports (use crate::module::self;) are not matched. Only simple
+// single-path use statements are detected. Grouped imports produce false
+// negatives — they are silently skipped rather than falsely flagged.
 var slp007RustUse = regexp.MustCompile(`^\s*use\s+([\w:]+)::(\w+)\s*(?:as\s+(\w+))?\s*;`)
 
 // goImportIdent returns the identifier to search for given a Go import path

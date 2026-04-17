@@ -435,15 +435,18 @@ func scanHunkForJavaTests(path string, h diff.Hunk, sev Severity, ruleID string)
 		if m := javaTestMethod.FindStringSubmatch(trimmed); m != nil {
 			funcName = m[3]
 		}
-		// Find the opening brace.
+		// Find the opening brace, scanning forward over subsequent added
+		// lines to handle multi-line signatures (e.g., @Test on its own
+		// line followed by "public void" on the next).
 		depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
 		startLine := ln.NewLineNo
-		if depth <= 0 && i+1 < len(lines) && lines[i+1].Kind == diff.LineAdd {
-			next := lines[i+1]
-			depth += strings.Count(next.Content, "{") - strings.Count(next.Content, "}")
-			if m := javaTestMethod.FindStringSubmatch(strings.TrimSpace(next.Content)); m != nil {
+		k := i + 1
+		for depth <= 0 && k < len(lines) && lines[k].Kind == diff.LineAdd {
+			depth += strings.Count(lines[k].Content, "{") - strings.Count(lines[k].Content, "}")
+			if m := javaTestMethod.FindStringSubmatch(strings.TrimSpace(lines[k].Content)); m != nil {
 				funcName = m[3]
 			}
+			k++
 		}
 		if depth <= 0 {
 			i++
@@ -497,8 +500,10 @@ func javaHasAssertion(line string) bool {
 // rustTestAttr matches #[test] attribute.
 var rustTestAttr = regexp.MustCompile(`#\[\s*test\s*\]`)
 
-// rustTestFunc matches fn test_xxx(.
-var rustTestFunc = regexp.MustCompile(`^\s*fn\s+(test\w+)\s*\(`)
+// rustTestFunc matches any fn signature after a #[test] attribute.
+// We match any function name — #[test] can mark functions with arbitrary
+// names like fn it_should_parse_valid_input().
+var rustTestFunc = regexp.MustCompile(`^\s*(pub\s+)?fn\s+(\w+)\s*\(`)
 
 // rustAssertTokens are assertion tokens for Rust test frameworks.
 var rustAssertTokens = []string{
@@ -533,7 +538,7 @@ func scanHunkForRustTests(path string, h diff.Hunk, sev Severity, ruleID string)
 			i++
 			continue
 		}
-		funcName := m[1]
+		funcName := m[2]
 		startLine := ln.NewLineNo
 		// Collect body by brace counting from the signature line.
 		depth := strings.Count(sigLine.Content, "{") - strings.Count(sigLine.Content, "}")

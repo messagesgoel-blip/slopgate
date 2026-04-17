@@ -162,6 +162,11 @@ func scanHunkForIncrementalGoTests(path string, h diff.Hunk, sev Severity, ruleI
 // test file for assertion presence.
 func scanHunkForIncrementalNonGoTests(path string, h diff.Hunk, sev Severity, ruleID string, lang string) []Finding {
 	var out []Finding
+	// Skip pure new-file additions: SLP010 only fires when existing test
+	// code is edited without adding assertions. Brand-new files are SLP001 territory.
+	if h.OldStart == 0 && h.OldLines == 0 {
+		return out
+	}
 	var addedLines []diff.Line
 	for _, ln := range h.Lines {
 		if ln.Kind == diff.LineAdd {

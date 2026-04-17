@@ -55,7 +55,7 @@ Exit codes:
 | SLP001 | Test function with no assertion | warn | Go, JS/TS, Python, Java, Rust |
 | SLP002 | Tautological assertion (e.g. `assert.Equal(t, x, x)`) | block | Go, JS/TS, Python, Java, Rust |
 | SLP003 | Empty error handler (catch/except with no handling) | warn | Go, JS/TS, Python, Java, Rust |
-| SLP005 | `.only` / `fdescribe` / `fit` / `@Disabled` committed | block | JS/TS, Java |
+| SLP005 | `.only` / `fdescribe` / `fit` / `@Disabled` / `@Ignore` committed | block | JS/TS, Java |
 | SLP006 | Panic/throw stub body (`panic("not implemented")`) | block | Go, JS/TS, Python, Java, Rust |
 | SLP007 | Import added in diff but never used | warn | Go, JS/TS, Python, Java, Rust |
 | SLP008 | Error logged but silently returned without recovery | warn | Go, JS/TS, Python, Java, Rust |

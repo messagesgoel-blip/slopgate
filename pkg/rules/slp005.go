@@ -34,11 +34,13 @@ var slp005Patterns = []*regexp.Regexp{
 }
 
 // slp005JavaPatterns match JUnit test-disabling annotations.
+// Anchored to start-of-line (with optional whitespace) to avoid matching
+// @Disabled/@Ignore inside comments or string literals.
 var slp005JavaPatterns = []*regexp.Regexp{
 	// JUnit 5: @Disabled("reason")
-	regexp.MustCompile(`@Disabled\b`),
+	regexp.MustCompile(`^\s*@Disabled\b`),
 	// JUnit 4: @Ignore
-	regexp.MustCompile(`@Ignore\b`),
+	regexp.MustCompile(`^\s*@Ignore\b`),
 }
 
 // isJSTestFilePath reports whether the path is a JS/TS test file

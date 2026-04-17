@@ -63,10 +63,9 @@ var slp009PySetenv = regexp.MustCompile(`os\.environ\[\s*"([^"]+)"\s*\]\s*=`)
 // --- Java regexes ---
 
 // slp009JavaGetenv matches System.getenv("NAME") (lookup).
+// Note: Java cannot set OS env vars at runtime; System.setProperty sets JVM
+// system properties, a different namespace. So we only detect reads.
 var slp009JavaGetenv = regexp.MustCompile(`System\.getenv\s*\(\s*"([^"]+)"\s*\)`)
-
-// slp009JavaSetenv matches System.setProperty("NAME", ...) (setup).
-var slp009JavaSetenv = regexp.MustCompile(`System\.setProperty\s*\(\s*"([^"]+)"\s*,`)
 
 // --- Rust regexes ---
 
@@ -155,9 +154,16 @@ func (r SLP009) Check(d *diff.Diff) []Finding {
 				}
 				// Collect reads: os.environ["NAME"]
 				for _, m := range slp009PyEnvironDot.FindAllStringSubmatch(ln.Content, -1) {
-					// Skip assignments — os.environ["NAME"] = ...
+					// If this read's variable name matches a write on
+					// the same line, skip it -- it reads the written value.
+					// But retain reads of *other* vars on the same line.
+					// e.g. os.environ["A"] = os.environ["B"] should
+					// still flag "B" as a drift read.
 					if slp009PySetenv.MatchString(ln.Content) {
-						continue
+						writeMatch := slp009PySetenv.FindStringSubmatch(ln.Content)
+						if writeMatch != nil && writeMatch[1] == m[1] {
+							continue
+						}
 					}
 					reads = append(reads, envLoc{name: m[1], file: f.Path, line: ln.NewLineNo})
 				}
@@ -167,13 +173,12 @@ func (r SLP009) Check(d *diff.Diff) []Finding {
 				}
 			}
 			if isJava {
-				// Collect reads: System.getenv("NAME")
+				// Java: System.setProperty sets JVM system properties, NOT
+				// environment variables. System.getenv reads OS env vars, which
+				// cannot be set at runtime. So we only collect reads — any
+				// System.getenv call is a drift finding by default.
 				for _, m := range slp009JavaGetenv.FindAllStringSubmatch(ln.Content, -1) {
 					reads = append(reads, envLoc{name: m[1], file: f.Path, line: ln.NewLineNo})
-				}
-				// Collect writes: System.setProperty("NAME", ...)
-				for _, m := range slp009JavaSetenv.FindAllStringSubmatch(ln.Content, -1) {
-					setVars[m[1]] = true
 				}
 			}
 			if isRust {
