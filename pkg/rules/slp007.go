@@ -1,0 +1,346 @@
+package rules
+
+import (
+	"fmt"
+	"regexp"
+	"strings"
+
+	"github.com/messagesgoel-blip/slopgate/pkg/diff"
+)
+
+// SLP007 flags imports that are added in a diff but never referenced in any
+// other added line of the same file. This catches the classic AI "just in
+// case" import slop where an agent adds an import but never uses the package.
+//
+// Supported languages:
+//   - Go: import "pkg" / import alias "pkg" / import ( ... ) groups
+//   - JS/TS: import { X } from 'y' / import X from 'y'
+//
+// Exempt:
+//   - Go blank imports: import _ "pkg" (side-effect imports)
+//   - Go dot imports: import . "pkg" (too ambiguous)
+//   - Pre-existing imports (only newly added import lines are checked)
+type SLP007 struct{}
+
+func (SLP007) ID() string                { return "SLP007" }
+func (SLP007) DefaultSeverity() Severity { return SeverityWarn }
+func (SLP007) Description() string {
+	return "import added in diff but not used in any added line"
+}
+
+// importInfo holds a parsed import with the identifier to search for.
+type importInfo struct {
+	content   string // full added line content (for snippet)
+	lineNo    int    // new file line number
+	ident     string // identifier to search for in other added lines
+	pkgPath   string // full import path (for message)
+	isGrouped bool   // true if inside import ( ... )
+}
+
+// --- Go import patterns ---
+
+// slp007GoSingleImport matches a single Go import outside a group.
+// Captures: 1=alias (optional: word alias with optional space, or . or _ with
+// optional space), 2=pkg path
+var slp007GoSingleImport = regexp.MustCompile(`^\s*import\s+((?:\w+(?:\s+)?)|[._](?:\s+)?)?"([^"]+)"`)
+
+// slp007GoGroupedImport matches a Go import line inside import ( ... ).
+// Captures: 1=alias (optional), 2=pkg path
+var slp007GoGroupedImport = regexp.MustCompile(`^\s*((?:\w+(?:\s+)?)|[._](?:\s+)?)?"([^"]+)"`)
+
+// slp007GoGroupOpen matches the opening of a Go grouped import block.
+var slp007GoGroupOpen = regexp.MustCompile(`^\s*import\s*\(\s*$`)
+
+// slp007GoGroupClose matches the closing of a Go grouped import block.
+var slp007GoGroupClose = regexp.MustCompile(`^\s*\)\s*$`)
+
+// --- JS/TS import patterns ---
+
+// slp007JSNamedImport matches `import { X, Y, Z } from 'pkg'` or
+// `import { X as Y } from 'pkg'`.
+var slp007JSNamedImport = regexp.MustCompile(`^\s*import\s*\{([^}]+)\}\s*from\s*['"][^'"]+['"]`)
+
+// slp007JSDefaultImport matches `import X from 'pkg'` where X is not
+// a brace or asterisk.
+var slp007JSDefaultImport = regexp.MustCompile(`^\s*import\s+([A-Za-z_$][\w$]*)\s+from\s*['"][^'"]+['"]`)
+
+// slp007JSStarImport matches `import * as X from 'pkg'`.
+var slp007JSStarImport = regexp.MustCompile(`^\s*import\s*\*\s*as\s+([A-Za-z_$][\w$]*)\s+from\s*['"][^'"]+['"]`)
+
+// slp007JSNamedItem matches a single item inside braces: X or X as Y.
+var slp007JSNamedItem = regexp.MustCompile(`(\w+)\s*(?:as\s+(\w+))?`)
+
+// goImportIdent returns the identifier to search for given a Go import path
+// and optional alias. If the import is blank or dot, it returns ("", false).
+func goImportIdent(pkgPath, prefix string) (string, bool) {
+	prefix = strings.TrimSpace(prefix)
+	switch prefix {
+	case "_":
+		// Blank import — side-effect import, not a finding.
+		return "", false
+	case ".":
+		// Dot import — too ambiguous, skip.
+		return "", false
+	}
+	if prefix != "" {
+		// Explicit alias: search for "alias."
+		return prefix, true
+	}
+	// No alias: use last segment of the import path.
+	// e.g. "fmt" -> "fmt", "encoding/json" -> "json"
+	parts := strings.Split(pkgPath, "/")
+	last := parts[len(parts)-1]
+	return last, true
+}
+
+// parseGoImports extracts newly added Go import identifiers from the added
+// lines of a file. It handles both single imports and grouped import ( ... )
+// blocks.
+func parseGoImports(added []diff.Line) []importInfo {
+	var result []importInfo
+
+	inGroup := false
+	for _, ln := range added {
+		content := ln.Content
+
+		if inGroup {
+			if slp007GoGroupClose.MatchString(content) {
+				inGroup = false
+				continue
+			}
+			m := slp007GoGroupedImport.FindStringSubmatch(content)
+			if m == nil {
+				continue
+			}
+			prefix := m[1]
+			pkgPath := m[2]
+			ident, ok := goImportIdent(pkgPath, prefix)
+			if !ok {
+				continue
+			}
+			result = append(result, importInfo{
+				content:   content,
+				lineNo:    ln.NewLineNo,
+				ident:     ident,
+				pkgPath:   pkgPath,
+				isGrouped: true,
+			})
+			continue
+		}
+
+		// Check for group opening: import (
+		if slp007GoGroupOpen.MatchString(content) {
+			inGroup = true
+			continue
+		}
+
+		// Check for single import.
+		m := slp007GoSingleImport.FindStringSubmatch(content)
+		if m == nil {
+			continue
+		}
+		prefix := m[1]
+		pkgPath := m[2]
+		ident, ok := goImportIdent(pkgPath, prefix)
+		if !ok {
+			continue
+		}
+		result = append(result, importInfo{
+			content: content,
+			lineNo:  ln.NewLineNo,
+			ident:   ident,
+			pkgPath: pkgPath,
+		})
+	}
+
+	return result
+}
+
+// parseJSImports extracts newly added JS/TS import identifiers from the added
+// lines of a file.
+func parseJSImports(added []diff.Line) []importInfo {
+	var result []importInfo
+
+	for _, ln := range added {
+		content := ln.Content
+
+		// import * as X from 'y' — ident is X
+		if m := slp007JSStarImport.FindStringSubmatch(content); m != nil {
+			result = append(result, importInfo{
+				content: content,
+				lineNo:  ln.NewLineNo,
+				ident:   m[1],
+				pkgPath: "star import",
+			})
+			continue
+		}
+
+		// import { X, Y, Z } from 'y'
+		if m := slp007JSNamedImport.FindStringSubmatch(content); m != nil {
+			braces := m[1]
+			for _, item := range parseJSNamedItems(braces) {
+				result = append(result, importInfo{
+					content: content,
+					lineNo:  ln.NewLineNo,
+					ident:   item,
+					pkgPath: "named import",
+				})
+			}
+			continue
+		}
+
+		// import X from 'y' — default import
+		if m := slp007JSDefaultImport.FindStringSubmatch(content); m != nil {
+			result = append(result, importInfo{
+				content: content,
+				lineNo:  ln.NewLineNo,
+				ident:   m[1],
+				pkgPath: "default import",
+			})
+			continue
+		}
+	}
+
+	return result
+}
+
+// parseJSNamedItems extracts individual identifiers from the braces content
+// of a named import. Handles "X" and "X as Y" — returns the local name (Y
+// for aliases, X otherwise).
+func parseJSNamedItems(braces string) []string {
+	var items []string
+	for _, m := range slp007JSNamedItem.FindAllStringSubmatch(braces, -1) {
+		name := m[1]
+		alias := m[2]
+		if alias != "" {
+			items = append(items, alias)
+		} else {
+			items = append(items, name)
+		}
+	}
+	return items
+}
+
+// identUsedInAddedLines reports whether any added line (other than import
+// lines themselves) contains a reference to the given identifier.
+// For Go: looks for "ident." (package qualifier).
+// For JS/TS: looks for the bare identifier as a word boundary.
+// skipLineN is the line number of the import line to skip (so we don't
+// falsely detect the identifier in its own import declaration).
+func identUsedInAddedLines(ident string, added []diff.Line, goMode bool, skipLineN int) bool {
+	var searchPat string
+	if goMode {
+		searchPat = ident + "."
+	} else {
+		searchPat = ident
+	}
+
+	for _, ln := range added {
+		// Skip the import line itself.
+		if ln.NewLineNo == skipLineN {
+			continue
+		}
+		content := ln.Content
+
+		if goMode {
+			// For Go, search for ident. as a package qualifier.
+			if strings.Contains(content, searchPat) {
+				return true
+			}
+		} else {
+			// For JS/TS, use word-boundary check.
+			if wordInLine(content, ident) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// wordInLine reports whether the given word appears as a whole word in the
+// line content. This prevents false positives like "Stateful" matching
+// "State".
+func wordInLine(line, word string) bool {
+	idx := 0
+	for {
+		pos := strings.Index(line[idx:], word)
+		if pos < 0 {
+			return false
+		}
+		pos += idx
+		// Check char before the match.
+		if pos > 0 {
+			ch := line[pos-1]
+			if isWordChar(ch) {
+				idx = pos + 1
+				continue
+			}
+		}
+		// Check char after the match.
+		end := pos + len(word)
+		if end < len(line) {
+			ch := line[end]
+			if isWordChar(ch) {
+				idx = pos + 1
+				continue
+			}
+		}
+		return true
+	}
+}
+
+// isWordChar reports whether the byte is a word character (alphanumeric,
+// underscore, or dollar sign).
+func isWordChar(ch byte) bool {
+	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' || ch == '$'
+}
+
+func (r SLP007) Check(d *diff.Diff) []Finding {
+	var out []Finding
+
+	for _, f := range d.Files {
+		if f.IsDelete {
+			continue
+		}
+
+		added := f.AddedLines()
+		if len(added) == 0 {
+			continue
+		}
+
+		var imports []importInfo
+		var goMode bool
+
+		if isGoFile(f.Path) {
+			imports = parseGoImports(added)
+			goMode = true
+		} else if isJSOrTSFile(f.Path) {
+			imports = parseJSImports(added)
+			goMode = false
+		} else {
+			continue
+		}
+
+		for _, imp := range imports {
+			if identUsedInAddedLines(imp.ident, added, goMode, imp.lineNo) {
+				continue
+			}
+
+			msg := fmt.Sprintf("import %q added but %s is never used in any added line", imp.pkgPath, imp.ident)
+			if goMode && !imp.isGrouped {
+				msg = fmt.Sprintf("import %q added but %s. is never used in any added line", imp.pkgPath, imp.ident)
+			}
+
+			out = append(out, Finding{
+				RuleID:   r.ID(),
+				Severity: r.DefaultSeverity(),
+				File:     f.Path,
+				Line:     imp.lineNo,
+				Message:  msg,
+				Snippet:  strings.TrimSpace(imp.content),
+			})
+		}
+	}
+
+	return out
+}

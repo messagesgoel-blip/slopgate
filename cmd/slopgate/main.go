@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/messagesgoel-blip/slopgate/pkg/config"
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 	"github.com/messagesgoel-blip/slopgate/pkg/report"
 	"github.com/messagesgoel-blip/slopgate/pkg/rules"
@@ -43,17 +44,21 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 
 	var (
-		staged  bool
-		base    string
-		repoDir string
-		format  string
-		noColor bool
+		staged     bool
+		base       string
+		repoDir    string
+		format     string
+		noColor    bool
+		configPath string
+		listRules  bool
 	)
 	fs.BoolVar(&staged, "staged", false, "scan the staged diff (pre-commit mode)")
 	fs.StringVar(&base, "base", "", "scan the diff against this base revision (e.g. main)")
 	fs.StringVar(&repoDir, "C", "", "run git from this directory instead of cwd")
 	fs.StringVar(&format, "format", "text", "output format: text or json")
 	fs.BoolVar(&noColor, "no-color", false, "disable ANSI colors in text output")
+	fs.StringVar(&configPath, "config", "", "path to .slopgate.toml config file")
+	fs.BoolVar(&listRules, "list-rules", false, "list all registered rules and exit")
 
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "slopgate: catches AI-generated code slop on staged or branch diffs")
@@ -62,6 +67,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+
+	// Handle --list-rules early — no diff or config needed.
+	if listRules {
+		reg := rules.Default()
+		for _, rule := range reg.All() {
+			fmt.Fprintf(stdout, "%s\t%s\t%s\n", rule.ID(), rule.DefaultSeverity(), rule.Description())
+		}
+		return 0
 	}
 
 	if staged && base != "" {
@@ -99,7 +113,36 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	parsed = diff.FilterIgnored(parsed, ignorePatterns)
 
-	findings := rules.Default().Run(parsed)
+	// Load config if provided or auto-discovered.
+	var cfg *config.Config
+	if configPath != "" {
+		var err error
+		cfg, err = config.Load(configPath)
+		if err != nil {
+			fmt.Fprintf(stderr, "slopgate: load config %s: %v\n", configPath, err)
+			return 2
+		}
+	} else {
+		// Auto-discover .slopgate.toml from the working directory.
+		searchDir := repoDir
+		if searchDir == "" {
+			searchDir, _ = os.Getwd()
+		}
+		discovered, err := config.Discover(searchDir)
+		if err != nil {
+			fmt.Fprintf(stderr, "slopgate: discover config: %v\n", err)
+			return 2
+		}
+		if discovered != "" {
+			cfg, err = config.Load(discovered)
+			if err != nil {
+				fmt.Fprintf(stderr, "slopgate: load config %s: %v\n", discovered, err)
+				return 2
+			}
+		}
+	}
+
+	findings := rules.Default().Run(parsed, cfg)
 
 	switch format {
 	case "json":
