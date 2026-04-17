@@ -43,12 +43,6 @@ Add to `.git/hooks/pre-commit` or `.githooks/pre-commit`:
 slopgate --staged --no-color
 ```
 
-By default slopgate findings are advisory (exit 0). To make block-severity findings fail the hook, set `SLOPGATE_BLOCK=1`:
-
-```bash
-SLOPGATE_BLOCK=1 slopgate --staged --no-color
-```
-
 Exit codes:
 - `0` - no blocking findings
 - `1` - blocking findings present
@@ -93,7 +87,7 @@ ignore_paths = ["**/*_test.go"]
 ### Config discovery
 
 1. `--config PATH` if provided on the command line
-2. Walk up from the working directory to the repo root looking for `.slopgate.toml`
+2. Walk up from the working directory, stopping at the repo root (`.git` or `go.mod` sentinel), looking for `.slopgate.toml`
 3. No config found — all rules use their default severity
 
 ### `.slopgateignore`
