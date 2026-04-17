@@ -54,15 +54,15 @@ func slp019IsTerminator(content string) bool {
 		}
 	}
 	// Strip everything from first non-alpha rune onward (e.g. "panic(" → "panic").
-	var clean string
+	var b strings.Builder
 	for _, r := range word {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '.' {
-			clean += string(r)
+			b.WriteRune(r)
 		} else {
 			break
 		}
 	}
-	return slp019Terminators[strings.ToLower(clean)]
+	return slp019Terminators[strings.ToLower(b.String())]
 }
 
 func isAlphaNum(b byte) bool {
@@ -119,17 +119,15 @@ func (r SLP019) Check(d *diff.Diff) []Finding {
 					if indentNext < indentTerm {
 						break
 					}
-					if indentNext >= indentTerm {
-						out = append(out, Finding{
-							RuleID:   r.ID(),
-							Severity: r.DefaultSeverity(),
-							File:     f.Path,
-							Line:     next.NewLineNo,
-							Message:  fmt.Sprintf("unreachable code after %s", strings.TrimSpace(stripCommentAndStrings(ln.Content))),
-							Snippet:  strings.TrimSpace(next.Content),
-						})
-						break
-					}
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     next.NewLineNo,
+						Message:  fmt.Sprintf("unreachable code after %s", strings.TrimSpace(stripCommentAndStrings(ln.Content))),
+						Snippet:  strings.TrimSpace(next.Content),
+					})
+					break
 				}
 			}
 		}

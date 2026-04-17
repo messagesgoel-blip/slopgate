@@ -38,7 +38,7 @@ var slp020Patterns = []struct {
 	example  string
 }{
 	// Insecure random
-	{regexp.MustCompile(`math/rand`), "go", "random", "math/rand"},
+	{regexp.MustCompile(`"math/rand"`), "go", "random", "math/rand"},
 	{regexp.MustCompile(`rand\.\w+\(`), "go", "random", "rand.*() (with math/rand)"},
 	{regexp.MustCompile(`random\.`), "py", "random", "random."},
 	{regexp.MustCompile(`Math\.random\s*\(`), "js", "random", "Math.random()"},
@@ -50,15 +50,15 @@ var slp020Patterns = []struct {
 	{regexp.MustCompile(`(?:MD5|SHA-1|SHA1)\b`), "java", "hash", "MD5/SHA-1"},
 }
 
-var slp020SecContext = regexp.MustCompile(`(?i)(?:password|token|secret|key|session|nonce|salt|credential|auth)`)
+var slp020SecContext = regexp.MustCompile(`(?i)\b(?:password|token|secret|key|session|nonce|salt|credential|auth)\b`)
 
 // slp020PythonSecure matches Python secrets module usage (safe random).
 var slp020PythonSecure = regexp.MustCompile(`secrets\.`)
 
-// slp020GoSecureRand detects crypto/rand import or usage (secure random).
-var slp020GoSecureRand = regexp.MustCompile(`crypto/rand`)
+// slp020GoSecureRand matches crypto/rand inside a Go import spec.
+var slp020GoSecureRand = regexp.MustCompile(`"crypto/rand"`)
 
-// slp020MathRand detects math/rand import (insecure random).
+// slp020MathRand matches math/rand inside a Go import spec.
 var slp020MathRand = regexp.MustCompile(`math/rand`)
 
 func slp020FileLang(path string) string {
@@ -115,7 +115,8 @@ func (r SLP020) Check(d *diff.Diff) []Finding {
 		for _, ln := range f.AddedLines() {
 			raw := ln.Content
 			trimmed := strings.TrimLeft(raw, " \t")
-			if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
+			if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") ||
+				strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*/") || strings.HasPrefix(trimmed, "* ") {
 				continue
 			}
 
