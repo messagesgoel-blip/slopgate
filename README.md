@@ -48,7 +48,7 @@ Exit codes:
 - `1` - blocking findings present
 - `2` - configuration or tool error
 
-## Rules (v0.0.3)
+## Rules (v0.0.4)
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
@@ -66,6 +66,16 @@ Exit codes:
 | SLP013 | Commented-out code block added in diff | block | all |
 | SLP014 | Debug print left in non-test file | block | Go, JS/TS, Python, Java, Rust |
 | SLP015 | Linter-suppression comment added instead of fixing the issue | warn | Go, JS/TS, Python, Java, Rust |
+| SLP016 | Variable shadows an outer-scope declaration with the same name | warn | Go, JS/TS, Python, Java, Rust |
+| SLP017 | Unexplained numeric literal — define a named constant instead | info | Go, JS/TS, Python, Java, Rust |
+| SLP018 | Overly broad catch/except catches base exception type | warn | Java, Python |
+| SLP019 | Unreachable code after return/throw/panic/break/continue | warn | Go, JS/TS, Python, Java, Rust |
+| SLP020 | Insecure random or weak hash — use cryptographic alternative | info* | Go, JS/TS, Python, Java |
+| SLP021 | Mixed camelCase and snake_case naming in the same hunk | info | Go, JS/TS, Python, Java, Rust |
+| SLP022 | fmt.Errorf uses %v/%s with error arg instead of %w for wrapping | warn | Go |
+| SLP023 | Bare type assertion without comma-ok guard panics on mismatch | warn | Go |
+
+\* SLP020 escalates to **warn** when security-context keywords (password, token, secret, key, session, nonce, salt, credential, auth) appear nearby.
 
 ## Configuration
 
