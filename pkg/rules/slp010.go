@@ -160,6 +160,11 @@ func scanHunkForIncrementalGoTests(path string, h diff.Hunk, sev Severity, ruleI
 // (JS/TS/Python/Java/Rust) contain any assertion tokens. For non-Go
 // languages, we use a simpler approach: check all added lines in the
 // test file for assertion presence.
+//
+// Limitation: this does not verify that added lines are inside an existing
+// test function body. Non-test code (imports, helpers) in test files may
+// trigger false positives. The new-file guard (OldStart==0 && OldLines==0)
+// excludes brand-new files which are SLP001's territory.
 func scanHunkForIncrementalNonGoTests(path string, h diff.Hunk, sev Severity, ruleID string, lang string) []Finding {
 	var out []Finding
 	// Skip pure new-file additions: SLP010 only fires when existing test

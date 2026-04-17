@@ -87,6 +87,12 @@ func slp015FileLang(path string) string {
 // used for SLP015 because we want to detect linter-suppression directives that
 // appear in comments, which would be stripped by stripCommentAndStrings.
 //
+// Limitation: this function processes each line independently, so multi-line
+// string literals (e.g. Python triple-quoted strings) that span multiple lines
+// are not tracked across calls. A string literal opened on a previous line will
+// not suppress false positives on subsequent lines. This is acceptable for
+// SLP015's diff-based analysis since multi-line strings in diffs are rare.
+//
 // Raw-string variants are also handled:
 //   - Python r"..." / r'...' / R"..." / R'...' — no backslash escaping
 //   - Rust r"..." and r#"..."# (arbitrary # count) — no backslash escaping;

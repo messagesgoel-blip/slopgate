@@ -325,6 +325,7 @@ var pyAssertTokens = []string{
 	"assert ", "self.assert", "self.assertEqual", "self.assertTrue",
 	"self.assertFalse", "self.assertIsNone", "self.assertIsNotNone",
 	"self.assertIn", "self.assertRaises",
+	"pytest.raises(",
 }
 
 // scanHunkForPyTests walks a hunk looking for added Python test function
@@ -454,7 +455,7 @@ func scanHunkForJavaTests(path string, h diff.Hunk, sev Severity, ruleID string)
 		}
 		sawAssertion := javaHasAssertion(ln.Content)
 		bodyAllAdded := true
-		j := i + 1
+		j := k // start after header lines consumed by lookahead
 		for j < len(lines) && depth > 0 {
 			bl := lines[j]
 			if bl.Kind != diff.LineAdd {
@@ -527,12 +528,16 @@ func scanHunkForRustTests(path string, h diff.Hunk, sev Severity, ruleID string)
 			i++
 			continue
 		}
-		// Next added line should be the function signature.
-		if i+1 >= len(lines) || lines[i+1].Kind != diff.LineAdd {
+		// Skip attribute lines (#[cfg(test)], etc.) to find the fn signature.
+		sigIdx := i + 1
+		for sigIdx < len(lines) && lines[sigIdx].Kind == diff.LineAdd && strings.HasPrefix(strings.TrimSpace(lines[sigIdx].Content), "#[") {
+			sigIdx++
+		}
+		if sigIdx >= len(lines) || lines[sigIdx].Kind != diff.LineAdd {
 			i++
 			continue
 		}
-		sigLine := lines[i+1]
+		sigLine := lines[sigIdx]
 		m := rustTestFunc.FindStringSubmatch(strings.TrimSpace(sigLine.Content))
 		if m == nil {
 			i++

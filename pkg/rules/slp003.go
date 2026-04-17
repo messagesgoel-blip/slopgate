@@ -34,7 +34,7 @@ var slp003GoErrCheck = regexp.MustCompile(`^\s*if\s+err\s*!=\s*nil\s*\{\s*$`)
 // `if err != nil { return nil }` or `if err != nil { return }`.
 // Also matches when preceded by other code (e.g., inside a function body).
 // Captures the content between the braces in group 1.
-var slp003GoSingleLineErrCheck = regexp.MustCompile(`if\s+err\s*!=\s*nil\s*\{\s*(.+?)\s*\}`)
+var slp003GoSingleLineErrCheck = regexp.MustCompile(`if\s+err\s*!=\s*nil\s*\{\s*(.*?)\s*\}`)
 
 // slp003LogTokens are substrings that indicate the error is being
 // logged rather than silently swallowed.
@@ -228,7 +228,9 @@ func rustIsBailOnly(body string) bool {
 		if trimmed == "" || trimmed == "}" || trimmed == "}," {
 			continue
 		}
-		if trimmed == "return None;" || trimmed == "return;" || trimmed == "return None," {
+		if trimmed == "return None;" || trimmed == "return;" || trimmed == "return None," ||
+			trimmed == "None" || trimmed == "None;" || trimmed == "None," ||
+			trimmed == "return None" {
 			continue
 		}
 		return false

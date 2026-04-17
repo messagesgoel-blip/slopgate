@@ -77,8 +77,8 @@ var slp007JSNamedItem = regexp.MustCompile(`(\w+)\s*(?:as\s+(\w+))?`)
 
 // --- Python import patterns ---
 
-// slp007PyPlainImport matches `import X` or `import X, Y`.
-var slp007PyPlainImport = regexp.MustCompile(`^\s*import\s+([\w.]+(?:\s*,\s*[\w.]+)*)`)
+// slp007PyPlainImport matches `import X` or `import X, Y` or `import X as Y`.
+var slp007PyPlainImport = regexp.MustCompile(`^\s*import\s+(.+)`)
 
 // slp007PyFromImport matches `from X import Y` (or `from X import Y as Z`).
 // Group 1: module path, Group 2: the items after import.
