@@ -99,6 +99,9 @@ func (r SLP020) Check(d *diff.Diff) []Finding {
 		if lang == "go" {
 			for _, h := range f.Hunks {
 				for _, ln := range h.Lines {
+					if ln.Kind == diff.LineDelete {
+						continue
+					}
 					if slp020GoSecureRand.MatchString(ln.Content) {
 						goUsesCryptoRand = true
 					}
@@ -136,8 +139,8 @@ func (r SLP020) Check(d *diff.Diff) []Finding {
 				if p.lang != "" && lang != p.lang {
 					continue
 				}
-				// Go: skip random-category match if file imports crypto/rand.
-				if lang == "go" && goUsesCryptoRand && p.category == "random" {
+				// Go: skip random-category match if file imports only crypto/rand (not also math/rand).
+				if lang == "go" && goUsesCryptoRand && !goUsesMathRand && p.category == "random" {
 					continue
 				}
 				// Go: skip rand.*() call-site pattern without math/rand import (ambiguous).

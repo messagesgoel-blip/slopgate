@@ -45,23 +45,25 @@ func (r SLP023) Check(d *diff.Diff) []Finding {
 		}
 		for _, ln := range f.AddedLines() {
 			content := ln.Content
-			trimmed := strings.TrimLeft(content, " \t")
+			stripped := stripCommentAndStrings(content)
+			trimmed := strings.TrimLeft(stripped, " \t")
 			if strings.HasPrefix(trimmed, "//") {
 				continue
 			}
 			// Skip type switches.
-			if slp023TypeSwitch.MatchString(content) {
-				continue
-			}
-			// Skip comma-ok assertions.
-			if slp023CommaOk.MatchString(content) {
+			if slp023TypeSwitch.MatchString(stripped) {
 				continue
 			}
 			// Check for bare type assertions.
-			if !slp023TypeAssert.MatchString(content) {
+			if !slp023TypeAssert.MatchString(stripped) {
 				continue
 			}
-			// Extract the assertion for the message.
+			// Scope comma-ok check to prefix before the assertion position.
+			loc := slp023TypeAssert.FindStringIndex(stripped)
+			if loc != nil && slp023CommaOk.MatchString(stripped[:loc[0]]) {
+				continue
+			}
+			// Extract the assertion from raw content for the message.
 			m := slp023TypeAssert.FindString(content)
 			out = append(out, Finding{
 				RuleID:   r.ID(),

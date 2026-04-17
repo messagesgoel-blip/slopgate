@@ -74,7 +74,7 @@ func slp019IsClosingBrace(s string) bool {
 	clean := stripCommentAndStrings(s)
 	clean = strings.TrimRight(clean, ";")
 	clean = strings.TrimSpace(clean)
-	return clean == "}" || clean == ")" || clean == "]" || clean == "});" || clean == "]);"
+	return clean == "}" || clean == ")" || clean == "]" || clean == "})" || clean == "])"
 }
 
 func (r SLP019) Check(d *diff.Diff) []Finding {
