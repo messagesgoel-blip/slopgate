@@ -177,7 +177,7 @@ func readGitDiff(dir string, staged bool, base string) ([]byte, error) {
 	gitArgs = append(gitArgs, "diff", "--no-color", "-U3")
 	switch {
 	case staged:
-		gitArgs = append(gitArgs, "--staged")
+		gitArgs = append(gitArgs, "--cached")
 	case base != "":
 		gitArgs = append(gitArgs, base+"...HEAD")
 	}
