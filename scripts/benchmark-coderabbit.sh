@@ -10,10 +10,10 @@
 # BASE_REF   — base branch for diff (default: main)
 # --output   — optional: write JSON comparison to FILE
 #
-# Requires: gh (authenticated), jq, slopgate (on PATH or SLOPGATE_BIN)
+# Requires: gh (authenticated), jq, python3, slopgate (on PATH or SLOPGATE_BIN)
 set -euo pipefail
 
-SLOPGATE_BIN="${SLOPGATE_BIN:-$(which slopgate 2>/dev/null || echo /srv/storage/shared/tools/bin/slopgate)}"
+SLOPGATE_BIN="${SLOPGATE_BIN:-$(command -v slopgate 2>/dev/null || echo /srv/storage/shared/tools/bin/slopgate)}"
 FUZZY_LINE_RANGE="${BENCHMARK_FUZZY_RANGE:-2}"
 OUTPUT_FILE=""
 
@@ -29,8 +29,12 @@ BASE_REF="main"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --output) OUTPUT_FILE="$2"; shift 2 ;;
-    --base) BASE_REF="$2"; shift 2 ;;
+    --output)
+      if [[ $# -lt 2 ]]; then echo "Error: --output requires an argument" >&2; exit 1; fi
+      OUTPUT_FILE="$2"; shift 2 ;;
+    --base)
+      if [[ $# -lt 2 ]]; then echo "Error: --base requires an argument" >&2; exit 1; fi
+      BASE_REF="$2"; shift 2 ;;
     *) BASE_REF="$1"; shift ;;
   esac
 done
@@ -55,7 +59,11 @@ echo ""
 
 # --- Step 1: Run slopgate ---
 echo "Running slopgate..." >&2
-SLOPGATE_JSON=$("$SLOPGATE_BIN" --base "$BASE_REF" --format json -C "$REPO_DIR" 2>/dev/null || echo '{"findings":[],"summary":{"total":0,"block":0,"warn":0,"info":0}}')
+if ! SLOPGATE_JSON=$("$SLOPGATE_BIN" --base "$BASE_REF" --format json -C "$REPO_DIR" 2>&1); then
+  echo "Error: slopgate failed" >&2
+  echo "$SLOPGATE_JSON" | head -5 >&2
+  SLOPGATE_JSON='{"findings":[],"summary":{"total":0,"block":0,"warn":0,"info":0}}'
+fi
 
 SLOPGATE_COUNT="$(echo "$SLOPGATE_JSON" | jq '.summary.total // 0')"
 SLOPGATE_BLOCK="$(echo "$SLOPGATE_JSON" | jq '.summary.block // 0')"
@@ -66,11 +74,8 @@ echo "Slopgate: $SLOPGATE_COUNT findings ($SLOPGATE_BLOCK block, $SLOPGATE_WARN 
 
 # --- Step 2: Fetch CodeRabbit comments ---
 echo "Fetching CodeRabbit comments..." >&2
-CR_COMMENTS_RAW="$(gh api "repos/$OWNER_REPO/pulls/$PR_NUMBER/comments" --paginate 2>/dev/null || echo '[]')"
-# Handle case where --paginate outputs multiple concatenated JSON arrays
-if echo "$CR_COMMENTS_RAW" | jq -e . >/dev/null 2>&1; then
-  CR_COMMENTS_RAW="$(echo "$CR_COMMENTS_RAW" | jq '.')"
-fi
+# --paginate may output multiple JSON arrays; jq -s 'add' merges them.
+CR_COMMENTS_RAW="$(gh api "repos/$OWNER_REPO/pulls/$PR_NUMBER/comments" --paginate 2>/dev/null | jq -s 'add' 2>/dev/null || echo '[]')"
 
 # Filter to CodeRabbit comments only
 CR_COMMENTS="$(echo "$CR_COMMENTS_RAW" | jq '[.[] | select(.user.login | test("coderabbit|code-rabbit"; "i"))]')"
@@ -79,31 +84,34 @@ CR_COUNT="$(echo "$CR_COMMENTS" | jq 'length')"
 echo "CodeRabbit: $CR_COUNT review comments"
 echo ""
 
-# --- Step 3: Use Python for fuzzy line matching comparison ---
-# Write normalized data to temp files, then use python for the comparison
-# since awk fuzzy matching was unreliable with TSV containing colons in messages.
-
+# --- Step 3: Normalize and compare using Python ---
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
 echo "$SLOPGATE_JSON" | jq -c '.findings[] | {file, line, rule_id, severity, message}' > "$TMPDIR/slopgate.json"
 echo "$CR_COMMENTS" | jq -c '.[] | {path, line: (.line // .original_line // 0), body: (.body | split("\n")[0][0:120]), id}' > "$TMPDIR/cr.json"
 
-# Python comparison script
-python3 << PYEOF > "$TMPDIR/report.txt" 2>/dev/null
-import json, sys
+# Write Python script to a file to avoid shell interpolation issues
+cat > "$TMPDIR/compare.py" << 'PYEOF'
+import json, sys, os, re
+from collections import Counter
 
-fuzzy = $FUZZY_LINE_RANGE
+fuzzy = int(os.environ.get("BENCHMARK_FUZZY_RANGE", "2"))
+tmpdir = os.environ.get("BENCHMARK_TMPDIR", "/tmp")
 
-with open("$TMPDIR/slopgate.json") as f:
+def sanitize(s):
+    """Strip non-JSON-safe characters for safe embedding."""
+    return re.sub(r'[^\w .:/\\-]', '_', s[:200])
+
+with open(os.path.join(tmpdir, "slopgate.json")) as f:
     sg_findings = [json.loads(line) for line in f if line.strip()]
 
-with open("$TMPDIR/cr.json") as f:
+with open(os.path.join(tmpdir, "cr.json")) as f:
     cr_comments = [json.loads(line) for line in f if line.strip()]
 
 # Match by file + line proximity
 overlap = []
-sg_only = list(sg_findings)  # copy, will remove matches
+sg_only = list(sg_findings)
 cr_matched = set()
 
 for sf in sg_findings:
@@ -151,28 +159,44 @@ if sg_only:
     print()
 
 # Per-rule slopgate breakdown
-from collections import Counter
 rule_counts = Counter((f["rule_id"], f["severity"]) for f in sg_findings)
 print("--- Slopgate per-rule breakdown ---")
 for (rule, sev), count in rule_counts.most_common():
     print(f"  {rule:10} [{sev:5}] {count} findings")
 print()
 
-# JSON output
+# JSON output — read repo/pr/base from environment to avoid injection
 result = {
-    "repo": "$OWNER_REPO",
-    "pr": $PR_NUMBER,
-    "base": "$BASE_REF",
-    "slopgate": {"total": len(sg_findings), "block": sum(1 for f in sg_findings if f["severity"] == "block"), "warn": sum(1 for f in sg_findings if f["severity"] == "warn"), "info": sum(1 for f in sg_findings if f["severity"] == "info")},
+    "repo": os.environ.get("BENCHMARK_REPO", "unknown"),
+    "pr": int(os.environ.get("BENCHMARK_PR", "0")),
+    "base": os.environ.get("BENCHMARK_BASE", "main"),
+    "slopgate": {
+        "total": len(sg_findings),
+        "block": sum(1 for f in sg_findings if f["severity"] == "block"),
+        "warn": sum(1 for f in sg_findings if f["severity"] == "warn"),
+        "info": sum(1 for f in sg_findings if f["severity"] == "info"),
+    },
     "coderabbit": {"total": len(cr_comments)},
     "comparison": {"overlap": len(overlap), "slopgate_only": len(sg_only), "cr_only": len(cr_only)},
     "overlap_details": [{"file": o["sg"]["file"], "line": o["sg"]["line"], "rule_id": o["sg"]["rule_id"], "cr_summary": o["cr"]["body"][:120]} for o in overlap],
     "cr_only_details": [{"file": cc["path"], "line": cc["line"], "summary": cc["body"][:120]} for cc in cr_only],
-    "sg_only_details": [{"file": sf["file"], "line": sf["line"], "rule_id": sf["rule_id"], "severity": sf["severity"], "message": sf["message"]} for sf in sg_only]
+    "sg_only_details": [{"file": sf["file"], "line": sf["line"], "rule_id": sf["rule_id"], "severity": sf["severity"], "message": sf["message"]} for sf in sg_only],
 }
-with open("$TMPDIR/result.json", "w") as f:
+with open(os.path.join(tmpdir, "result.json"), "w") as f:
     json.dump(result, f, indent=2)
 PYEOF
+
+BENCHMARK_TMPDIR="$TMPDIR" \
+BENCHMARK_REPO="$OWNER_REPO" \
+BENCHMARK_PR="$PR_NUMBER" \
+BENCHMARK_BASE="$BASE_REF" \
+BENCHMARK_FUZZY_RANGE="$FUZZY_LINE_RANGE" \
+python3 "$TMPDIR/compare.py" > "$TMPDIR/report.txt"
+
+if [[ $? -ne 0 ]]; then
+  echo "Error: comparison script failed" >&2
+  exit 1
+fi
 
 cat "$TMPDIR/report.txt"
 
