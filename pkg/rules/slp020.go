@@ -59,7 +59,7 @@ var slp020PythonSecure = regexp.MustCompile(`secrets\.`)
 var slp020GoSecureRand = regexp.MustCompile(`"crypto/rand"`)
 
 // slp020MathRand matches math/rand inside a Go import spec.
-var slp020MathRand = regexp.MustCompile(`math/rand`)
+var slp020MathRand = regexp.MustCompile(`"math/rand"`)
 
 func slp020FileLang(path string) string {
 	if isGoFile(path) {

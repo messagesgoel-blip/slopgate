@@ -112,6 +112,10 @@ func (r SLP019) Check(d *diff.Diff) []Finding {
 					if trimmed == "" {
 						continue
 					}
+					// Skip comment-only lines.
+					if strings.TrimSpace(stripCommentAndStrings(next.Content)) == "" {
+						continue
+					}
 					if slp019IsClosingBrace(next.Content) {
 						continue
 					}
