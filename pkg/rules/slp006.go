@@ -75,13 +75,13 @@ func extractStringLiteralFrom(s string, start int) (string, bool) {
 }
 
 // slp006GoPanic matches Go panic calls: panic(
-var slp006GoPanic = regexp.MustCompile(`panic\s*\(`)
+var slp006GoPanic = regexp.MustCompile(`\bpanic\s*\(`)
 
 // slp006JSThrow matches JS throw new Error calls: throw new Error(
-var slp006JSThrow = regexp.MustCompile(`throw\s+new\s+Error\s*\(`)
+var slp006JSThrow = regexp.MustCompile(`\bthrow\s+new\s+Error\s*\(`)
 
 // slp006PyRaise matches Python raise NotImplementedError
-var slp006PyRaise = regexp.MustCompile(`raise\s+NotImplementedError`)
+var slp006PyRaise = regexp.MustCompile(`\braise\s+NotImplementedError\b`)
 
 func (r SLP006) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -94,59 +94,66 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 		isPy := isPythonFile(f.Path)
 		for _, ln := range f.AddedLines() {
 			content := ln.Content
-			stripped := stripCommentAndStrings(content)
 
 			// Go: panic("...stub keyword...")
-			if isGo && slp006GoPanic.MatchString(stripped) {
-				loc := slp006GoPanic.FindStringIndex(stripped)
-				lit, ok := extractStringLiteralFrom(content, loc[0])
-				if ok && containsStubKeyword(lit) {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  fmt.Sprintf("Go panic with stub keyword %q — implement or remove", lit),
-						Snippet:  strings.TrimSpace(content),
-					})
-					continue
+			// Run regex on content so byte offsets are consistent with
+			// extractStringLiteralFrom.
+			if isGo {
+				loc := slp006GoPanic.FindStringIndex(content)
+				if loc != nil {
+					lit, ok := extractStringLiteralFrom(content, loc[0])
+					if ok && containsStubKeyword(lit) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  fmt.Sprintf("Go panic with stub keyword %q — implement or remove", lit),
+							Snippet:  strings.TrimSpace(content),
+						})
+						continue
+					}
 				}
 			}
 
 			// JS/TS: throw new Error("...stub keyword...")
-			if isJS && slp006JSThrow.MatchString(stripped) {
-				loc := slp006JSThrow.FindStringIndex(stripped)
-				lit, ok := extractStringLiteralFrom(content, loc[0])
-				if ok && containsStubKeyword(lit) {
+			if isJS {
+				loc := slp006JSThrow.FindStringIndex(content)
+				if loc != nil {
+					lit, ok := extractStringLiteralFrom(content, loc[0])
+					if ok && containsStubKeyword(lit) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  fmt.Sprintf("JS throw with stub keyword %q — implement or remove", lit),
+							Snippet:  strings.TrimSpace(content),
+						})
+						continue
+					}
+				}
+			}
+
+			// Python: raise NotImplementedError
+			if isPy {
+				loc := slp006PyRaise.FindStringIndex(content)
+				if loc != nil {
+					msg := "Python raise NotImplementedError — implement or remove"
+					lit, ok := extractStringLiteralFrom(content, loc[1])
+					if ok {
+						msg = fmt.Sprintf("Python raise NotImplementedError(%q) — implement or remove", lit)
+					}
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),
 						File:     f.Path,
 						Line:     ln.NewLineNo,
-						Message:  fmt.Sprintf("JS throw with stub keyword %q — implement or remove", lit),
+						Message:  msg,
 						Snippet:  strings.TrimSpace(content),
 					})
 					continue
 				}
-			}
-
-			// Python: raise NotImplementedError
-			if isPy && slp006PyRaise.MatchString(stripped) {
-				msg := "Python raise NotImplementedError — implement or remove"
-				loc := slp006PyRaise.FindStringIndex(stripped)
-				lit, ok := extractStringLiteralFrom(content, loc[1])
-				if ok {
-					msg = fmt.Sprintf("Python raise NotImplementedError(%q) — implement or remove", lit)
-				}
-				out = append(out, Finding{
-					RuleID:   r.ID(),
-					Severity: r.DefaultSeverity(),
-					File:     f.Path,
-					Line:     ln.NewLineNo,
-					Message:  msg,
-					Snippet:  strings.TrimSpace(content),
-				})
-				continue
 			}
 		}
 	}
