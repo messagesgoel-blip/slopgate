@@ -46,7 +46,11 @@ func slp019IsTerminator(content string) bool {
 	// Check compound terminators first (e.g. "sys.exit(1)" → "sys.exit").
 	for key := range slp019Terminators {
 		if strings.Contains(key, ".") && strings.HasPrefix(word, key) {
-			return true
+			// Ensure the match isn't a longer identifier (e.g. "sys.exit_code").
+			rest := word[len(key):]
+			if len(rest) == 0 || rest[0] == '(' || (!isAlphaNum(rest[0]) && rest[0] != '_') {
+				return true
+			}
 		}
 	}
 	// Strip everything from first non-alpha rune onward (e.g. "panic(" → "panic").
@@ -61,9 +65,16 @@ func slp019IsTerminator(content string) bool {
 	return slp019Terminators[strings.ToLower(clean)]
 }
 
+func isAlphaNum(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+}
+
 func slp019IsClosingBrace(s string) bool {
-	trimmed := strings.TrimSpace(s)
-	return trimmed == "}" || trimmed == ")" || trimmed == "];" || trimmed == "]" || trimmed == "});"
+	// Strip inline comments and trailing semicolons, then trim.
+	clean := stripCommentAndStrings(s)
+	clean = strings.TrimRight(clean, ";")
+	clean = strings.TrimSpace(clean)
+	return clean == "}" || clean == ")" || clean == "]" || clean == "});" || clean == "]);"
 }
 
 func (r SLP019) Check(d *diff.Diff) []Finding {

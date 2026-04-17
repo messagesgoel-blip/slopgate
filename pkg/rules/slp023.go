@@ -30,8 +30,9 @@ func (SLP023) Description() string {
 // Supports qualified types like pkg.Type and *pkg.Type.
 var slp023TypeAssert = regexp.MustCompile(`\w[\w.*]*\s*\.\s*\(\s*\*?\s*\w+(?:\.\w+)*\s*\)`)
 
-// slp023CommaOk matches the comma-ok guard: `, ok :=` or `, ok =` (with or without space).
-var slp023CommaOk = regexp.MustCompile(`,\s*ok\s+:?=`)
+// slp023CommaOk matches the comma-ok guard: `, name :=` or `, name =` (with or without space).
+// Any valid Go identifier after the comma counts as a two-value assignment.
+var slp023CommaOk = regexp.MustCompile(`,\s*[_A-Za-z][_A-Za-z0-9]*\s+:?=`)
 
 // slp023TypeSwitch matches type switch constructs: `.(\s*type\s*)`.
 var slp023TypeSwitch = regexp.MustCompile(`\.\s*\(\s*type\s*\)`)

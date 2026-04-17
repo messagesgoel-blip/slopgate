@@ -24,7 +24,9 @@ func (SLP021) Description() string {
 }
 
 // slp021Identifier matches likely identifier names from declarations.
-var slp021Identifier = regexp.MustCompile(`(?:func|def|var|let|const|int|long|float|double|string|bool|auto|public|private|protected)\s+(\w+)`)
+// Access modifiers and types are optional non-capturing prefixes so the
+// captured group always targets the declared name.
+var slp021Identifier = regexp.MustCompile(`(?:func|def|var|let|const|public|private|protected)\s+(?:(?:int|long|float|double|string|bool|auto|static|final|virtual|override)\s+)*(\w+)`)
 var slp021AssignIdent = regexp.MustCompile(`(\w+)\s*:?=`)
 
 func slp021IsScreamingSnake(s string) bool {
@@ -63,10 +65,21 @@ func slp021ExtractIdentifiers(content string) []string {
 			ids = append(ids, m[1])
 		}
 	}
-	for _, m := range slp021AssignIdent.FindAllStringSubmatch(clean, -1) {
-		if len(m) > 1 && !slp021IsScreamingSnake(m[1]) {
-			ids = append(ids, m[1])
+	for _, m := range slp021AssignIdent.FindAllStringSubmatchIndex(clean, -1) {
+		if len(m) < 4 {
+			continue
 		}
+		nameStart, nameEnd := m[2], m[3]
+		name := clean[nameStart:nameEnd]
+		if slp021IsScreamingSnake(name) {
+			continue
+		}
+		// Skip if the = is part of == (comparison).
+		eqIdx := m[1] // end of full match
+		if eqIdx < len(clean) && clean[eqIdx] == '=' {
+			continue
+		}
+		ids = append(ids, name)
 	}
 	return ids
 }

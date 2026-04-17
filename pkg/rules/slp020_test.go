@@ -137,6 +137,30 @@ func TestSLP020_InsecureRandomCrypto(t *testing.T) {
  }`,
 			want: 0,
 		},
+		{
+			name: "go crypto/rand + md5 flagged",
+			diff: `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,3 +1,5 @@
+ import "crypto/rand"
++import "crypto/md5"
++func hash(d []byte) [16]byte { return md5.Sum(d) }
+ }`,
+			want: 1,
+		},
+		{
+			name: "go rand call without import not flagged",
+			diff: `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,3 +1,4 @@
+ func foo() {
+-	return 0
++	return rand.Intn(10)
+ }`,
+			want: 0,
+		},
 	}
 
 	for _, tt := range tests {

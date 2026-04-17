@@ -38,7 +38,8 @@ var slp020Patterns = []struct {
 	example  string
 }{
 	// Insecure random
-	{regexp.MustCompile(`math/rand|rand\.\w+\(`), "go", "random", "math/rand"},
+	{regexp.MustCompile(`math/rand`), "go", "random", "math/rand"},
+	{regexp.MustCompile(`rand\.\w+\(`), "go", "random", "rand.*() (with math/rand)"},
 	{regexp.MustCompile(`random\.`), "py", "random", "random."},
 	{regexp.MustCompile(`Math\.random\s*\(`), "js", "random", "Math.random()"},
 	{regexp.MustCompile(`java\.util\.Random`), "java", "random", "java.util.Random"},
@@ -56,6 +57,9 @@ var slp020PythonSecure = regexp.MustCompile(`secrets\.`)
 
 // slp020GoSecureRand detects crypto/rand import or usage (secure random).
 var slp020GoSecureRand = regexp.MustCompile(`crypto/rand`)
+
+// slp020MathRand detects math/rand import (insecure random).
+var slp020MathRand = regexp.MustCompile(`math/rand`)
 
 func slp020FileLang(path string) string {
 	if isGoFile(path) {
@@ -89,18 +93,18 @@ func (r SLP020) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		// Go: check if the file imports crypto/rand anywhere in the diff.
+		// Go: check if the file imports crypto/rand or math/rand anywhere in the diff.
 		goUsesCryptoRand := false
+		goUsesMathRand := false
 		if lang == "go" {
 			for _, h := range f.Hunks {
 				for _, ln := range h.Lines {
 					if slp020GoSecureRand.MatchString(ln.Content) {
 						goUsesCryptoRand = true
-						break
 					}
-				}
-				if goUsesCryptoRand {
-					break
+					if slp020MathRand.MatchString(ln.Content) {
+						goUsesMathRand = true
+					}
 				}
 			}
 		}
@@ -127,13 +131,17 @@ func (r SLP020) Check(d *diff.Diff) []Finding {
 			if lang == "py" && slp020PythonSecure.MatchString(checkAgainst) {
 				continue
 			}
-			// Go: skip if file imports crypto/rand.
-			if lang == "go" && goUsesCryptoRand {
-				continue
-			}
 
 			for _, p := range slp020Patterns {
 				if p.lang != "" && lang != p.lang {
+					continue
+				}
+				// Go: skip random-category match if file imports crypto/rand.
+				if lang == "go" && goUsesCryptoRand && p.category == "random" {
+					continue
+				}
+				// Go: skip rand.*() call-site pattern without math/rand import (ambiguous).
+				if lang == "go" && p.example == "rand.*() (with math/rand)" && !goUsesMathRand {
 					continue
 				}
 				if p.re.MatchString(checkAgainst) {
