@@ -58,7 +58,7 @@ Exit codes:
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
-| SLP001 | Test function with no assertion | block | Go |
+| SLP001 | Test function with no assertion | warn | Go |
 | SLP002 | Tautological assertion (e.g. `assert.Equal(t, x, x)`) | block | Go, JS/TS, Python |
 | SLP003 | Empty error handler (catch/except with no handling) | warn | Go, JS/TS, Python |
 | SLP005 | `.only` / `fdescribe` / `fit` committed | block | TypeScript, JavaScript |
