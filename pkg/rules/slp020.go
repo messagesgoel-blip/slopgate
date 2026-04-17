@@ -18,11 +18,11 @@ import (
 //   - info: otherwise
 //
 // Patterns flagged:
-//   - Insecure random: math/rand (Go), random. (Python, not secrets.),
+//   - Insecure random: math/rand import (Go), random. (Python, not secrets.),
 //     Math.random() (JS), java.util.Random (Java)
 //   - Insecure hash: md5/sha1 (Go, Python, JS, Java)
 //
-// Exempt: test files; doc files; Python secrets module.
+// Exempt: test files; doc files; Python secrets module; Go crypto/rand.
 type SLP020 struct{}
 
 func (SLP020) ID() string                { return "SLP020" }
@@ -43,7 +43,7 @@ var slp020Patterns = []struct {
 	{regexp.MustCompile(`Math\.random\s*\(`), "js", "random", "Math.random()"},
 	{regexp.MustCompile(`java\.util\.Random`), "java", "random", "java.util.Random"},
 	// Insecure hash
-	{regexp.MustCompile(`(crypto/md5|crypto/sha1)\.|md5\.(Sum|New)\b|sha1\.(Sum|New)\b`), "go", "hash", "crypto/md5 or crypto/sha1"},
+	{regexp.MustCompile(`md5\.(Sum|New)\b|sha1\.(Sum|New)\b`), "go", "hash", "crypto/md5 or crypto/sha1"},
 	{regexp.MustCompile(`hashlib\.(md5|sha1)\b`), "py", "hash", "hashlib.md5/sha1"},
 	{regexp.MustCompile(`createHash\s*\(\s*(?:'md5'|'sha1'|"md5"|"sha1")\s*\)`), "js", "hash", "createHash('md5'/'sha1')"},
 	{regexp.MustCompile(`(?:MD5|SHA-1|SHA1)\b`), "java", "hash", "MD5/SHA-1"},
@@ -54,7 +54,7 @@ var slp020SecContext = regexp.MustCompile(`(?i)(?:password|token|secret|key|sess
 // slp020PythonSecure matches Python secrets module usage (safe random).
 var slp020PythonSecure = regexp.MustCompile(`secrets\.`)
 
-// slp020GoSecureRand matches crypto/rand import or usage (secure random).
+// slp020GoSecureRand detects crypto/rand import or usage (secure random).
 var slp020GoSecureRand = regexp.MustCompile(`crypto/rand`)
 
 func slp020FileLang(path string) string {
@@ -88,35 +88,57 @@ func (r SLP020) Check(d *diff.Diff) []Finding {
 		if isTest {
 			continue
 		}
+
+		// Go: check if the file imports crypto/rand anywhere in the diff.
+		goUsesCryptoRand := false
+		if lang == "go" {
+			for _, h := range f.Hunks {
+				for _, ln := range h.Lines {
+					if slp020GoSecureRand.MatchString(ln.Content) {
+						goUsesCryptoRand = true
+						break
+					}
+				}
+				if goUsesCryptoRand {
+					break
+				}
+			}
+		}
+
 		for _, ln := range f.AddedLines() {
 			raw := ln.Content
 			trimmed := strings.TrimLeft(raw, " \t")
 			if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
 				continue
 			}
-			clean := stripCommentAndStrings(raw)
-			checkAgainst := clean
-			if lang == "go" {
-				checkAgainst = raw
+
+			// For Go, use raw content (import paths are in strings).
+			// For JS/Java, use raw content (hash algorithm names are in strings).
+			// For Python, use stripped content.
+			checkAgainst := raw
+			if lang == "py" {
+				checkAgainst = stripCommentAndStrings(raw)
 			}
 			if checkAgainst == "" {
 				continue
 			}
+
 			// Python: skip lines using secrets module (cryptographically secure).
-			if lang == "py" && slp020PythonSecure.MatchString(clean) {
+			if lang == "py" && slp020PythonSecure.MatchString(checkAgainst) {
 				continue
 			}
-			// Go: skip lines using crypto/rand (cryptographically secure).
-			if lang == "go" && slp020GoSecureRand.MatchString(raw) {
+			// Go: skip if file imports crypto/rand.
+			if lang == "go" && goUsesCryptoRand {
 				continue
 			}
+
 			for _, p := range slp020Patterns {
 				if p.lang != "" && lang != p.lang {
 					continue
 				}
 				if p.re.MatchString(checkAgainst) {
 					sev := SeverityInfo
-					if slp020SecContext.MatchString(raw) || slp020SecContext.MatchString(clean) {
+					if slp020SecContext.MatchString(raw) {
 						sev = SeverityWarn
 					}
 					out = append(out, Finding{

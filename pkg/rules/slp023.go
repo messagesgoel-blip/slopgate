@@ -27,11 +27,11 @@ func (SLP023) Description() string {
 }
 
 // slp023TypeAssert matches a type assertion pattern: expr.(TypeName).
-// Captures the full assertion text.
-var slp023TypeAssert = regexp.MustCompile(`\w[\w.*]*\s*\.\s*\(\s*\*?\s*\w+\s*\)`)
+// Supports qualified types like pkg.Type and *pkg.Type.
+var slp023TypeAssert = regexp.MustCompile(`\w[\w.*]*\s*\.\s*\(\s*\*?\s*\w+(?:\.\w+)*\s*\)`)
 
-// slp023CommaOk matches the comma-ok guard: `, ok :=` or `, ok =`.
-var slp023CommaOk = regexp.MustCompile(`,\s+ok\s+:?=`)
+// slp023CommaOk matches the comma-ok guard: `, ok :=` or `, ok =` (with or without space).
+var slp023CommaOk = regexp.MustCompile(`,\s*ok\s+:?=`)
 
 // slp023TypeSwitch matches type switch constructs: `.(\s*type\s*)`.
 var slp023TypeSwitch = regexp.MustCompile(`\.\s*\(\s*type\s*\)`)

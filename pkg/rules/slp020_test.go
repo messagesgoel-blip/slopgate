@@ -126,6 +126,17 @@ func TestSLP020_InsecureRandomCrypto(t *testing.T) {
  }`,
 			want: 0,
 		},
+		{
+			name: "go crypto/rand not flagged",
+			diff: `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,3 +1,4 @@
+ import "crypto/rand"
++func gen(n int) int { b := make([]byte, n); rand.Read(b); return int(b[0]) }
+ }`,
+			want: 0,
+		},
 	}
 
 	for _, tt := range tests {

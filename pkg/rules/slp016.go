@@ -9,14 +9,13 @@ import (
 )
 
 // SLP016 flags variable shadowing — when an inner scope declares a
-// variable with the same name as one in an outer scope within the
-// same hunk. AI agents frequently shadow outer variables
-// unintentionally, causing subtle bugs.
+// variable with the same name as one already seen in an outer scope.
+// AI agents frequently shadow outer variables unintentionally,
+// causing subtle bugs.
 //
-// Pass 1: collect variable names from context lines (establish outer
-// scope) and from added lines at shallow indentation.
-// Pass 2: check added lines at deeper indentation for declarations
-// of names already in scope.
+// Single order-sensitive pass over hunk lines: context lines seed
+// outerNames first; then each added line is checked against
+// outerNames before its own names are added.
 //
 // Exempt: single-letter loop iterators (i, j, k, _); Go's err at
 // info level only; test files; doc files.
@@ -29,7 +28,7 @@ func (SLP016) Description() string {
 }
 
 var slp016DeclPattern = regexp.MustCompile(`(?:var|let|const|int|long|float|double|string|bool|auto)\s+(\w+)\b`)
-var slp016AssignDecl = regexp.MustCompile(`(\w+)\s*:?=`)
+var slp016AssignDecl = regexp.MustCompile(`(\w+)\s*:=`)
 var slp016ForVar = regexp.MustCompile(`for\s*\(\s*\w+\s+(\w+)\b`)
 
 var slp016ExemptNames = map[string]bool{
@@ -70,15 +69,7 @@ func (r SLP016) Check(d *diff.Diff) []Finding {
 			continue
 		}
 		for _, h := range f.Hunks {
-			// Pass 1: collect outer-scope names from context and shallow-added lines.
-			outerNames := map[string]int{} // name → indent level
-			// Also track all declared names from added lines.
-			addedDecls := []struct {
-				name   string
-				indent int
-				line   diff.Line
-				isErr  bool
-			}{}
+			outerNames := map[string]int{} // name → indent level (only already-seen)
 
 			for _, ln := range h.Lines {
 				if ln.Kind == diff.LineContext {
@@ -98,47 +89,33 @@ func (r SLP016) Check(d *diff.Diff) []Finding {
 						continue
 					}
 					seen[name] = true
-					addedDecls = append(addedDecls, struct {
-						name   string
-						indent int
-						line   diff.Line
-						isErr  bool
-					}{name, indent, ln, slp016GoErrPattern.MatchString(clean) && name == "err"})
 
-					// Also record as outer scope for later lines.
+					// Check against already-seen outer names.
+					if outerIndent, exists := outerNames[name]; exists {
+						if indent > outerIndent && !slp016ExemptNames[name] {
+							sev := SeverityWarn
+							msg := fmt.Sprintf("variable %q shadows outer-scope declaration", name)
+							isErr := slp016GoErrPattern.MatchString(clean) && name == "err"
+							if isErr {
+								sev = SeverityInfo
+								msg = fmt.Sprintf("variable %q shadows outer err — consider renaming for clarity", name)
+							}
+							out = append(out, Finding{
+								RuleID:   r.ID(),
+								Severity: sev,
+								File:     f.Path,
+								Line:     ln.NewLineNo,
+								Message:  msg,
+								Snippet:  strings.TrimSpace(ln.Content),
+							})
+						}
+					}
+
+					// Now add this name to outer scope for subsequent lines.
 					if _, exists := outerNames[name]; !exists || outerNames[name] > indent {
 						outerNames[name] = indent
 					}
 				}
-			}
-
-			// Pass 2: check added declarations for shadowing.
-			for _, decl := range addedDecls {
-				if slp016ExemptNames[decl.name] {
-					continue
-				}
-				outerIndent, exists := outerNames[decl.name]
-				if !exists {
-					continue
-				}
-				if decl.indent <= outerIndent {
-					// Same or shallower indentation — not a shadow.
-					continue
-				}
-				sev := SeverityWarn
-				msg := fmt.Sprintf("variable %q shadows outer-scope declaration", decl.name)
-				if decl.isErr {
-					sev = SeverityInfo
-					msg = fmt.Sprintf("variable %q shadows outer err — consider renaming for clarity", decl.name)
-				}
-				out = append(out, Finding{
-					RuleID:   r.ID(),
-					Severity: sev,
-					File:     f.Path,
-					Line:     decl.line.NewLineNo,
-					Message:  msg,
-					Snippet:  strings.TrimSpace(decl.line.Content),
-				})
 			}
 		}
 	}

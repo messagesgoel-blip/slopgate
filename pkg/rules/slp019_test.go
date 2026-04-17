@@ -64,7 +64,7 @@ func TestSLP019_UnreachableCode(t *testing.T) {
 			want: 0,
 		},
 		{
-			name: "defer after return not flagged",
+			name: "defer after return is unreachable",
 			diff: `diff --git a/main.go b/main.go
 --- a/main.go
 +++ b/main.go
@@ -74,7 +74,7 @@ func TestSLP019_UnreachableCode(t *testing.T) {
 +	return
 +	defer cleanup()
  }`,
-			want: 0,
+			want: 1,
 		},
 		{
 			name: "closing brace after return not flagged",

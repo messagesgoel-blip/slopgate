@@ -12,8 +12,8 @@ import (
 // same or deeper indentation level within the same hunk. AI agents
 // frequently generate dead code after terminators.
 //
-// Exempt: closing braces/parens; blank lines; Go defer lines; lines
-// at shallower indentation (new scope); test files; doc files.
+// Exempt: closing braces/parens; blank lines; lines at shallower
+// indentation (new scope); test files; doc files.
 type SLP019 struct{}
 
 func (SLP019) ID() string                { return "SLP019" }
@@ -38,16 +38,21 @@ func slp019IsTerminator(content string) bool {
 	if trimmed == "" {
 		return false
 	}
-	// Get first word.
 	fields := strings.Fields(trimmed)
 	if len(fields) == 0 {
 		return false
 	}
 	word := fields[0]
+	// Check compound terminators first (e.g. "sys.exit(1)" → "sys.exit").
+	for key := range slp019Terminators {
+		if strings.Contains(key, ".") && strings.HasPrefix(word, key) {
+			return true
+		}
+	}
 	// Strip everything from first non-alpha rune onward (e.g. "panic(" → "panic").
 	var clean string
 	for _, r := range word {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '.' {
 			clean += string(r)
 		} else {
 			break
@@ -59,11 +64,6 @@ func slp019IsTerminator(content string) bool {
 func slp019IsClosingBrace(s string) bool {
 	trimmed := strings.TrimSpace(s)
 	return trimmed == "}" || trimmed == ")" || trimmed == "];" || trimmed == "]" || trimmed == "});"
-}
-
-func slp019IsDefer(s string) bool {
-	trimmed := strings.TrimSpace(s)
-	return strings.HasPrefix(trimmed, "defer ")
 }
 
 func (r SLP019) Check(d *diff.Diff) []Finding {
@@ -93,7 +93,6 @@ func (r SLP019) Check(d *diff.Diff) []Finding {
 					next := lines[j]
 					if next.Kind != diff.LineAdd {
 						if next.Kind == diff.LineContext {
-							// Context line = scope transition; stop.
 							break
 						}
 						continue
@@ -105,12 +104,8 @@ func (r SLP019) Check(d *diff.Diff) []Finding {
 					if slp019IsClosingBrace(next.Content) {
 						continue
 					}
-					if slp019IsDefer(next.Content) {
-						continue
-					}
 					indentNext := leadingSpaces(next.Content)
 					if indentNext < indentTerm {
-						// Shallower indentation = new scope; stop.
 						break
 					}
 					if indentNext >= indentTerm {

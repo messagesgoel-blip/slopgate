@@ -95,6 +95,42 @@ func TestSLP023_BareTypeAssertion(t *testing.T) {
  }`,
 			want: 0,
 		},
+		{
+			name: "qualified type assertion flagged",
+			diff: `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,3 +1,4 @@
+ func foo(v interface{}) {
+-	_ = nil
++	s := v.(io.Reader)
+ }`,
+			want: 1,
+		},
+		{
+			name: "compact comma-ok not flagged",
+			diff: `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,3 +1,4 @@
+ func foo(v interface{}) {
+-	_ = nil
++	s,ok := v.(string)
+ }`,
+			want: 0,
+		},
+		{
+			name: "pointer qualified type assertion flagged",
+			diff: `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,3 +1,4 @@
+ func foo(v interface{}) {
+-	_ = nil
++	p := v.(*pkg.Foo)
+ }`,
+			want: 1,
+		},
 	}
 
 	for _, tt := range tests {

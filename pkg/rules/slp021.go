@@ -84,9 +84,13 @@ func (r SLP021) Check(d *diff.Diff) []Finding {
 		}
 		for _, h := range f.Hunks {
 			var camelNames, snakeNames []string
+			var firstAddedLineNo int
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
 					continue
+				}
+				if firstAddedLineNo == 0 {
+					firstAddedLineNo = ln.NewLineNo
 				}
 				for _, id := range slp021ExtractIdentifiers(ln.Content) {
 					if len(id) <= 1 || slp021IsScreamingSnake(id) {
@@ -104,7 +108,7 @@ func (r SLP021) Check(d *diff.Diff) []Finding {
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
-					Line:     h.Lines[0].NewLineNo,
+					Line:     firstAddedLineNo,
 					Message:  fmt.Sprintf("mixed naming styles — camelCase (%s) and snake_case (%s) in same hunk", strings.Join(camelNames, ", "), strings.Join(snakeNames, ", ")),
 					Snippet:  fmt.Sprintf("camelCase: %v, snake_case: %v", camelNames, snakeNames),
 				})
