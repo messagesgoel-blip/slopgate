@@ -182,7 +182,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 			if isJava {
 				loc := slp006JavaThrow.FindStringIndex(masked)
 				if loc != nil {
-					lit, ok := extractStringLiteralFrom(content, loc[0])
+					lit, ok := extractStringLiteralFrom(content, loc[1])
 					if ok && containsStubKeyword(lit) {
 						out = append(out, Finding{
 							RuleID:   r.ID(),
@@ -233,7 +233,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 					}
 					// panic!("...stub keyword...") -- only flag with stub keyword.
 					if macro == "panic" {
-						lit, ok := extractStringLiteralFrom(content, loc[0])
+						lit, ok := extractStringLiteralFrom(content, loc[1])
 						if ok && containsStubKeyword(lit) {
 							out = append(out, Finding{
 								RuleID:   r.ID(),

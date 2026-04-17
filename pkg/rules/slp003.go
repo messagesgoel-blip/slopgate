@@ -169,10 +169,7 @@ func slp003JavaHasHandling(content string) bool {
 			return true
 		}
 	}
-	if strings.Contains(content, "throw") {
-		return true
-	}
-	return false
+	return strings.Contains(content, "throw")
 }
 
 // javaIsBailOnly reports whether the body, after stripping the closing

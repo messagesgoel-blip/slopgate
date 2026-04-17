@@ -13,13 +13,13 @@ func isGoFile(path string) bool {
 // isJSOrTSFile reports whether path is a JS or TS file.
 func isJSOrTSFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
-	return ext == ".js" || ext == ".ts" || ext == ".tsx" || ext == ".jsx" || ext == ".mjs"
+	return ext == ".js" || ext == ".ts" || ext == ".tsx" || ext == ".jsx" || ext == ".mjs" || ext == ".cjs"
 }
 
 // isPythonFile reports whether path ends with .py.
 func isPythonFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))
-	return ext == ".py"
+	return ext == ".py" || ext == ".pyi" || ext == ".pyw"
 }
 
 // isJavaFile reports whether path is a Java or Kotlin file.

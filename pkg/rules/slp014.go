@@ -65,7 +65,7 @@ func isSuppressedDebugFile(path string) bool {
 		return true
 	}
 	// Java/Kotlin test files (JUnit convention: *Test.java, *Tests.java).
-	if isJavaFile(path) && (strings.Contains(base, "Test") || strings.Contains(base, "test")) {
+	if isJavaTestFile(path) {
 		return true
 	}
 	// Rust test files.

@@ -104,8 +104,8 @@ func stripStringLiterals(s string) string {
 			}
 			continue
 		}
-		switch {
-		case c == '"' || c == '\'' || c == '`':
+		switch c {
+		case '"', '\'', '`':
 			quote = c
 			b.WriteByte(c) // opening quote stays
 		default:

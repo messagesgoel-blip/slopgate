@@ -58,12 +58,12 @@ var slp008SilentReturnPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\breturn\s+(undefined|null)\b`),
 	// Python: return None, bare return
 	regexp.MustCompile(`\breturn\s+None\b`),
-	// Java: return null, return; (void method)
+	// Java: return null
 	regexp.MustCompile(`\breturn\s+null\s*;`),
+	// Java & Rust: bare return; (matches `return;` at end of line)
 	regexp.MustCompile(`\breturn\s*;\s*$`),
-	// Rust: return None, return; (unit return)
+	// Rust: return None
 	regexp.MustCompile(`\breturn\s+None\s*;`),
-	regexp.MustCompile(`\breturn\s*;\s*$`),
 }
 
 // slp008ErrorReturnPattern detects a return that actually propagates an
@@ -76,13 +76,11 @@ var slp008ErrorReturnPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\breturn\s+errors\.(Wrap|Wrapf|New)\s*\(`),
 	// Go: return ..., err (multi-return propagating error)
 	regexp.MustCompile(`\breturn\s+.*,\s*err\b`),
-	// JS/TS: return err, throw err, return new Error
+	// JS/TS & Java: return err, throw (propagates error)
 	regexp.MustCompile(`\breturn\s+err\b`),
 	regexp.MustCompile(`\bthrow\b`),
 	// Python: raise, return err
 	regexp.MustCompile(`\braise\b`),
-	// Java: throw, return err
-	regexp.MustCompile(`\bthrow\b`),
 	// Rust: return Err(...), return err
 	regexp.MustCompile(`\breturn\s+Err\s*\(`),
 }

@@ -273,7 +273,7 @@ func TestSLP006_IgnoresMethodCallPanic(t *testing.T) {
 	}
 }
 
-func TestSLP006_IgnoresQuedStubInComment(t *testing.T) {
+func TestSLP006_IgnoresQuotedStubInComment(t *testing.T) {
 	// panic in a comment should not fire.
 	d := parseDiff(t, `diff --git a/a.go b/a.go
 --- a/a.go
@@ -288,7 +288,7 @@ func TestSLP006_IgnoresQuedStubInComment(t *testing.T) {
 	}
 }
 
-func TestSLP006_IgnoresQuedStubInString(t *testing.T) {
+func TestSLP006_IgnoresQuotedStubInString(t *testing.T) {
 	// panic in a string literal should not fire.
 	d := parseDiff(t, `diff --git a/a.go b/a.go
 --- a/a.go

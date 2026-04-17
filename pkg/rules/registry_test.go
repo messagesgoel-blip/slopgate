@@ -18,6 +18,7 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 		"SLP012": false,
 		"SLP013": false,
 		"SLP014": false,
+		"SLP015": false,
 	}
 	for _, rule := range r.All() {
 		if _, ok := want[rule.ID()]; ok {
