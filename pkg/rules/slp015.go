@@ -58,6 +58,7 @@ var slp015Patterns = []struct {
 	{regexp.MustCompile(`//\s*NOPMD\b`), "java", "// NOPMD"},
 
 	// Rust: #[allow(...)], #[allow(dead_code)], etc.
+	{regexp.MustCompile(`#!\[\s*allow\s*\(`), "rust", "#![allow(...)]"},
 	{regexp.MustCompile(`#\[\s*allow\s*\(`), "rust", "#[allow(...)]"},
 }
 

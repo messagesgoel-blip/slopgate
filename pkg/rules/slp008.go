@@ -39,7 +39,7 @@ var slp008LogPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\b(log|logger|LOG|Logger)\.(error|warn|warning|severe)\s*\(`),
 	// Rust: error!, warn!, log::error!, tracing::error!
 	regexp.MustCompile(`\b(error|warn)!\s*\(`),
-	regexp.MustCompile(`\blog::(error|warn|info|debug)!\s*\(`),
+	regexp.MustCompile(`\blog::(error|warn)!\s*\(`),
 	regexp.MustCompile(`\btracing::(error|warn)!\s*\(`),
 }
 

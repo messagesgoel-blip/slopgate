@@ -41,8 +41,9 @@ func isJavaTestFile(path string) bool {
 		return false
 	}
 	lower := strings.ToLower(path)
-	base := strings.ToLower(filepath.Base(path))
-	return strings.Contains(base, "test") ||
+	// Strip the extension so "FooTest.java" → "footest", not "footest.java".
+	base := strings.ToLower(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
+	return strings.HasPrefix(base, "test") || strings.HasSuffix(base, "test") || strings.HasSuffix(base, "tests") ||
 		strings.Contains(lower, "/test/") ||
 		strings.Contains(lower, "\\test\\")
 }

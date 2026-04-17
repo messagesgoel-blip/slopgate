@@ -360,3 +360,37 @@ func TestSLP006_GoPanicOnMultiStatementLine(t *testing.T) {
 		t.Fatalf("expected 1 finding for panic on multi-statement line, got %d: %+v", len(got), got)
 	}
 }
+
+func TestSLP006_JavaThrowBare(t *testing.T) {
+	// Bare throw new UnsupportedOperationException() without a stub keyword
+	// should still be flagged because the exception type itself signals unimplemented code.
+	d := parseDiff(t, `diff --git a/Svc.java b/Svc.java
+--- a/Svc.java
++++ b/Svc.java
+@@ -1,1 +1,3 @@
+ package svc;
++throw new UnsupportedOperationException();
+`)
+	got := SLP006{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for bare Java throw, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "UnsupportedOperationException") {
+		t.Errorf("message should mention UnsupportedOperationException: %q", got[0].Message)
+	}
+}
+
+func TestSLP006_RustPanicStub(t *testing.T) {
+	// panic! with a stub keyword should be flagged.
+	d := parseDiff(t, `diff --git a/main.rs b/main.rs
+--- a/main.rs
++++ b/main.rs
+@@ -1,1 +1,3 @@
+ fn main() {}
++panic!("not implemented");
+`)
+	got := SLP006{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Rust panic! with stub keyword, got %d: %+v", len(got), got)
+	}
+}

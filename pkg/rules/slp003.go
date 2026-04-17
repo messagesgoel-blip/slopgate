@@ -151,9 +151,10 @@ func slp003PythonIsBailLine(content string) bool {
 
 // --- Java patterns ---
 
-// slp003JavaCatch matches `catch (Exception e) {` on an added line.
-// Also matches single-line `catch (Exception e) { ... }`.
-var slp003JavaCatch = regexp.MustCompile(`catch\s*\(\s*\w+(?:\s+\w+)?\s*\)\s*\{`)
+// slp003JavaCatch matches Java catch clauses on an added line.
+// Supports: simple types (Exception), fully-qualified types (java.io.IOException),
+// multi-catch (IOException | SQLException), final modifier, and optional variable names.
+var slp003JavaCatch = regexp.MustCompile(`catch\s*\(\s*(?:final\s+)?[\w.]+(?:\s*\|\s*[\w.]+)*(?:\s+\w+)?\s*\)\s*\{`)
 
 // slp003JavaLogTokens are substrings that indicate the error is being
 // logged in a Java catch block.
@@ -445,6 +446,12 @@ func (r SLP003) checkJS(f diff.File) []Finding {
 			}
 
 			depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
+			// If the catch header line has a closing brace (e.g. "} catch (e) {"),
+			// depth can be 0 even though the opening brace for the catch body
+			// is on this line. Ensure depth is at least 1 so the body loop enters.
+			if depth < 1 && strings.Contains(ln.Content, "{") {
+				depth = 1
+			}
 			bodyAllAdded := true
 			var bodyContent strings.Builder
 
@@ -695,6 +702,12 @@ func (r SLP003) checkJava(f diff.File) []Finding {
 			}
 
 			depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
+			// If the catch header line has a closing brace (e.g. "} catch (e) {"),
+			// depth can be 0 even though the opening brace for the catch body
+			// is on this line. Ensure depth is at least 1 so the body loop enters.
+			if depth < 1 && strings.Contains(ln.Content, "{") {
+				depth = 1
+			}
 			bodyAllAdded := true
 			var bodyContent strings.Builder
 
@@ -776,6 +789,39 @@ func (r SLP003) checkRust(f diff.File) []Finding {
 			if !isMatch {
 				i++
 				continue
+			}
+
+			// Try unbraced match arm: Err(e) => expr,
+			// These don't have braces so extractRustSingleLineBody won't match,
+			// but they are common slop patterns like Err(e) => return None,
+			if strings.Contains(ln.Content, "=>") && !strings.Contains(ln.Content, "{") {
+				arrow := strings.Index(ln.Content, "=>")
+				if arrow >= 0 {
+					rhs := strings.TrimSpace(ln.Content[arrow+2:])
+					rhs = strings.TrimRight(rhs, ",;")
+					rhs = strings.TrimSpace(rhs)
+					if rhs == "" {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     startLine,
+							Message:  "error handler is empty -- log or return the error",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+					} else if rustIsBailOnly(rhs+"\n}") && !slp003RustHasHandling(rhs) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     startLine,
+							Message:  "error handler swallows the error -- log or return the error",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+					}
+					i++
+					continue
+				}
 			}
 
 			// Try single-line match arm body extraction.
