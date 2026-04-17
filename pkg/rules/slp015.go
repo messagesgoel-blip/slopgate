@@ -86,24 +86,73 @@ func slp015FileLang(path string) string {
 // single-quoted, backtick-quoted) from a line but preserves comments. This is
 // used for SLP015 because we want to detect linter-suppression directives that
 // appear in comments, which would be stripped by stripCommentAndStrings.
+//
+// Raw-string variants are also handled:
+//   - Python r"..." / r'...' / R"..." / R'...' — no backslash escaping
+//   - Rust r"..." and r#"..."# (arbitrary # count) — no backslash escaping;
+//     Rust raw strings terminate only when the closing quote is followed by the
+//     same number of '#' chars as the opening delimiter
 func stripStringLiterals(s string) string {
 	var b strings.Builder
 	var quote byte
+	rawMode := false // true → backslashes are not escape sequences
+	rustHashes := 0  // number of '#' chars in a Rust r#"..."# delimiter
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if quote != 0 {
-			if quote != '`' && c == '\\' && i+1 < len(s) {
+			if !rawMode && quote != '`' && c == '\\' && i+1 < len(s) {
 				b.WriteString("  ") // blank escaped char
 				i++                 // skip next
 				continue
 			}
 			if c == quote {
+				if rawMode && rustHashes > 0 {
+					// Rust raw string: the closing quote must be followed by exactly
+					// rustHashes '#' chars to end the literal.
+					trailing := 0
+					for i+1+trailing < len(s) && s[i+1+trailing] == '#' {
+						trailing++
+					}
+					if trailing < rustHashes {
+						b.WriteByte(' ') // embedded quote — not the real closing delimiter
+						continue
+					}
+					// Consume the trailing hashes.
+					for k := 0; k < rustHashes; k++ {
+						b.WriteByte('#')
+					}
+					i += rustHashes
+				}
 				quote = 0
+				rawMode = false
+				rustHashes = 0
 				b.WriteByte(c) // closing quote stays
 			} else {
 				b.WriteByte(' ') // blank string content
 			}
 			continue
+		}
+		// Detect a raw-string prefix: r/R optionally followed by '#' chars and a quote.
+		// Covers Python r"..."  and Rust r"..." / r#"..."# / r##"..."## etc.
+		if (c == 'r' || c == 'R') && i+1 < len(s) {
+			hashes := 0
+			k := i + 1
+			for k < len(s) && s[k] == '#' {
+				hashes++
+				k++
+			}
+			if k < len(s) && (s[k] == '"' || s[k] == '\'') {
+				b.WriteByte(c) // emit 'r'/'R'
+				for h := 0; h < hashes; h++ {
+					b.WriteByte('#')
+				}
+				b.WriteByte(s[k]) // opening quote stays
+				quote = s[k]
+				rawMode = true
+				rustHashes = hashes
+				i = k
+				continue
+			}
 		}
 		switch c {
 		case '"', '\'', '`':

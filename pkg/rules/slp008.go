@@ -60,8 +60,8 @@ var slp008SilentReturnPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\breturn\s+None\b`),
 	// Java: return null
 	regexp.MustCompile(`\breturn\s+null\s*;`),
-	// Java & Rust: bare return; (matches `return;` at end of line)
-	regexp.MustCompile(`\breturn\s*;\s*$`),
+	// Java & Rust: bare return; optionally followed by an inline comment
+	regexp.MustCompile(`\breturn\s*;\s*(?://.*|/\*.*\*/)?\s*$`),
 	// Rust: return None
 	regexp.MustCompile(`\breturn\s+None\s*;`),
 }

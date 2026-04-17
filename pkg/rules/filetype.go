@@ -28,9 +28,9 @@ func isJavaFile(path string) bool {
 	return ext == ".java" || ext == ".kt"
 }
 
-// isRustFile reports whether path ends with .rs.
+// isRustFile reports whether path ends with .rs (case-insensitive, matching isJavaFile behaviour).
 func isRustFile(path string) bool {
-	return strings.HasSuffix(path, ".rs")
+	return strings.ToLower(filepath.Ext(path)) == ".rs"
 }
 
 // isJavaTestFile reports whether path is a Java test file.
@@ -55,5 +55,6 @@ func isRustTestFile(path string) bool {
 		return false
 	}
 	return strings.HasSuffix(path, "_test.rs") ||
-		strings.Contains(path, "/tests/")
+		strings.Contains(path, "/tests/") ||
+		strings.Contains(path, "\\tests\\")
 }

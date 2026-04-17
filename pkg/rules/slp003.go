@@ -850,6 +850,11 @@ func (r SLP003) checkRust(f diff.File) []Finding {
 			}
 
 			depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
+			// Handle `if let Err(...) = expr()` where the opening `{` is on the
+			// next line: depth is 0 here but the body loop must still run.
+			if depth < 1 && i+1 < len(lines) && strings.Contains(lines[i+1].Content, "{") {
+				depth = 1
+			}
 			bodyAllAdded := true
 			var bodyContent strings.Builder
 
