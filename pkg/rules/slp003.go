@@ -178,7 +178,7 @@ func slp003JavaHasHandling(content string) bool {
 func javaIsBailOnly(body string) bool {
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(stripCommentAndStrings(line))
 		if trimmed == "" || trimmed == "}" {
 			continue
 		}
@@ -224,7 +224,7 @@ func slp003RustHasHandling(content string) bool {
 func rustIsBailOnly(body string) bool {
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(stripCommentAndStrings(line))
 		if trimmed == "" || trimmed == "}" || trimmed == "}," {
 			continue
 		}
@@ -368,7 +368,7 @@ func (r SLP003) checkGo(f diff.File) []Finding {
 func isGoBailOnly(body string) bool {
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(stripCommentAndStrings(line))
 		if trimmed == "" || trimmed == "}" {
 			continue
 		}
@@ -542,7 +542,7 @@ func extractSingleLineCatchBody(content string) (string, bool) {
 func jsIsBailOnly(body string) bool {
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(stripCommentAndStrings(line))
 		if trimmed == "" || trimmed == "}" {
 			continue
 		}
@@ -634,7 +634,7 @@ func (r SLP003) checkPython(f diff.File) []Finding {
 func pythonIsBailOnly(body string) bool {
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(stripCommentAndStrings(line))
 		if trimmed == "" {
 			continue
 		}

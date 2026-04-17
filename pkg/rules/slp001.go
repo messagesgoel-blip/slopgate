@@ -250,10 +250,13 @@ func scanHunkForJSTests(path string, h diff.Hunk, sev Severity, ruleID string) [
 			continue
 		}
 		startLine := ln.NewLineNo
-		// Build body content from the test function line + subsequent added lines.
+		// When the opening brace is on a separate line, look ahead
+		// to consume that brace line before starting the body scan.
 		depth := strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
-		if depth <= 0 && i+1 < len(lines) && lines[i+1].Kind == diff.LineAdd {
-			depth += strings.Count(lines[i+1].Content, "{") - strings.Count(lines[i+1].Content, "}")
+		k := i + 1
+		if depth <= 0 && k < len(lines) && lines[k].Kind == diff.LineAdd {
+			depth += strings.Count(lines[k].Content, "{") - strings.Count(lines[k].Content, "}")
+			k++
 		}
 		if depth <= 0 {
 			// Single-line test: check for assertions.
@@ -274,7 +277,7 @@ func scanHunkForJSTests(path string, h diff.Hunk, sev Severity, ruleID string) [
 		// Multi-line: scan body until brace depth reaches 0.
 		sawAssertion := jsHasAssertion(trimmed)
 		bodyAllAdded := true
-		j := i + 1
+		j := k
 		for j < len(lines) && depth > 0 {
 			bl := lines[j]
 			if bl.Kind != diff.LineAdd {
