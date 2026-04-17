@@ -91,6 +91,15 @@ var slp006JavaThrow = regexp.MustCompile(`\bthrow\s+new\s+UnsupportedOperationEx
 // slp006RustMacro matches Rust todo!(), unimplemented!(), panic!()
 var slp006RustMacro = regexp.MustCompile(`\b(todo|unimplemented|panic)!\s*\(`)
 
+// isMethodCall reports whether the match at loc[0] in content is preceded by
+// a dot, indicating a method call like obj.panic(...) rather than a built-in.
+func isMethodCall(content string, loc []int) bool {
+	if loc[0] > 0 && content[loc[0]-1] == '.' {
+		return true
+	}
+	return false
+}
+
 func (r SLP006) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -104,13 +113,16 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 		isRust := isRustFile(f.Path)
 		for _, ln := range f.AddedLines() {
 			content := ln.Content
+			// Mask comments and strings so regex matches don't fire
+			// inside quoted text or annotations, but preserve byte
+			// offsets so we can still extract string literals from
+			// the original content.
+			masked := maskCommentAndStrings(content)
 
 			// Go: panic("...stub keyword...")
-			// Run regex on content so byte offsets are consistent with
-			// extractStringLiteralFrom.
 			if isGo {
-				loc := slp006GoPanic.FindStringIndex(content)
-				if loc != nil {
+				loc := slp006GoPanic.FindStringIndex(masked)
+				if loc != nil && !isMethodCall(content, loc) {
 					lit, ok := extractStringLiteralFrom(content, loc[0])
 					if ok && containsStubKeyword(lit) {
 						out = append(out, Finding{
@@ -128,7 +140,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 
 			// JS/TS: throw new Error("...stub keyword...")
 			if isJS {
-				loc := slp006JSThrow.FindStringIndex(content)
+				loc := slp006JSThrow.FindStringIndex(masked)
 				if loc != nil {
 					lit, ok := extractStringLiteralFrom(content, loc[0])
 					if ok && containsStubKeyword(lit) {
@@ -147,7 +159,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 
 			// Python: raise NotImplementedError
 			if isPy {
-				loc := slp006PyRaise.FindStringIndex(content)
+				loc := slp006PyRaise.FindStringIndex(masked)
 				if loc != nil {
 					msg := "Python raise NotImplementedError -- implement or remove"
 					lit, ok := extractStringLiteralFrom(content, loc[1])
@@ -168,7 +180,7 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 
 			// Java: throw new UnsupportedOperationException("stub keyword...")
 			if isJava {
-				loc := slp006JavaThrow.FindStringIndex(content)
+				loc := slp006JavaThrow.FindStringIndex(masked)
 				if loc != nil {
 					lit, ok := extractStringLiteralFrom(content, loc[0])
 					if ok && containsStubKeyword(lit) {
@@ -199,9 +211,9 @@ func (r SLP006) Check(d *diff.Diff) []Finding {
 
 			// Rust: todo!("..."), unimplemented!("..."), panic!("stub keyword...")
 			if isRust {
-				loc := slp006RustMacro.FindStringIndex(content)
+				loc := slp006RustMacro.FindStringIndex(masked)
 				if loc != nil {
-					macro := slp006RustMacro.FindStringSubmatch(content)[1]
+					macro := slp006RustMacro.FindStringSubmatch(masked)[1]
 					// todo!() and unimplemented!() are always stubs.
 					if macro == "todo" || macro == "unimplemented" {
 						msg := fmt.Sprintf("Rust %s!() -- implement or remove", macro)

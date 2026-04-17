@@ -156,6 +156,87 @@ func TestSLP003_GoMixedBodyNotAllAdded_NoFinding(t *testing.T) {
 	}
 }
 
+func TestSLP003_GoSingleLineReturnNil(t *testing.T) {
+	// if err != nil { return nil } — single-line swallow.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++if err != nil { return nil }
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for single-line return nil, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "swallow") {
+		t.Errorf("message should mention swallow: %q", got[0].Message)
+	}
+}
+
+func TestSLP003_GoSingleLineEmptyBlock(t *testing.T) {
+	// if err != nil { } — single-line empty block.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++if err != nil { }
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for single-line empty block, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "empty") {
+		t.Errorf("message should mention empty: %q", got[0].Message)
+	}
+}
+
+func TestSLP003_GoSingleLineWithLog_NoFinding(t *testing.T) {
+	// if err != nil { log.Println(err); return nil } — logged, NOT a finding.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++if err != nil { log.Println(err); return nil }
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (logged), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP003_GoSingleLineReturnErr_NoFinding(t *testing.T) {
+	// if err != nil { return err } — propagates the error, NOT a finding.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++if err != nil { return err }
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (return err), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP003_GoSingleLineReturnFalseNil(t *testing.T) {
+	// if err != nil { return false, nil } — silent multi-return.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++if err != nil { return false, nil }
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for single-line return false, nil, got %d: %+v", len(got), got)
+	}
+}
+
 // --- JS/TS tests ---
 
 func TestSLP003_JSEmptyCatch(t *testing.T) {

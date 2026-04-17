@@ -65,6 +65,7 @@ Exit codes:
 | SLP012 | TODO/FIXME/HACK comment added in diff | block | all |
 | SLP013 | Commented-out code block added in diff | block | all |
 | SLP014 | Debug print left in non-test file | block | Go, JS/TS, Python, Java, Rust |
+| SLP015 | Linter-suppression comment added instead of fixing the issue | warn | Go, JS/TS, Python, Java, Rust |
 
 ## Configuration
 
@@ -102,7 +103,7 @@ vendor/**
 ## Adding a new rule
 
 1. Create `pkg/rules/slpXXX.go` implementing the `Rule` interface:
-   - `ID() string` — return the stable rule ID (e.g. `"SLP015"`)
+   - `ID() string` — return the stable rule ID (e.g. `"SLP016"`)
    - `Description() string` — one-line human description
    - `DefaultSeverity() Severity` — `SeverityBlock`, `SeverityWarn`, or `SeverityInfo`
    - `Check(d *diff.Diff) []Finding` — run detection, return findings

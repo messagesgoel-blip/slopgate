@@ -257,3 +257,106 @@ diff --git a/b.py b/b.py
 		t.Fatalf("expected 2 findings across files, got %d: %+v", len(got), got)
 	}
 }
+
+func TestSLP006_IgnoresMethodCallPanic(t *testing.T) {
+	// obj.panic("not implemented") is a method call, not a built-in panic.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++obj.panic("not implemented")
+`)
+	got := SLP006{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for method call panic, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP006_IgnoresQuedStubInComment(t *testing.T) {
+	// panic in a comment should not fire.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++// panic("not implemented")
+`)
+	got := SLP006{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for commented panic, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP006_IgnoresQuedStubInString(t *testing.T) {
+	// panic in a string literal should not fire.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++msg := "panic: not implemented"
+`)
+	got := SLP006{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for panic in string, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP006_PythonRaiseInComment(t *testing.T) {
+	// raise NotImplementedError in a comment should not fire.
+	d := parseDiff(t, `diff --git a/a.py b/a.py
+--- a/a.py
++++ b/a.py
+@@ -1,1 +1,3 @@
+ import os
++# raise NotImplementedError
+`)
+	got := SLP006{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for commented raise, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP006_JavaThrow(t *testing.T) {
+	d := parseDiff(t, `diff --git a/Svc.java b/Svc.java
+--- a/Svc.java
++++ b/Svc.java
+@@ -1,1 +1,3 @@
+ package svc;
++throw new UnsupportedOperationException("not implemented");
+`)
+	got := SLP006{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Java throw, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP006_RustTodo(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.rs b/main.rs
+--- a/main.rs
++++ b/main.rs
+@@ -1,1 +1,3 @@
+ fn main() {}
++todo!("implement this")
+`)
+	got := SLP006{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Rust todo!, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP006_GoPanicOnMultiStatementLine(t *testing.T) {
+	// panic("TODO") after a semicolon should still be detected.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,3 @@
+ package a
++x := 1; panic("TODO: implement")
+`)
+	got := SLP006{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for panic on multi-statement line, got %d: %+v", len(got), got)
+	}
+}

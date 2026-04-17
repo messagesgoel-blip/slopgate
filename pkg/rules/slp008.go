@@ -175,9 +175,10 @@ func (r SLP008) Check(d *diff.Diff) []Finding {
 // sameLineReturn checks whether a line that contains a logging call also
 // contains a silent return on the same line (e.g. after a semicolon).
 func sameLineReturn(line string) bool {
-	// Strip comments and string literals to avoid false splits on semicolons
-	// inside strings or comments.
-	clean := stripCommentAndStrings(line)
+	// Mask comments and strings to avoid false splits on semicolons
+	// inside strings or comments. maskCommentAndStrings preserves byte
+	// offsets so we can still identify return patterns accurately.
+	clean := maskCommentAndStrings(line)
 	parts := strings.Split(clean, ";")
 	if len(parts) < 2 {
 		return false

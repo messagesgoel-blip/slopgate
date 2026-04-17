@@ -27,8 +27,14 @@ func (SLP003) Description() string {
 
 // --- Go patterns ---
 
-// slp003GoErrCheck matches `if err != nil {` on an added line.
+// slp003GoErrCheck matches `if err != nil {` on an added line (multi-line block).
 var slp003GoErrCheck = regexp.MustCompile(`^\s*if\s+err\s*!=\s*nil\s*\{\s*$`)
+
+// slp003GoSingleLineErrCheck matches single-line Go error handlers like
+// `if err != nil { return nil }` or `if err != nil { return }`.
+// Also matches when preceded by other code (e.g., inside a function body).
+// Captures the content between the braces in group 1.
+var slp003GoSingleLineErrCheck = regexp.MustCompile(`if\s+err\s*!=\s*nil\s*\{\s*(.+?)\s*\}`)
 
 // slp003LogTokens are substrings that indicate the error is being
 // logged rather than silently swallowed.
@@ -265,7 +271,40 @@ func (r SLP003) checkGo(f diff.File) []Finding {
 		i := 0
 		for i < len(lines) {
 			ln := lines[i]
-			if ln.Kind != diff.LineAdd || !slp003GoErrCheck.MatchString(ln.Content) {
+			if ln.Kind != diff.LineAdd {
+				i++
+				continue
+			}
+
+			// Check for single-line error handler: if err != nil { return nil }
+			if m := slp003GoSingleLineErrCheck.FindStringSubmatch(ln.Content); m != nil {
+				body := m[1]
+				trimmed := strings.TrimSpace(body)
+				if trimmed == "" {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "if err != nil block is empty — log, wrap, or return the error",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				} else if isGoBailOnlySingleLine(trimmed) && !slp003GoHasHandling(body) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "if err != nil block swallows the error — log, wrap, or return the error",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				}
+				i++
+				continue
+			}
+
+			// Check for multi-line error handler: if err != nil {
+			if !slp003GoErrCheck.MatchString(ln.Content) {
 				i++
 				continue
 			}
@@ -337,6 +376,27 @@ func isGoBailOnly(body string) bool {
 			continue
 		}
 		// Any other non-trivial statement means the block does something.
+		return false
+	}
+	return true
+}
+
+// isGoBailOnlySingleLine reports whether a single-line Go error handler
+// body (the content between { and }) contains only bail statements like
+// `return nil`, `return`, or `return false, nil`. Semicolons are used as
+// statement separators.
+func isGoBailOnlySingleLine(body string) bool {
+	// Mask comments and strings to avoid splitting on semicolons inside strings.
+	clean := maskCommentAndStrings(body)
+	parts := strings.Split(clean, ";")
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		if isSilentReturn(trimmed) {
+			continue
+		}
 		return false
 	}
 	return true
