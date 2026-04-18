@@ -59,6 +59,11 @@ if [[ -z "$OWNER_REPO" ]]; then
   exit 1
 fi
 
+if ! [[ "$OWNER_REPO" =~ ^[^/]+/[^/]+$ ]]; then
+  echo "Error: OWNER/REPO malformed (expected owner/repo): got '$OWNER_REPO' from '$REMOTE_URL'" >&2
+  exit 1
+fi
+
 echo "=== Slopgate vs CodeRabbit Benchmark ==="
 echo "Repo:       $OWNER_REPO"
 echo "PR:         #$PR_NUMBER"
@@ -114,7 +119,7 @@ TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
 echo "$SLOPGATE_JSON" | jq -c '.findings[] | {file, line, rule_id, severity, message}' > "$TMPDIR/slopgate.json"
-echo "$CR_COMMENTS" | jq -c '.[] | {path, line: (.line // .original_line // 0), body: (.body | split("\n")[0][0:120]), id}' > "$TMPDIR/cr.json"
+echo "$CR_COMMENTS" | jq -c '.[] | {path, line: (.line // .original_line), body: (.body | split("\n")[0][0:120]), id} | select(.line != null)' > "$TMPDIR/cr.json"
 
 # Write Python script to a file to avoid shell interpolation issues
 cat > "$TMPDIR/compare.py" << 'PYEOF'
