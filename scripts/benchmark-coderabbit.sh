@@ -130,25 +130,42 @@ with open(os.path.join(tmpdir, "slopgate.json")) as f:
 with open(os.path.join(tmpdir, "cr.json")) as f:
     cr_comments = [json.loads(line) for line in f if line.strip()]
 
-# Match by file + line proximity
-overlap = []
-sg_only = list(sg_findings)
-cr_matched = set()
+# Maximum bipartite matching (DFS-based augmenting paths).
+# A greedy first-fit loop can undercount overlaps when an early sg
+# claims a cr that would be the only match for a later sg.
+# Build bipartite graph: sg_idx -> [cr_idx, ...] where file matches
+# and line proximity is within fuzzy range.
 
-for sf in sg_findings:
-    matched_cr = None
-    for i, cc in enumerate(cr_comments):
-        if i in cr_matched:
-            continue
+sys.setrecursionlimit(max(sys.getrecursionlimit(), len(sg_findings) * 2 + 100))
+
+adj = {s: [] for s in range(len(sg_findings))}
+for s, sf in enumerate(sg_findings):
+    for c, cc in enumerate(cr_comments):
         if sf["file"] == cc["path"] and abs(sf["line"] - cc["line"]) <= fuzzy:
-            matched_cr = cc
-            cr_matched.add(i)
-            break
-    if matched_cr:
-        overlap.append({"sg": sf, "cr": matched_cr})
-        sg_only.remove(sf)
+            adj[s].append(c)
 
-cr_only = [cc for i, cc in enumerate(cr_comments) if i not in cr_matched]
+match_cr = {}  # cr_idx -> sg_idx
+
+def _dfs(s, seen):
+    for c in adj[s]:
+        if c in seen:
+            continue
+        seen.add(c)
+        if c not in match_cr or _dfs(match_cr[c], seen):
+            match_cr[c] = s
+            return True
+    return False
+
+for s in range(len(sg_findings)):
+    _dfs(s, set())
+
+matched_sg = set(match_cr.values())
+overlap = []
+for c, s in match_cr.items():
+    overlap.append({"sg": sg_findings[s], "cr": cr_comments[c]})
+
+sg_only = [sf for i, sf in enumerate(sg_findings) if i not in matched_sg]
+cr_only = [cc for i, cc in enumerate(cr_comments) if i not in match_cr]
 
 # Output report
 print(f"Overlap:       {len(overlap)} findings (both found)")
@@ -209,16 +226,13 @@ with open(os.path.join(tmpdir, "result.json"), "w") as f:
     json.dump(result, f, indent=2)
 PYEOF
 
-BENCHMARK_TMPDIR="$TMPDIR" \
-BENCHMARK_REPO="$OWNER_REPO" \
-BENCHMARK_PR="$PR_NUMBER" \
-BENCHMARK_BASE="$BASE_REF" \
-BENCHMARK_FUZZY_RANGE="$FUZZY_LINE_RANGE" \
-python3 "$TMPDIR/compare.py" > "$TMPDIR/report.txt"
-
-PY_EXIT=$?
-if [[ $PY_EXIT -ne 0 ]]; then
-  echo "Error: comparison script failed (exit $PY_EXIT)" >&2
+export BENCHMARK_TMPDIR="$TMPDIR"
+export BENCHMARK_REPO="$OWNER_REPO"
+export BENCHMARK_PR="$PR_NUMBER"
+export BENCHMARK_BASE="$BASE_REF"
+export BENCHMARK_FUZZY_RANGE="$FUZZY_LINE_RANGE"
+if ! python3 "$TMPDIR/compare.py" > "$TMPDIR/report.txt"; then
+  echo "Error: comparison script failed" >&2
   exit 1
 fi
 
