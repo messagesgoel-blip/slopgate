@@ -48,7 +48,7 @@ Exit codes:
 - `1` - blocking findings present
 - `2` - configuration or tool error
 
-## Rules (v0.0.4)
+## Rules (v0.0.6)
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
@@ -74,8 +74,20 @@ Exit codes:
 | SLP021 | Mixed camelCase and snake_case naming in the same hunk | info | Go, JS/TS, Python, Java, Rust |
 | SLP022 | fmt.Errorf uses %v/%s with error arg instead of %w for wrapping | warn | Go |
 | SLP023 | Bare type assertion without comma-ok guard panics on mismatch | warn | Go |
+| SLP024 | Catch block returns 2xx status after logging error — webhook callers will not retry | block | JS/TS |
+| SLP025 | URL concatenation without path validation — could produce malformed URLs | warn | JS/TS |
+| SLP026 | SQL NULL check without sentinel exclusion — consider excluding placeholder values | warn | SQL, JS/TS |
+| SLP027 | Async function throws synchronously — use return Promise.reject for consistent error handling | warn | JS/TS |
 
 \* SLP020 escalates to **warn** when security-context keywords (password, token, secret, key, session, nonce, salt, credential, auth) appear nearby.
+
+### v0.0.6 Changes
+
+- **SLP017**: Now exempts HTTP status codes (200, 400, 500, etc.) in HTTP context and common pagination limits (10, 50, 100) in limit context, reducing noise from intentional values.
+- **SLP024**: New rule catching webhook handlers that return 200 on error, preventing retries.
+- **SLP025**: New rule detecting URL concatenation without path validation.
+- **SLP026**: New rule flagging SQL NULL checks that may miss sentinel placeholder values.
+- **SLP027**: New rule detecting async functions that throw synchronously instead of returning Promise.reject.
 
 ## Configuration
 
