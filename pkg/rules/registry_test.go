@@ -31,6 +31,7 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 		"SLP025": false,
 		"SLP026": false,
 		"SLP027": false,
+		"SLP030": false,
 	}
 	for _, rule := range r.All() {
 		if _, ok := want[rule.ID()]; ok {
@@ -46,7 +47,7 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 
 func TestDefault_NoExtraRules(t *testing.T) {
 	r := Default()
-	if got := len(r.All()); got != 26 {
-		t.Errorf("Default registry has %d rules, want 26", got)
+	if got := len(r.All()); got != 27 {
+		t.Errorf("Default registry has %d rules, want 27", got)
 	}
 }
