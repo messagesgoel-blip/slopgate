@@ -13,7 +13,13 @@
 # Requires: gh (authenticated), jq, python3, slopgate (on PATH or SLOPGATE_BIN)
 set -euo pipefail
 
-SLOPGATE_BIN="${SLOPGATE_BIN:-$(command -v slopgate 2>/dev/null || echo /srv/storage/shared/tools/bin/slopgate)}"
+# --- Resolve slopgate binary ---
+SLOPGATE_BIN="${SLOPGATE_BIN:-$(command -v slopgate 2>/dev/null || true)}"
+if [[ -z "$SLOPGATE_BIN" ]] || ! [[ -x "$SLOPGATE_BIN" ]]; then
+  echo "Error: slopgate not found. Install it or set SLOPGATE_BIN." >&2
+  exit 1
+fi
+
 FUZZY_LINE_RANGE="${BENCHMARK_FUZZY_RANGE:-2}"
 OUTPUT_FILE=""
 
@@ -30,11 +36,13 @@ BASE_REF="main"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --output)
-      if [[ $# -lt 2 ]]; then echo "Error: --output requires an argument" >&2; exit 1; fi
+      if [[ $# -lt 2 ]] || [[ "$2" == -* ]]; then echo "Error: --output requires a non-option argument" >&2; exit 1; fi
       OUTPUT_FILE="$2"; shift 2 ;;
     --base)
-      if [[ $# -lt 2 ]]; then echo "Error: --base requires an argument" >&2; exit 1; fi
+      if [[ $# -lt 2 ]] || [[ "$2" == -* ]]; then echo "Error: --base requires a non-option argument" >&2; exit 1; fi
       BASE_REF="$2"; shift 2 ;;
+    -*)
+      echo "Error: unknown option $1" >&2; exit 1 ;;
     *) BASE_REF="$1"; shift ;;
   esac
 done
@@ -57,12 +65,20 @@ echo "PR:         #$PR_NUMBER"
 echo "Base:       $BASE_REF"
 echo ""
 
-# --- Step 1: Run slopgate ---
+# --- Step 1: Run slopgate (separate stdout from stderr) ---
 echo "Running slopgate..." >&2
-if ! SLOPGATE_JSON=$("$SLOPGATE_BIN" --base "$BASE_REF" --format json -C "$REPO_DIR" 2>&1); then
+SLOPGATE_ERR_FILE="$(mktemp)"
+SLOPGATE_JSON="$( "$SLOPGATE_BIN" --base "$BASE_REF" --format json -C "$REPO_DIR" 2>"$SLOPGATE_ERR_FILE" )" || {
   echo "Error: slopgate failed" >&2
-  echo "$SLOPGATE_JSON" | head -5 >&2
-  SLOPGATE_JSON='{"findings":[],"summary":{"total":0,"block":0,"warn":0,"info":0}}'
+  cat "$SLOPGATE_ERR_FILE" | head -5 >&2
+  rm -f "$SLOPGATE_ERR_FILE"
+  exit 1
+}
+SLOPGATE_ERR="$(cat "$SLOPGATE_ERR_FILE")"
+rm -f "$SLOPGATE_ERR_FILE"
+if [[ -n "$SLOPGATE_ERR" ]]; then
+  echo "Warning: slopgate stderr:" >&2
+  echo "$SLOPGATE_ERR" | head -3 >&2
 fi
 
 SLOPGATE_COUNT="$(echo "$SLOPGATE_JSON" | jq '.summary.total // 0')"
@@ -74,8 +90,17 @@ echo "Slopgate: $SLOPGATE_COUNT findings ($SLOPGATE_BLOCK block, $SLOPGATE_WARN 
 
 # --- Step 2: Fetch CodeRabbit comments ---
 echo "Fetching CodeRabbit comments..." >&2
+CR_ERR_FILE="$(mktemp)"
+CR_COMMENTS_RAW="$(gh api "repos/$OWNER_REPO/pulls/$PR_NUMBER/comments" --paginate 2>"$CR_ERR_FILE")" || {
+  echo "Error: gh api failed" >&2
+  cat "$CR_ERR_FILE" | head -5 >&2
+  rm -f "$CR_ERR_FILE"
+  exit 1
+}
+rm -f "$CR_ERR_FILE"
+
 # --paginate may output multiple JSON arrays; jq -s 'add' merges them.
-CR_COMMENTS_RAW="$(gh api "repos/$OWNER_REPO/pulls/$PR_NUMBER/comments" --paginate 2>/dev/null | jq -s 'add' 2>/dev/null || echo '[]')"
+CR_COMMENTS_RAW="$(echo "$CR_COMMENTS_RAW" | jq -s 'add')"
 
 # Filter to CodeRabbit comments only
 CR_COMMENTS="$(echo "$CR_COMMENTS_RAW" | jq '[.[] | select(.user.login | test("coderabbit|code-rabbit"; "i"))]')"
@@ -99,10 +124,6 @@ from collections import Counter
 fuzzy = int(os.environ.get("BENCHMARK_FUZZY_RANGE", "2"))
 tmpdir = os.environ.get("BENCHMARK_TMPDIR", "/tmp")
 
-def sanitize(s):
-    """Strip non-JSON-safe characters for safe embedding."""
-    return re.sub(r'[^\w .:/\\-]', '_', s[:200])
-
 with open(os.path.join(tmpdir, "slopgate.json")) as f:
     sg_findings = [json.loads(line) for line in f if line.strip()]
 
@@ -117,6 +138,8 @@ cr_matched = set()
 for sf in sg_findings:
     matched_cr = None
     for i, cc in enumerate(cr_comments):
+        if i in cr_matched:
+            continue
         if sf["file"] == cc["path"] and abs(sf["line"] - cc["line"]) <= fuzzy:
             matched_cr = cc
             cr_matched.add(i)
@@ -193,14 +216,24 @@ BENCHMARK_BASE="$BASE_REF" \
 BENCHMARK_FUZZY_RANGE="$FUZZY_LINE_RANGE" \
 python3 "$TMPDIR/compare.py" > "$TMPDIR/report.txt"
 
-if [[ $? -ne 0 ]]; then
-  echo "Error: comparison script failed" >&2
+PY_EXIT=$?
+if [[ $PY_EXIT -ne 0 ]]; then
+  echo "Error: comparison script failed (exit $PY_EXIT)" >&2
+  exit 1
+fi
+
+if [[ ! -f "$TMPDIR/report.txt" ]]; then
+  echo "Error: report file not generated" >&2
   exit 1
 fi
 
 cat "$TMPDIR/report.txt"
 
 if [[ -n "$OUTPUT_FILE" ]]; then
+  if [[ ! -f "$TMPDIR/result.json" ]]; then
+    echo "Error: JSON result file not generated" >&2
+    exit 1
+  fi
   cp "$TMPDIR/result.json" "$OUTPUT_FILE"
   echo "JSON report written to $OUTPUT_FILE"
 fi
