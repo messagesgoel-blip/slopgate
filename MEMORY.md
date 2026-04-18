@@ -12,8 +12,8 @@ This file tracks key information about the slopgate project for future agent ses
 
 ## Current Version
 
-- **v0.0.6** (branch: `feat/semantic-rules-v0.0.6`)
-- 26 rules (SLP001-SLP027, note: SLP004 was never assigned)
+- **v0.0.7** (merged PR #9, 2026-04-18)
+- 27 rules (SLP001-SLP027, SLP030; note: SLP004 was never assigned)
 
 ## Benchmark Status
 
@@ -28,11 +28,12 @@ This file tracks key information about the slopgate project for future agent ses
 - SLP001-SLP023: All syntactic patterns (empty tests, unused imports, debug prints, etc.)
 - Fast regex-based detection on staged diff
 
-### Semantic Patterns (v0.0.6 additions)
+### Semantic Patterns (v0.0.6-v0.0.7 additions)
 - SLP024: Webhook ACK on failure (block) - catches `catch { console.error; res.status(200) }`
 - SLP025: URL concatenation without validation (warn) - catches `${URL}${Path}` patterns
 - SLP026: SQL NULL check without sentinel (warn) - catches `WHERE hash IS NOT NULL` without exclusion
 - SLP027: Async function sync throw (warn) - catches `async function { throw }` patterns
+- SLP030: Query sentinel exclusion (warn) - catches `.only/.first/.last()` without `where('hash', '!=', 'marker')`
 
 ### Noise Reduction (SLP017 tuning)
 - Exempts HTTP status codes (200, 400, 500, etc.) in `.status()` context
