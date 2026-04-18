@@ -48,7 +48,7 @@ Exit codes:
 - `1` - blocking findings present
 - `2` - configuration or tool error
 
-## Rules (v0.0.6)
+## Rules (v0.0.7)
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
@@ -78,16 +78,13 @@ Exit codes:
 | SLP025 | URL concatenation without path validation — could produce malformed URLs | warn | JS/TS |
 | SLP026 | SQL NULL check without sentinel exclusion — consider excluding placeholder values | warn | SQL, JS/TS |
 | SLP027 | Async function throws synchronously — use return Promise.reject for consistent error handling | warn | JS/TS |
+| SLP030 | Query .only/.first/.last without sentinel exclusion — could return placeholder record | warn | JS/TS, Python, Go |
 
 \* SLP020 escalates to **warn** when security-context keywords (password, token, secret, key, session, nonce, salt, credential, auth) appear nearby.
 
-### v0.0.6 Changes
+### v0.0.7 Changes
 
-- **SLP017**: Now exempts HTTP status codes (200, 400, 500, etc.) in HTTP context and common pagination limits (10, 50, 100) in limit context, reducing noise from intentional values.
-- **SLP024**: New rule catching webhook handlers that return 200 on error, preventing retries.
-- **SLP025**: New rule detecting URL concatenation without path validation.
-- **SLP026**: New rule flagging SQL NULL checks that may miss sentinel placeholder values.
-- **SLP027**: New rule detecting async functions that throw synchronously instead of returning Promise.reject.
+- **SLP030**: New rule catching ORM/query methods (.only, .first, .last, .findOne) that select single records without filtering sentinel placeholder values.
 
 ## Configuration
 
