@@ -155,6 +155,74 @@ func TestSLP017_MagicNumber(t *testing.T) {
  }`,
 			want: 1,
 		},
+		{
+			name: "HTTP status 400 not flagged",
+			diff: `diff --git a/handler.js b/handler.js
+--- a/handler.js
++++ b/handler.js
+@@ -1,3 +1,4 @@
+ async function handle() {
+-	return res.json({})
++	if (!valid) return res.status(400).json({ error: 'bad' })
+ }`,
+			want: 0,
+		},
+		{
+			name: "HTTP status 500 not flagged",
+			diff: `diff --git a/handler.js b/handler.js
+--- a/handler.js
++++ b/handler.js
+@@ -1,3 +1,4 @@
+ async function handle() {
+-	return res.json({})
++	return res.status(500).json({ error: 'internal' })
+ }`,
+			want: 0,
+		},
+		{
+			name: "SQL LIMIT 10 not flagged",
+			diff: `diff --git a/query.sql b/query.sql
+--- a/query.sql
++++ b/query.sql
+@@ -1,2 +1,3 @@
+ SELECT * FROM users
++LIMIT 10;
+`,
+			want: 0,
+		},
+		{
+			name: "limit(50) not flagged",
+			diff: `diff --git a/api.js b/api.js
+--- a/api.js
++++ b/api.js
+@@ -1,2 +1,3 @@
+ const result = await query()
++  .limit(50);
+`,
+			want: 0,
+		},
+		{
+			name: "pageSize 20 not flagged",
+			diff: `diff --git a/api.js b/api.js
+--- a/api.js
++++ b/api.js
+@@ -1,2 +1,3 @@
+ const pageSize = 20
++const result = await query.limit(pageSize)
+`,
+			want: 0,
+		},
+		{
+			name: "non-standard number still flagged",
+			diff: `diff --git a/tax.js b/tax.js
+--- a/tax.js
++++ b/tax.js
+@@ -1,2 +1,3 @@
++const taxRate = 86.9;  // not ALL_CAPS, should flag
+ return total * rate;
+`,
+			want: 1,
+		},
 	}
 
 	for _, tt := range tests {
