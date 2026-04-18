@@ -48,6 +48,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Resolve repo info ---
+if [[ ! -d "$REPO_PATH" ]]; then
+  echo "Error: REPO_PATH does not exist or is not a directory: $REPO_PATH" >&2
+  exit 1
+fi
+
 REPO_DIR="$(cd "$REPO_PATH" && git rev-parse --show-toplevel 2>/dev/null || echo "$REPO_PATH")"
 REMOTE_URL="$(git -C "$REPO_DIR" remote get-url origin 2>/dev/null || true)"
 
