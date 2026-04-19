@@ -30,7 +30,7 @@ var slp034AntiPatterns = []*regexp.Regexp{
 	// Direct mutation of state objects
 	regexp.MustCompile(`(?i)(\w+)\[(\w+)\]\s*=\s*`),
 	// Async operations without proper dependency arrays in useEffect
-	regexp.MustCompile(`(?i)useEffect\s*\(\s*\(\s*\)\s*=>\s*{\s*async\s+function|\(async\s*\(.*\)\s*=>\s*{.*fetch|axios\.get`),
+	regexp.MustCompile(`(?i)useEffect\s*\(\s*async\s+\([^)]*\)\s*=>\s*\{`),
 	// State updates based on previous state without functional updates
 	regexp.MustCompile(`(?i)(const|let)\s+(\w+)\s*=\s*\w+;\s*\w+\s*=\s*\w+\s*[+\-*/]\s*`),
 	// Multiple sequential state updates that should be batched

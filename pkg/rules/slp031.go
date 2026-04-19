@@ -36,6 +36,7 @@ var slp031IntakePatterns = []*regexp.Regexp{
 var slp031LicensePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(license check|license validated|oss approved|legal reviewed)`),
 	regexp.MustCompile(`(?i)(license compatibility|license review completed)`),
+	regexp.MustCompile(`(?i)(legal team|approved by legal|legal validation completed)`),
 }
 
 func (r SLP031) Check(d *diff.Diff) []Finding {

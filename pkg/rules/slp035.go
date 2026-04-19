@@ -2,6 +2,7 @@ package rules
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -131,13 +132,13 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 				}
 				
 				// Check for very long lines
-				if len(ln.Content) > 120 {
+				if len(ln.Content) > 100 {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),
 						File:     f.Path,
 						Line:     ln.NewLineNo,
-						Message:  "line is too long (" + string(rune(len(ln.Content))) + " chars) - consider breaking into multiple lines",
+						Message:  "line is too long (" + strconv.Itoa(len(ln.Content)) + " chars) - consider breaking into multiple lines",
 						Snippet:  content[:min(60, len(content))] + "...",
 					})
 				}
