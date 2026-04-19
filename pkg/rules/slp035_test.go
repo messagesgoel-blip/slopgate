@@ -121,6 +121,29 @@ func TestSLP035(t *testing.T) {
 			},
 			wantFindings: 0,
 		},
+		{
+			name: "Console log in different hunk",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "Component.tsx",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "const value = getValue();"},
+								},
+							},
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 5, Content: "console.log('debugging');"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 1,
+		},
 	}
 
 	for _, tt := range tests {

@@ -60,6 +60,9 @@ var slp035PotentialDeadCode = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(TODO|FIXME|HACK|XXX)`),
 }
 
+// slp035TicketReferencePattern matches ticket references like SLOP-123 or CODE-456
+var slp035TicketReferencePattern = regexp.MustCompile(`(?i)\b\w+-\d+\b`)
+
 func (r SLP035) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -106,7 +109,7 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 				// Check for TODO/FIXME without ticket references
 				if regexp.MustCompile(`(?i)(TODO|FIXME|HACK|XXX)`).MatchString(content) {
 					// Check if it has a ticket reference (e.g., CR-123, ISSUE-456)
-					hasTicketRef := regexp.MustCompile(`(?i)\b\w+-\d+\b`).MatchString(content)
+					hasTicketRef := slp035TicketReferencePattern.MatchString(content)
 					if !hasTicketRef {
 						out = append(out, Finding{
 							RuleID:   r.ID(),

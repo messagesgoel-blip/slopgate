@@ -24,7 +24,7 @@ func (SLP032) Description() string {
 }
 
 // slp032MissingReactImport matches TSX files without React import.
-var slp032MissingReactImport = regexp.MustCompile(`(?i)(^|\s)import\s+.*(?:React|{[^}]*\b(?:React|useState|useEffect|useContext)\b|.*from\s+["']react["'])`)
+var slp032MissingReactImport = regexp.MustCompile(`(?i)(?:^|\s)import\s+(?:\w+,?\s*)?(?:\{[^}]*\})?\s*from\s+["']react["']`)
 
 // slp032ComponentPatterns matches React component patterns that might have issues.
 var slp032ComponentPatterns = []*regexp.Regexp{

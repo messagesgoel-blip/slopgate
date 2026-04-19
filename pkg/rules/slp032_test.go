@@ -74,6 +74,31 @@ func TestSLP032(t *testing.T) {
 			},
 			wantFindings: 1,
 		},
+		{
+			name: "React import in different hunk",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "Component.tsx",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "import React from 'react';"},
+								},
+							},
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 5, Content: "export function MyComponent() {"},
+									{Kind: diff.LineAdd, NewLineNo: 6, Content: "  return <div>Hello</div>;"},
+									{Kind: diff.LineAdd, NewLineNo: 7, Content: "}"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
+		},
 	}
 
 	for _, tt := range tests {

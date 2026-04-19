@@ -92,6 +92,31 @@ func TestSLP034(t *testing.T) {
 			},
 			wantFindings: 1,
 		},
+		{
+			name: "Anti-pattern useEffect with async function in different hunk",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "Component.tsx",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "const [data, setData] = useState(null);"},
+								},
+							},
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 5, Content: "useEffect(async () => {"},
+									{Kind: diff.LineAdd, NewLineNo: 6, Content: "  const response = await fetch('/api/data');"},
+									{Kind: diff.LineAdd, NewLineNo: 7, Content: "}, []);"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 1,
+		},
 	}
 
 	for _, tt := range tests {

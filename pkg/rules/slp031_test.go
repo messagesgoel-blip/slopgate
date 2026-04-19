@@ -68,6 +68,30 @@ func TestSLP031(t *testing.T) {
 			},
 			wantFindings: 0,
 		},
+		{
+			name: "Split hunks in same file",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "ATTRIBUTION.md",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "Some unrelated content"},
+								},
+							},
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 5, Content: "This directory is a direct-code intake from `codero-sparkle-start`"},
+									{Kind: diff.LineAdd, NewLineNo: 6, Content: "Upstream repo: https://github.com/example/repo"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 1,
+		},
 	}
 
 	for _, tt := range tests {

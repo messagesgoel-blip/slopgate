@@ -104,6 +104,29 @@ func TestSLP033(t *testing.T) {
 			},
 			wantFindings: 0,
 		},
+		{
+			name: "Import in different hunk",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "Component.tsx",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "import { useState } from 'react';"},
+								},
+							},
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 5, Content: "const [count, setCount] = useState(0);"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
+		},
 	}
 
 	for _, tt := range tests {
