@@ -22,46 +22,15 @@ func (SLP035) Description() string {
 	return "code quality or style issue detected"
 }
 
-// slp035UnusedVarPatterns matches patterns of potentially unused variables.
-var slp035UnusedVarPatterns = []*regexp.Regexp{
-	// Variables declared but not used in the same scope
-	regexp.MustCompile(`(?i)const\s+(\w+)\s*=\s*[^;,]*[;,]\s*[^=]*\s*[^;]*[;]`),
-	// Catch parameters that are not used
-	regexp.MustCompile(`(?i)catch\s*\(\s*(\w+)\s*\)`),
-	// Loop variables that are not used
-	regexp.MustCompile(`(?i)for\s*\([^;]*;\s*\w+\s*;\s*\)`),
-}
-
-// slp035StyleIssues matches common style issues.
-var slp035StyleIssues = []*regexp.Regexp{
-	// Inconsistent naming patterns (camelCase vs snake_case mix)
-	regexp.MustCompile(`(?i)[a-z]+[A-Z][a-zA-Z]*\w*[A-Z]\w*`), // Mixed case that might be inconsistent
-	// Multiple consecutive blank lines
-	regexp.MustCompile(`\n\s*\n\s*\n`),
-	// Trailing whitespace
-	regexp.MustCompile(`\s+$`),
-	// Tabs mixed with spaces (basic check)
-	regexp.MustCompile(`\t.* {2,}|\s{2,}.*\t`),
-	// Long lines (typically > 100 chars)
-	regexp.MustCompile(`^.{101,}$`),
-}
-
-// slp035PotentialDeadCode matches patterns that might indicate dead code.
-var slp035PotentialDeadCode = []*regexp.Regexp{
-	// Commented-out code blocks
-	regexp.MustCompile(`(?s)/\*.*?\*/`),
-	// Large commented-out sections
-	regexp.MustCompile(`(?s)//\s*[^\n]{50,}`),
-	// Console.log statements in production code
-	regexp.MustCompile(`(?i)console\.(log|debug|info|warn|error)\s*\(`),
-	// Debugger statements
-	regexp.MustCompile(`(?i)\bdebugger\b`),
-	// TODO/FIXME comments without ticket references
-	regexp.MustCompile(`(?i)(TODO|FIXME|HACK|XXX)`),
-}
-
 // slp035TicketReferencePattern matches ticket references like SLOP-123 or CODE-456
 var slp035TicketReferencePattern = regexp.MustCompile(`(?i)\b\w+-\d+\b`)
+
+// Named regex patterns for efficient lookup
+var consolePattern = regexp.MustCompile(`(?i)console\.(log|debug|info|warn|error)\s*\(`)
+var debuggerPattern = regexp.MustCompile(`(?i)\bdebugger\b`)
+var todoPattern = regexp.MustCompile(`(?i)(TODO|FIXME|HACK|XXX)`)
+var trailingWhitespacePattern = regexp.MustCompile(`\s+$`)
+var longLinePattern = regexp.MustCompile(`^.{101,}$`)
 
 func (r SLP035) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -82,93 +51,72 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				
-				// Check for console.log statements using the defined pattern
-				for _, pattern := range slp035PotentialDeadCode {
-					if pattern.String() == `(?i)console\.(log|debug|info|warn|error)\s*\(` {
-						if pattern.MatchString(content) {
-							out = append(out, Finding{
-								RuleID:   r.ID(),
-								Severity: r.DefaultSeverity(),
-								File:     f.Path,
-								Line:     ln.NewLineNo,
-								Message:  "console statement detected in code - remove before production",
-								Snippet:  content,
-							})
-							break
-						}
+				// Check for console.log statements using direct pattern check
+				if consolePattern.MatchString(content) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "console statement detected in code - remove before production",
+						Snippet:  content,
+					})
+				}
+				
+				// Check for debugger statements using direct pattern check
+				if debuggerPattern.MatchString(content) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "debugger statement detected in code - remove before production",
+						Snippet:  content,
+					})
+				}
+				
+				// Check for TODO/FIXME without ticket references using direct pattern check
+				if todoPattern.MatchString(content) {
+					// Check if it has a ticket reference (e.g., CR-123, ISSUE-456)
+					hasTicketRef := slp035TicketReferencePattern.MatchString(content)
+					if !hasTicketRef {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  "TODO/FIXME comment without ticket reference - add ticket number",
+							Snippet:  content,
+						})
 					}
 				}
 				
-				// Check for debugger statements using the defined pattern
-				for _, pattern := range slp035PotentialDeadCode {
-					if pattern.String() == `(?i)\bdebugger\b` {
-						if pattern.MatchString(content) {
-							out = append(out, Finding{
-								RuleID:   r.ID(),
-								Severity: r.DefaultSeverity(),
-								File:     f.Path,
-								Line:     ln.NewLineNo,
-								Message:  "debugger statement detected in code - remove before production",
-								Snippet:  content,
-							})
-							break
-						}
-					}
+				// Check for trailing whitespace using direct pattern check
+				if trailingWhitespacePattern.MatchString(ln.Content) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "trailing whitespace detected",
+						Snippet:  strings.TrimRight(content, " \t"),
+					})
 				}
 				
-				// Check for TODO/FIXME without ticket references using the defined pattern
-				for _, pattern := range slp035PotentialDeadCode {
-					if pattern.String() == `(?i)(TODO|FIXME|HACK|XXX)` {
-						if pattern.MatchString(content) {
-							// Check if it has a ticket reference (e.g., CR-123, ISSUE-456)
-							hasTicketRef := slp035TicketReferencePattern.MatchString(content)
-							if !hasTicketRef {
-								out = append(out, Finding{
-									RuleID:   r.ID(),
-									Severity: r.DefaultSeverity(),
-									File:     f.Path,
-									Line:     ln.NewLineNo,
-									Message:  "TODO/FIXME comment without ticket reference - add ticket number",
-									Snippet:  content,
-								})
-							}
-							break
-						}
+				// Check for very long lines using direct pattern check
+				if longLinePattern.MatchString(ln.Content) {
+					snippet := content
+					if len(content) > 60 {
+						snippet = content[:60] + "..."
 					}
-				}
-				
-				// Check for trailing whitespace using the defined pattern
-				for _, pattern := range slp035StyleIssues {
-					if pattern.String() == `\s+$` {
-						if pattern.MatchString(ln.Content) {
-							out = append(out, Finding{
-								RuleID:   r.ID(),
-								Severity: r.DefaultSeverity(),
-								File:     f.Path,
-								Line:     ln.NewLineNo,
-								Message:  "trailing whitespace detected",
-								Snippet:  strings.TrimRight(content, " \t"),
-							})
-							break
-						}
-					}
-				}
-				
-				// Check for very long lines using the defined pattern
-				for _, pattern := range slp035StyleIssues {
-					if pattern.String() == `^.{101,}$` {
-						if pattern.MatchString(ln.Content) {
-							out = append(out, Finding{
-								RuleID:   r.ID(),
-								Severity: r.DefaultSeverity(),
-								File:     f.Path,
-								Line:     ln.NewLineNo,
-								Message:  "line is too long (" + strconv.Itoa(len(ln.Content)) + " chars) - consider breaking into multiple lines",
-								Snippet:  content[:min(60, len(content))] + "...",
-							})
-							break
-						}
-					}
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "line is too long (" + strconv.Itoa(len(ln.Content)) + " chars) - consider breaking into multiple lines",
+						Snippet:  snippet,
+					})
 				}
 			}
 		}
