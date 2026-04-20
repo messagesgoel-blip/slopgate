@@ -46,8 +46,12 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				
+				// Process content for checks while preserving original for snippet
+				rawContent := ln.Content
 				content := strings.TrimSpace(ln.Content)
-				if content == "" {
+				
+				// Don't skip whitespace-only lines since they're needed for trailing whitespace detection
+				if rawContent == "" {
 					continue
 				}
 				
@@ -59,7 +63,7 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 						File:     f.Path,
 						Line:     ln.NewLineNo,
 						Message:  "console statement detected in code - remove before production",
-						Snippet:  content,
+						Snippet:  rawContent,
 					})
 				}
 				
@@ -71,7 +75,7 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 						File:     f.Path,
 						Line:     ln.NewLineNo,
 						Message:  "debugger statement detected in code - remove before production",
-						Snippet:  content,
+						Snippet:  rawContent,
 					})
 				}
 				
@@ -86,7 +90,7 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 							File:     f.Path,
 							Line:     ln.NewLineNo,
 							Message:  "TODO/FIXME comment without ticket reference - add ticket number",
-							Snippet:  content,
+							Snippet:  rawContent,
 						})
 					}
 				}
@@ -99,15 +103,15 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 						File:     f.Path,
 						Line:     ln.NewLineNo,
 						Message:  "trailing whitespace detected",
-						Snippet:  strings.TrimRight(content, " \t"),
+						Snippet:  ln.Content, // Use original content for trailing whitespace detection
 					})
 				}
 				
 				// Check for very long lines using direct pattern check
 				if longLinePattern.MatchString(ln.Content) {
-					snippet := content
-					if len(content) > 60 {
-						snippet = content[:60] + "..."
+					snippet := rawContent
+					if len(rawContent) > 60 {
+						snippet = rawContent[:60] + "..."
 					}
 					out = append(out, Finding{
 						RuleID:   r.ID(),
@@ -122,12 +126,4 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 		}
 	}
 	return out
-}
-
-// Helper function for min
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
