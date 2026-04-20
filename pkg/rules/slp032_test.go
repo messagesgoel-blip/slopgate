@@ -8,8 +8,8 @@ import (
 
 func TestSLP032(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       *diff.Diff
+		name         string
+		input        *diff.Diff
 		wantFindings int
 	}{
 		{
@@ -54,7 +54,7 @@ func TestSLP032(t *testing.T) {
 			wantFindings: 0,
 		},
 		{
-			name: "JSX button without accessibility",
+			name: "Button with visible text is accessible",
 			input: &diff.Diff{
 				Files: []diff.File{
 					{
@@ -72,7 +72,49 @@ func TestSLP032(t *testing.T) {
 					},
 				},
 			},
+			wantFindings: 0,
+		},
+		{
+			name: "Button without aria, title, or visible text",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "Component.tsx",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "import React from 'react';"},
+									{Kind: diff.LineAdd, NewLineNo: 2, Content: "export function MyComponent() {"},
+									{Kind: diff.LineAdd, NewLineNo: 3, Content: "  return <button />;"},
+									{Kind: diff.LineAdd, NewLineNo: 4, Content: "}"},
+								},
+							},
+						},
+					},
+				},
+			},
 			wantFindings: 1,
+		},
+		{
+			name: "Button with aria-label is accessible",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "Component.tsx",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "import React from 'react';"},
+									{Kind: diff.LineAdd, NewLineNo: 2, Content: "export function MyComponent() {"},
+									{Kind: diff.LineAdd, NewLineNo: 3, Content: "  return <button aria-label='Close' />;"},
+									{Kind: diff.LineAdd, NewLineNo: 4, Content: "}"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
 		},
 		{
 			name: "React import in different hunk",
@@ -98,6 +140,26 @@ func TestSLP032(t *testing.T) {
 				},
 			},
 			wantFindings: 0,
+		},
+		{
+			name: "react-router-dom should not count as React import",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "Component.tsx",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "import { Link } from 'react-router-dom';"},
+									{Kind: diff.LineAdd, NewLineNo: 2, Content: "export function MyComponent() {"},
+									{Kind: diff.LineAdd, NewLineNo: 3, Content: "  return <div>Hello</div>;"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 1,
 		},
 	}
 

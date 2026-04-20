@@ -39,50 +39,54 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		
+
 		// Check all file types
 		for _, h := range f.Hunks {
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
-				
-				// Process content for checks while preserving original for snippet
-				rawContent := ln.Content
-				content := strings.TrimSpace(ln.Content)
-				
-				// Don't skip whitespace-only lines since they're needed for trailing whitespace detection
-				if rawContent == "" {
+
+				// Skip truly empty lines (no characters at all)
+				if ln.Content == "" {
 					continue
 				}
-				
+
+				content := strings.TrimSpace(ln.Content)
+
+				// Check for trailing whitespace on the raw line first
+				// (whitespace-only lines like "   " should still be caught here)
+				if trailingWhitespacePattern.MatchString(ln.Content) {
+					appendFinding(&out, r, f.Path, ln.NewLineNo, "trailing whitespace detected", ln.Content)
+				}
+
+				// Skip whitespace-only lines for remaining checks
+				if content == "" {
+					continue
+				}
+
 				// Check for console.log statements using direct pattern check
 				if consolePattern.MatchString(content) {
-					appendFinding(&out, r, f.Path, ln.NewLineNo, "console statement detected in code - remove before production", rawContent)
+					appendFinding(&out, r, f.Path, ln.NewLineNo, "console statement detected in code - remove before production", ln.Content)
 				}
-				
+
 				// Check for debugger statements using direct pattern check
 				if debuggerPattern.MatchString(content) {
-					appendFinding(&out, r, f.Path, ln.NewLineNo, "debugger statement detected in code - remove before production", rawContent)
+					appendFinding(&out, r, f.Path, ln.NewLineNo, "debugger statement detected in code - remove before production", ln.Content)
 				}
-				
+
 				// Check for TODO/FIXME without ticket references using direct pattern check
 				if todoPattern.MatchString(content) {
 					// Check if it has a ticket reference (e.g., CR-123, ISSUE-456)
 					hasTicketRef := slp035TicketReferencePattern.MatchString(content)
 					if !hasTicketRef {
-						appendFinding(&out, r, f.Path, ln.NewLineNo, "TODO/FIXME comment without ticket reference - add ticket number", rawContent)
+						appendFinding(&out, r, f.Path, ln.NewLineNo, "TODO/FIXME comment without ticket reference - add ticket number", ln.Content)
 					}
 				}
-				
-				// Check for trailing whitespace using direct pattern check
-				if trailingWhitespacePattern.MatchString(ln.Content) {
-					appendFinding(&out, r, f.Path, ln.NewLineNo, "trailing whitespace detected", ln.Content)
-				}
-				
+
 				// Check for very long lines using direct pattern check
 				if longLinePattern.MatchString(ln.Content) {
-					appendFinding(&out, r, f.Path, ln.NewLineNo, "line is too long (" + strconv.Itoa(len(ln.Content)) + " chars) - consider breaking into multiple lines", rawContent)
+					appendFinding(&out, r, f.Path, ln.NewLineNo, "line is too long ("+strconv.Itoa(len(ln.Content))+" chars) - consider breaking into multiple lines", ln.Content)
 				}
 			}
 		}

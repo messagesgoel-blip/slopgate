@@ -23,9 +23,6 @@ func (SLP032) Description() string {
 	return "React/TypeScript component may have type or accessibility issues"
 }
 
-// slp032MissingReactImport matches TSX files without React import.
-var slp032MissingReactImport = regexp.MustCompile(`(?i)(?:^|\s)import\s+(?:\w+,?\s*)?(?:\{[^}]*\})?\s*from\s+["']react["']`)
-
 // slp032ComponentPatterns matches React component patterns that might have issues.
 var slp032ComponentPatterns = []*regexp.Regexp{
 	// JSX element without proper React import
@@ -38,9 +35,10 @@ var slp032ComponentPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)useState\s*\(|React\.useState\s*\(`),
 	// useEffect without React import
 	regexp.MustCompile(`(?i)useEffect\s*\(|React\.useEffect\s*\(`),
-	// Missing accessibility attributes
-	regexp.MustCompile(`(?i)<button[^>]*>([^<]*)</button>`), // button without aria-label or accessible content
 }
+
+// slp032ButtonHasText matches buttons with visible text content between tags.
+var slp032ButtonHasText = regexp.MustCompile(`(?i)<button[^>]*>[^<]+</button>`)
 
 func (r SLP032) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -48,19 +46,19 @@ func (r SLP032) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		
+
 		// Only check TSX files
 		if !strings.HasSuffix(strings.ToLower(f.Path), ".tsx") {
 			continue
 		}
 
-		// Check if React is imported
+		// Check if React is imported (match "react" exactly, not react-router-dom etc.)
 		hasReactImport := false
 		for _, h := range f.Hunks {
 			for _, ln := range h.Lines {
 				if ln.Kind == diff.LineAdd {
 					content := strings.ToLower(ln.Content)
-					if strings.Contains(content, "import") && strings.Contains(content, "react") {
+					if strings.Contains(content, "import") && (strings.Contains(content, `"react"`) || strings.Contains(content, `'react'`)) {
 						hasReactImport = true
 						break
 					}
@@ -76,9 +74,9 @@ func (r SLP032) Check(d *diff.Diff) []Finding {
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
-				
+
 				content := ln.Content
-				
+
 				// Check for React component patterns if React isn't imported
 				if !hasReactImport {
 					for _, pattern := range slp032ComponentPatterns {
@@ -98,10 +96,11 @@ func (r SLP032) Check(d *diff.Diff) []Finding {
 						}
 					}
 				}
-				
-				// Check for accessibility issues
-				if strings.Contains(content, "<button") && !strings.Contains(content, "aria-") {
-					if !strings.Contains(content, "title=") && !strings.Contains(content, "children") {
+
+				// Check for accessibility issues - flag buttons without aria, title, or visible text
+				if strings.Contains(content, "<button") && !strings.Contains(content, "aria-") && !strings.Contains(content, "title=") {
+					// Skip buttons with visible text content like <button>Click me</button>
+					if !slp032ButtonHasText.MatchString(content) {
 						out = append(out, Finding{
 							RuleID:   r.ID(),
 							Severity: r.DefaultSeverity(),

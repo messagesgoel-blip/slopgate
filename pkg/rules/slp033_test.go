@@ -8,8 +8,8 @@ import (
 
 func TestSLP033(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       *diff.Diff
+		name         string
+		input        *diff.Diff
 		wantFindings int
 	}{
 		{
@@ -96,6 +96,25 @@ func TestSLP033(t *testing.T) {
 							{
 								Lines: []diff.Line{
 									{Kind: diff.LineAdd, NewLineNo: 1, Content: "useState := 0"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
+		},
+		{
+			name: "Namespace import satisfies React availability",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "Component.tsx",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "import * as React from 'react';"},
+									{Kind: diff.LineAdd, NewLineNo: 2, Content: "const [count, setCount] = React.useState(0);"},
 								},
 							},
 						},

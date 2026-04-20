@@ -13,7 +13,7 @@ import (
 // Pattern: Complex state update patterns that could lead to race conditions
 // or inconsistent state.
 //
-// Rationale: Improper state management can lead to race conditions, 
+// Rationale: Improper state management can lead to race conditions,
 // inconsistent UI states, and difficult-to-debug issues.
 type SLP034 struct{}
 
@@ -27,20 +27,21 @@ func (SLP034) Description() string {
 var slp034AntiPatterns = []*regexp.Regexp{
 	// Multiple state updates in sequence using stale values
 	regexp.MustCompile(`(?s)(set\w+\([^)]*\);\s*){2,}`),
-	// Direct mutation of state objects
-	regexp.MustCompile(`(?i)(\w+)\[(\w+)\]\s*=\s*`),
-	// Async operations without proper dependency arrays in useEffect
+	// Direct mutation of state objects (e.g., state[key] = value after setState)
+	regexp.MustCompile(`(?i)state\w*\[.*\]\s*=\s*`),
+	// Async operations in useEffect callback
 	regexp.MustCompile(`(?i)useEffect\s*\(\s*async\s+`),
 	// State updates based on previous state without functional updates
 	regexp.MustCompile(`(?i)(const|let)\s+(\w+)\s*=\s*\w+;\s*\w+\s*=\s*\w+\s*[+\-*/]\s*`),
 	// Multiple sequential state updates that should be batched
 	regexp.MustCompile(`(?s)set\w+\([^)]*\);\s*set\w+\([^)]*\);\s*set\w+\([^)]*\)`),
-	// Missing dependency in useEffect that references state
-	regexp.MustCompile(`(?i)useEffect\s*\(\s*\(\s*\)\s*=>\s*{.*}(,\s*\[[^\]]*\])?\s*\)`),
 }
 
 // slp034SequentialUpdates matches multiple state updates in sequence.
 var slp034SequentialUpdates = regexp.MustCompile(`(?i)set\w+\([^)]*\);\s*set\w+\([^)]*\)`)
+
+// slp034SetStateCall matches individual setState-like calls.
+var slp034SetStateCall = regexp.MustCompile(`(?i)set\w+\s*\(`)
 
 func (r SLP034) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -48,13 +49,13 @@ func (r SLP034) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		
+
 		// Only check JavaScript/TypeScript files
 		lowerPath := strings.ToLower(f.Path)
-		if !strings.HasSuffix(lowerPath, ".ts") && 
-		   !strings.HasSuffix(lowerPath, ".tsx") && 
-		   !strings.HasSuffix(lowerPath, ".js") &&
-		   !strings.HasSuffix(lowerPath, ".jsx") {
+		if !strings.HasSuffix(lowerPath, ".ts") &&
+			!strings.HasSuffix(lowerPath, ".tsx") &&
+			!strings.HasSuffix(lowerPath, ".js") &&
+			!strings.HasSuffix(lowerPath, ".jsx") {
 			continue
 		}
 
@@ -66,14 +67,14 @@ func (r SLP034) Check(d *diff.Diff) []Finding {
 					allAddedContent = append(allAddedContent, ln.Content)
 				}
 			}
-			
+
 			fullContent := strings.Join(allAddedContent, "\n")
-			
+
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
-				
+
 				content := ln.Content
 				// Check for anti-patterns
 				for _, pattern := range slp034AntiPatterns {
@@ -89,40 +90,27 @@ func (r SLP034) Check(d *diff.Diff) []Finding {
 						break
 					}
 				}
-				
+
 				// Check for sequential state updates that should be combined
 				if slp034SequentialUpdates.MatchString(content) {
-					// Look for multiple setState calls in the same function scope
-					// This requires more context, so we'll check the hunk for multiple set* calls
-					setStateCount := 0
-					for _, hLn := range h.Lines {
-						if hLn.Kind == diff.LineAdd && regexp.MustCompile(`(?i)set\w+\s*\(`).MatchString(hLn.Content) {
-							setStateCount++
-						}
-					}
-					
-					if setStateCount >= 2 {
-						out = append(out, Finding{
-							RuleID:   r.ID(),
-							Severity: r.DefaultSeverity(),
-							File:     f.Path,
-							Line:     ln.NewLineNo,
-							Message:  "multiple state updates detected - consider batching or using functional updates",
-							Snippet:  strings.TrimSpace(content),
-						})
-						break // Only report once per hunk to avoid duplicates
-					}
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "multiple state updates detected - consider batching or using functional updates",
+						Snippet:  strings.TrimSpace(content),
+					})
+					break
 				}
 			}
-			
+
 			// Also check the full hunk content for multi-line patterns
 			if len(allAddedContent) > 0 {
 				for _, pattern := range slp034AntiPatterns {
 					if pattern.MatchString(fullContent) {
-						// Report the first line of the hunk if we found a multi-line pattern
 						for _, ln := range h.Lines {
 							if ln.Kind == diff.LineAdd {
-								// Don't add duplicate findings
 								duplicate := false
 								for _, existing := range out {
 									if existing.File == f.Path && existing.Line == ln.NewLineNo {

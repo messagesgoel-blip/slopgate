@@ -8,8 +8,8 @@ import (
 
 func TestSLP034(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       *diff.Diff
+		name         string
+		input        *diff.Diff
 		wantFindings int
 	}{
 		{

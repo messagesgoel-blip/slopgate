@@ -10,7 +10,7 @@ import (
 // SLP031 flags documentation files that indicate direct code intake
 // from external sources without proper license validation.
 //
-// Pattern: Files mentioning "direct-code intake", "upstream repo", 
+// Pattern: Files mentioning "direct-code intake", "upstream repo",
 // "Lovable-generated", or similar patterns that suggest external code
 // without explicit license review.
 //
@@ -45,71 +45,73 @@ func (r SLP031) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		
+
 		// Only check documentation files
 		lowerPath := strings.ToLower(f.Path)
-		if !strings.Contains(lowerPath, "readme") && 
-		   !strings.Contains(lowerPath, "attribution") && 
-		   !strings.Contains(lowerPath, "notice") &&
-		   !strings.Contains(lowerPath, "license") &&
-		   !strings.Contains(lowerPath, "doc") &&
-		   !strings.HasSuffix(lowerPath, ".md") {
+		if !strings.Contains(lowerPath, "readme") &&
+			!strings.Contains(lowerPath, "attribution") &&
+			!strings.Contains(lowerPath, "notice") &&
+			!strings.Contains(lowerPath, "license") &&
+			!strings.Contains(lowerPath, "docs/") &&
+			!strings.HasSuffix(lowerPath, "/doc") &&
+			!strings.HasSuffix(lowerPath, ".md") {
 			continue
 		}
 
+		// Aggregate all added lines across all hunks for this file
+		var allAdded []diff.Line
+		var allAddedContent []string
 		for _, h := range f.Hunks {
-			var contentLines []string
 			for _, ln := range h.Lines {
 				if ln.Kind == diff.LineAdd {
-					contentLines = append(contentLines, ln.Content)
+					allAdded = append(allAdded, ln)
+					allAddedContent = append(allAddedContent, ln.Content)
 				}
 			}
-			
-			content := strings.Join(contentLines, "\n")
-			
-			// Check if it contains intake patterns
-			hasIntakePattern := false
-			for _, pattern := range slp031IntakePatterns {
-				if pattern.MatchString(content) {
-					hasIntakePattern = true
-					break
-				}
+		}
+
+		content := strings.Join(allAddedContent, "\n")
+
+		// Check if it contains intake patterns
+		hasIntakePattern := false
+		for _, pattern := range slp031IntakePatterns {
+			if pattern.MatchString(content) {
+				hasIntakePattern = true
+				break
 			}
-			
-			if !hasIntakePattern {
-				continue
+		}
+
+		if !hasIntakePattern {
+			continue
+		}
+
+		// Check if it contains license validation patterns
+		hasLicenseValidation := false
+		for _, pattern := range slp031LicensePatterns {
+			if pattern.MatchString(content) {
+				hasLicenseValidation = true
+				break
 			}
-			
-			// Check if it contains license validation patterns
-			hasLicenseValidation := false
-			for _, pattern := range slp031LicensePatterns {
-				if pattern.MatchString(content) {
-					hasLicenseValidation = true
-					break
-				}
-			}
-			
-			if !hasLicenseValidation {
-				// Find the first line with an intake pattern to report
-				for _, ln := range h.Lines {
-					if ln.Kind == diff.LineAdd {
-						for _, pattern := range slp031IntakePatterns {
-							if pattern.MatchString(ln.Content) {
-								out = append(out, Finding{
-									RuleID:   r.ID(),
-									Severity: r.DefaultSeverity(),
-									File:     f.Path,
-									Line:     ln.NewLineNo,
-									Message:  "external code intake detected without license validation confirmation",
-									Snippet:  strings.TrimSpace(ln.Content),
-								})
-								break
-							}
-						}
-						if len(out) > 0 && out[len(out)-1].File == f.Path {
-							break // Only report once per file
-						}
+		}
+
+		if !hasLicenseValidation {
+			// Find the first line with an intake pattern to report
+			for _, ln := range allAdded {
+				for _, pattern := range slp031IntakePatterns {
+					if pattern.MatchString(ln.Content) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  "external code intake detected without license validation confirmation",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+						break
 					}
+				}
+				if len(out) > 0 && out[len(out)-1].File == f.Path {
+					break
 				}
 			}
 		}

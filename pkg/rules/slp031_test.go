@@ -8,8 +8,8 @@ import (
 
 func TestSLP031(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       *diff.Diff
+		name         string
+		input        *diff.Diff
 		wantFindings int
 	}{
 		{
@@ -91,6 +91,29 @@ func TestSLP031(t *testing.T) {
 				},
 			},
 			wantFindings: 1,
+		},
+		{
+			name: "Intake in one hunk, license validation in another hunk of same file",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "ATTRIBUTION.md",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "This directory is a direct-code intake from `codero-sparkle-start`"},
+								},
+							},
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 5, Content: "License validation completed by legal team"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
 		},
 	}
 
