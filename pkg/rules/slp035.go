@@ -82,11 +82,7 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 				
 				// Check for very long lines using direct pattern check
 				if longLinePattern.MatchString(ln.Content) {
-					snippet := rawContent
-					if len(rawContent) > 60 {
-						snippet = rawContent[:60] + "..."
-					}
-					appendFinding(&out, r, f.Path, ln.NewLineNo, "line is too long (" + strconv.Itoa(len(ln.Content)) + " chars) - consider breaking into multiple lines", snippet)
+					appendFinding(&out, r, f.Path, ln.NewLineNo, "line is too long (" + strconv.Itoa(len(ln.Content)) + " chars) - consider breaking into multiple lines", rawContent)
 				}
 			}
 		}
