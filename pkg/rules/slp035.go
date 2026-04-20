@@ -10,7 +10,8 @@ import (
 
 // SLP035 flags common code quality and style issues.
 //
-// Pattern: Unused variables, dead code, inconsistent naming, etc.
+// Pattern: Console statements, debugger statements, TODOs without ticket references,
+// trailing whitespace, and overly long lines.
 //
 // Rationale: Code quality issues can lead to maintenance problems
 // and potential runtime errors.
@@ -57,26 +58,12 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 				
 				// Check for console.log statements using direct pattern check
 				if consolePattern.MatchString(content) {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "console statement detected in code - remove before production",
-						Snippet:  rawContent,
-					})
+					appendFinding(&out, r, f.Path, ln.NewLineNo, "console statement detected in code - remove before production", rawContent)
 				}
 				
 				// Check for debugger statements using direct pattern check
 				if debuggerPattern.MatchString(content) {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "debugger statement detected in code - remove before production",
-						Snippet:  rawContent,
-					})
+					appendFinding(&out, r, f.Path, ln.NewLineNo, "debugger statement detected in code - remove before production", rawContent)
 				}
 				
 				// Check for TODO/FIXME without ticket references using direct pattern check
@@ -84,27 +71,13 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 					// Check if it has a ticket reference (e.g., CR-123, ISSUE-456)
 					hasTicketRef := slp035TicketReferencePattern.MatchString(content)
 					if !hasTicketRef {
-						out = append(out, Finding{
-							RuleID:   r.ID(),
-							Severity: r.DefaultSeverity(),
-							File:     f.Path,
-							Line:     ln.NewLineNo,
-							Message:  "TODO/FIXME comment without ticket reference - add ticket number",
-							Snippet:  rawContent,
-						})
+						appendFinding(&out, r, f.Path, ln.NewLineNo, "TODO/FIXME comment without ticket reference - add ticket number", rawContent)
 					}
 				}
 				
 				// Check for trailing whitespace using direct pattern check
 				if trailingWhitespacePattern.MatchString(ln.Content) {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "trailing whitespace detected",
-						Snippet:  ln.Content, // Use original content for trailing whitespace detection
-					})
+					appendFinding(&out, r, f.Path, ln.NewLineNo, "trailing whitespace detected", ln.Content)
 				}
 				
 				// Check for very long lines using direct pattern check
@@ -113,17 +86,22 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 					if len(rawContent) > 60 {
 						snippet = rawContent[:60] + "..."
 					}
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "line is too long (" + strconv.Itoa(len(ln.Content)) + " chars) - consider breaking into multiple lines",
-						Snippet:  snippet,
-					})
+					appendFinding(&out, r, f.Path, ln.NewLineNo, "line is too long (" + strconv.Itoa(len(ln.Content)) + " chars) - consider breaking into multiple lines", snippet)
 				}
 			}
 		}
 	}
 	return out
+}
+
+// Helper function to append a finding
+func appendFinding(out *[]Finding, r SLP035, filePath string, lineNo int, message string, snippet string) {
+	*out = append(*out, Finding{
+		RuleID:   r.ID(),
+		Severity: r.DefaultSeverity(),
+		File:     filePath,
+		Line:     lineNo,
+		Message:  message,
+		Snippet:  snippet,
+	})
 }
