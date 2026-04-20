@@ -48,7 +48,7 @@ Exit codes:
 - `1` - blocking findings present
 - `2` - configuration or tool error
 
-## Rules (v0.0.7)
+## Rules (v0.0.8)
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
@@ -79,8 +79,21 @@ Exit codes:
 | SLP026 | SQL NULL check without sentinel exclusion — consider excluding placeholder values | warn | SQL, JS/TS |
 | SLP027 | Async function throws synchronously — use return Promise.reject for consistent error handling | warn | JS/TS |
 | SLP030 | Query .only/.first/.last without sentinel exclusion — could return placeholder record | warn | JS/TS, Python, Go |
+| SLP031 | Documentation indicates external code intake without license validation | warn | all |
+| SLP032 | React/TypeScript component may have type or accessibility issues | warn | TSX |
+| SLP033 | Missing import statement for referenced type/function | warn | JS/TS |
+| SLP034 | Potential state management anti-pattern detected | warn | JS/TS |
+| SLP035 | Code quality or style issue detected (console/debugger, TODO without ticket, trailing whitespace, long lines) | warn | all |
 
 \* SLP020 escalates to **warn** when security-context keywords (password, token, secret, key, session, nonce, salt, credential, auth) appear nearby.
+
+### v0.0.8 Changes
+
+- **SLP031**: New rule flagging documentation files that indicate external code intake without license validation. Detects patterns like "direct-code intake", "upstream repo", "Lovable-generated" and checks for license review confirmation.
+- **SLP032**: New rule for React/TSX components detecting missing React imports, and buttons without accessibility attributes (aria-label, title, or visible text).
+- **SLP033**: New rule for missing import statements — detects React hooks and common types used without corresponding imports, including namespace imports (`import * as React`).
+- **SLP034**: New rule for React state management anti-patterns — sequential state updates, async useEffect callbacks, direct state mutation.
+- **SLP035**: New rule for code quality issues — console/debugger statements, TODO/FIXME without ticket references, trailing whitespace, and overly long lines.
 
 ### v0.0.7 Changes
 
