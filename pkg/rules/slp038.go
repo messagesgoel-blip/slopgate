@@ -27,7 +27,6 @@ func (SLP038) Description() string {
 }
 
 // prQueryRe matches SQL queries that filter by pr_number/PR without repo/branch.
-// Looks for patterns like: WHERE ... pr_number = ? or WHERE ... PRNumber = ?
 var prQueryRe = regexp.MustCompile(`(?i)WHERE.*pr[_-]?number.*=`)
 
 // scopeByRepoOrBranchRe matches if the query scopes by repo and/or branch,
@@ -45,17 +44,25 @@ func (r SLP038) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		for _, line := range f.AddedLines() {
-			content := line.Content
-			// If query filters by PR number but NOT by repo or branch, flag it.
-			if prQueryRe.MatchString(content) && !scopeByRepoOrBranchRe.MatchString(content) {
+		lines := f.AddedLines()
+		for i, line := range lines {
+			// Accumulate contiguous added lines into a block for multiline SQL detection.
+			var block strings.Builder
+			block.WriteString(line.Content)
+			block.WriteString(" ")
+			for j := i + 1; j < len(lines) && lines[j].NewLineNo == lines[j-1].NewLineNo+1; j++ {
+				block.WriteString(lines[j].Content)
+				block.WriteString(" ")
+			}
+			blockStr := block.String()
+			if prQueryRe.MatchString(blockStr) && !scopeByRepoOrBranchRe.MatchString(blockStr) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     line.NewLineNo,
 					Message:  r.Description(),
-					Snippet:  strings.TrimSpace(content),
+					Snippet:  strings.TrimSpace(line.Content),
 				})
 			}
 		}

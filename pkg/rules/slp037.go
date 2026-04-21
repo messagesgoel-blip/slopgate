@@ -26,10 +26,11 @@ func (SLP037) Description() string {
 
 // insertUpdateRe matches common INSERT or UPDATE statements in Go database/sql.
 // Uses word boundaries to avoid matching "updated_at" as UPDATE.
-var insertUpdateRe = regexp.MustCompile(`(?i)\.(Exec(Context)?|Query(Context)?)\s*\([^)]*\b(INSERT|UPDATE)\b`)
+// Includes QueryRow variants since they can also contain write statements.
+var insertUpdateRe = regexp.MustCompile(`(?i)\.(Exec(Context)?|Query(Context)?|QueryRow(Context)?)\s*\([^)]*\b(INSERT|UPDATE)\b`)
 
-// txAssignRe matches "tx :=" with word boundary to avoid matching "ctx :=".
-var txAssignRe = regexp.MustCompile(`(?:^|\s)tx\s*:?=`)
+// txAssignRe matches "tx :=" or "tx, err :=" etc., with word boundary to avoid "ctx :=".
+var txAssignRe = regexp.MustCompile(`(?:^|\s)tx(?:\s*,\s*\w+)*\s*:?=`)
 
 func hasTransactionSignal(content string) bool {
 	return strings.Contains(content, "BeginTx") ||

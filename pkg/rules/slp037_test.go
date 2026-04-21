@@ -96,6 +96,27 @@ func TestSLP037(t *testing.T) {
 			wantRuleID:   "",
 			wantLine:     0,
 		},
+		{
+			name: "tx comma err assignment suppresses finding",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "db.go",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 10, Content: "tx, err := db.BeginTx(ctx, nil)"},
+									{Kind: diff.LineAdd, NewLineNo: 11, Content: "\t_, err = tx.Exec(`INSERT INTO events (repo, payload) VALUES (?, ?)`, repo, payload)"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
+			wantRuleID:   "",
+			wantLine:     0,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
