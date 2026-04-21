@@ -28,6 +28,19 @@ func (SLP037) Description() string {
 // Uses word boundaries to avoid matching "updated_at" as UPDATE.
 var insertUpdateRe = regexp.MustCompile(`(?i)\.(Exec(Context)?|Query(Context)?)\s*\([^)]*\b(INSERT|UPDATE)\b`)
 
+// txAssignRe matches "tx :=" with word boundary to avoid matching "ctx :=".
+var txAssignRe = regexp.MustCompile(`(?:^|\s)tx\s*:?=`)
+
+func hasTransactionSignal(content string) bool {
+	return strings.Contains(content, "BeginTx") ||
+		strings.Contains(content, "sql.Tx") ||
+		txAssignRe.MatchString(content) ||
+		strings.Contains(content, ".Commit(") ||
+		strings.Contains(content, ".Rollback(") ||
+		strings.Contains(content, "Commit(") ||
+		strings.Contains(content, "Rollback(")
+}
+
 func (r SLP037) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -37,27 +50,25 @@ func (r SLP037) Check(d *diff.Diff) []Finding {
 		if !isGoFile(f.Path) {
 			continue
 		}
-		var addedContent strings.Builder
-		var insertUpdateLines []diff.Line
-		for _, line := range f.AddedLines() {
-			addedContent.WriteString(line.Content)
-			addedContent.WriteString("\n")
-			if insertUpdateRe.MatchString(line.Content) {
-				insertUpdateLines = append(insertUpdateLines, line)
+		// Check per-hunk so a transaction in one hunk doesn't suppress
+		// findings in an unrelated hunk.
+		for _, h := range f.Hunks {
+			var addedContent strings.Builder
+			var insertUpdateLines []diff.Line
+			for _, line := range h.Lines {
+				if line.Kind != diff.LineAdd {
+					continue
+				}
+				addedContent.WriteString(line.Content)
+				addedContent.WriteString("\n")
+				if insertUpdateRe.MatchString(line.Content) {
+					insertUpdateLines = append(insertUpdateLines, line)
+				}
 			}
-		}
-		if len(insertUpdateLines) > 0 {
-			addedStr := addedContent.String()
-			// Use regex to avoid substring false positives (e.g. "ctx :=" matching "tx :=")
-			txAssignRe := regexp.MustCompile(`(?:^|\s)tx\s*:?=`)
-			hasTx := strings.Contains(addedStr, "BeginTx") ||
-				strings.Contains(addedStr, "sql.Tx") ||
-				txAssignRe.MatchString(addedStr) ||
-				strings.Contains(addedStr, ".Commit(") ||
-				strings.Contains(addedStr, ".Rollback(") ||
-				strings.Contains(addedStr, "Commit(") ||
-				strings.Contains(addedStr, "Rollback(")
-			if !hasTx {
+			if len(insertUpdateLines) == 0 {
+				continue
+			}
+			if !hasTransactionSignal(addedContent.String()) {
 				for _, line := range insertUpdateLines {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
