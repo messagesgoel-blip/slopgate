@@ -33,8 +33,6 @@ var prQueryRe = regexp.MustCompile(`(?i)WHERE.*pr[_-]?number.*=`)
 // scopeByRepoOrBranchRe matches if the query scopes by repo and/or branch.
 var scopeByRepoOrBranchRe = regexp.MustCompile(`(?i)(WHERE|AND).*(repo|branch).*[=><]`)
 
-// isGo reports whether the file is a Go file.
-
 func (r SLP038) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {

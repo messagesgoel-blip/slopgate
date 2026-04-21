@@ -23,8 +23,13 @@ func (SLP045) Description() string {
 	return "DB function called without context - use r.Context() for proper timeout handling"
 }
 
-// dbCallWithoutContextRe matches DB function calls that look like they need context.
-var dbCallWithoutContextRe = regexp.MustCompile(`(?i)\.(Query|Exec|QueryContext|ExecContext|Ping|Prepare)\s*\(`)
+// dbCallWithoutContextRe matches DB function calls that look like they need context
+// but are NOT already using the Context variants (ExecContext, QueryContext).
+var dbCallWithoutContextRe = regexp.MustCompile(`\.(Query|Exec|Ping|Prepare)\s*\(`)
+
+// directContextRe matches direct context arguments like context.Background(),
+// context.TODO(), or context.With* calls that are passed inline.
+var directContextRe = regexp.MustCompile(`context\.(Background|TODO|WithDeadline|WithTimeout|WithCancel|WithValue)\s*\(`)
 
 // contextAssignmentRe matches if context is assigned from r.Context().
 var contextAssignmentRe = regexp.MustCompile(`(?i)ctx\s*:?=\s*r\.Context\(\)`)
@@ -49,16 +54,14 @@ func (r SLP045) Check(d *diff.Diff) []Finding {
 			}
 		}
 
-		// If we found DB calls, check if context is present in the file.
 		if len(dbCallLines) > 0 {
 			content := addedContent.String()
-			// Check for context usage
 			hasContextAssignment := contextAssignmentRe.MatchString(content)
 			hasContextParam := strings.Contains(content, "ctx context.Context")
 			hasRContext := strings.Contains(content, "r.Context()")
+			hasDirectContext := directContextRe.MatchString(content)
 
-			// Flag if no context is used at all
-			if !hasContextAssignment && !hasContextParam && !hasRContext {
+			if !hasContextAssignment && !hasContextParam && !hasRContext && !hasDirectContext {
 				for _, line := range dbCallLines {
 					out = append(out, Finding{
 						RuleID:   r.ID(),

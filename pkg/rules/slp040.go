@@ -27,8 +27,6 @@ func (SLP040) Description() string {
 // readAllRe matches io.ReadAll or io.ReadAll http request body.
 var readAllRe = regexp.MustCompile(`io\.ReadAll\s*\(\s*(http\.MaxBytesReader|r\.Body)`)
 
-// isGo reports whether the file is a Go file.
-
 func (r SLP040) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -49,11 +47,12 @@ func (r SLP040) Check(d *diff.Diff) []Finding {
 			}
 		}
 
-		// If we found io.ReadAll, check for empty validation nearby.
 		if len(readAllLines) > 0 {
 			content := addedContent.String()
-			// Look for empty checks: len(body) == 0, string(body) == "", body == nil, etc.
-			hasEmptyCheck := strings.Contains(content, "len(") && strings.Contains(content, "== 0")
+			hasEmptyCheck := (strings.Contains(content, "len(") && strings.Contains(content, "== 0")) ||
+				strings.Contains(content, "== nil") ||
+				strings.Contains(content, "!= nil") ||
+				(strings.Contains(content, "len(") && strings.Contains(content, "> 0"))
 			hasEmptyBodyCheck := strings.Contains(content, "empty_body") || strings.Contains(content, "Body is required")
 
 			if !hasEmptyCheck && !hasEmptyBodyCheck {

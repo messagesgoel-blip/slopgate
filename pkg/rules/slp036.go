@@ -55,6 +55,31 @@ func containsSuspiciousWord(line string) bool {
 	return false
 }
 
+// requiredItemsCount parses the number of items in a YAML required list.
+// Handles both inline list syntax (e.g., "required: [a, b, c]") and
+// multi-line syntax where items appear on subsequent lines counted separately.
+func requiredItemsCount(line string) int {
+	trimmed := strings.TrimSpace(line)
+	// Inline list: "required: [a, b, c]"
+	if idx := strings.Index(trimmed, "["); idx != -1 {
+		listPart := trimmed[idx+1:]
+		if end := strings.Index(listPart, "]"); end != -1 {
+			listPart = listPart[:end]
+		}
+		count := 0
+		for _, item := range strings.Split(listPart, ",") {
+			if strings.TrimSpace(item) != "" {
+				count++
+			}
+		}
+		return count
+	}
+	// Flow syntax: "required:" with no inline list — items follow on next lines.
+	// We can't count from a single line, so return a large number so the
+	// threshold check doesn't suppress it.
+	return 999
+}
+
 func (r SLP036) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -66,7 +91,7 @@ func (r SLP036) Check(d *diff.Diff) []Finding {
 			continue
 		}
 		for _, line := range f.AddedLines() {
-			if isRequiredLine(line.Content) && containsSuspiciousWord(line.Content) {
+			if isRequiredLine(line.Content) && containsSuspiciousWord(line.Content) && requiredItemsCount(line.Content) > 3 {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

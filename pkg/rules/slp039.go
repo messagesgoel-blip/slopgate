@@ -27,8 +27,6 @@ func (SLP039) Description() string {
 // totalLenRe matches patterns like: Total: len(filtered) or Total: len(items)
 var totalLenRe = regexp.MustCompile(`(?i)Total\s*:\s*len\s*\(\s*(filtered|items|results|result)\s*\)`)
 
-// isGo reports whether the file is a Go file.
-
 func (r SLP039) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {

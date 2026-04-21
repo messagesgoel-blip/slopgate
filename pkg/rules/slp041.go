@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -24,10 +23,6 @@ func (SLP041) Description() string {
 	return "SQL query without LIMIT clause may return unbounded results"
 }
 
-// queryWithoutLimitRe matches SQL queries (SELECT) that don't have LIMIT.
-// Looks for SELECT ... FROM ... ; patterns without LIMIT.
-var queryWithoutLimitRe = regexp.MustCompile(`(?i)SELECT.*FROM.*;?\s*$`)
-
 func (r SLP041) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -40,10 +35,11 @@ func (r SLP041) Check(d *diff.Diff) []Finding {
 
 		for _, line := range f.AddedLines() {
 			content := strings.TrimSpace(line.Content)
+			upper := strings.ToUpper(content)
 			// Check if it's a SQL query string (contains SELECT and FROM)
-			if strings.Contains(strings.ToUpper(content), "SELECT") &&
-				strings.Contains(strings.ToUpper(content), "FROM") &&
-				!strings.Contains(strings.ToUpper(content), "LIMIT") {
+			if strings.Contains(upper, "SELECT") &&
+				strings.Contains(upper, "FROM") &&
+				!strings.Contains(upper, "LIMIT") {
 				// Only flag if it's a multiline string or raw string literal (likely SQL)
 				if strings.Contains(content, "`") || strings.Contains(content, "\"") {
 					out = append(out, Finding{

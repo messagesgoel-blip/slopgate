@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -24,11 +23,6 @@ func (SLP043) Description() string {
 	return "response struct may have duplicate JSON keys"
 }
 
-// embeddedStructRe matches embedded struct usage in type definitions.
-var embeddedStructRe = regexp.MustCompile(`^\s*\w+\s+`)
-
-// isGo reports whether the file is a Go file.
-
 func (r SLP043) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -39,18 +33,37 @@ func (r SLP043) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		// Check for embedded types in structs that may cause duplicate fields.
+		// Detect embedded struct fields (type name on its own line inside a struct)
+		// that lack an explicit json tag override, which can create duplicate keys.
 		for _, line := range f.AddedLines() {
 			content := strings.TrimSpace(line.Content)
-			// Match patterns like: TypeName or *TypeName without json tag (embedded type)
-			if strings.HasPrefix(content, "Embedded") ||
-				(strings.Contains(content, "SomeType") && strings.Contains(content, "struct")) {
-				// This is a heuristic - flag embedded types without explicit json tags
-				if !strings.Contains(content, "json:") && (strings.HasPrefix(content, "Embedded") || strings.Contains(content, "`json:\"")) {
-					// Low confidence, skip for now - this rule is too noisy
-				}
+			// Match embedded type: a line that is just a type name (possibly with *)
+			// e.g., "  SomeType" or "  *SomeType" inside a struct, without a json tag.
+			if (strings.HasPrefix(content, "*") || (len(content) > 0 && isUpperCaseLetter(content[0]))) &&
+				!strings.Contains(content, "`") &&
+				!strings.HasPrefix(content, "//") &&
+				!strings.HasPrefix(content, "func") &&
+				!strings.HasPrefix(content, "type ") &&
+				!strings.HasPrefix(content, "package ") &&
+				!strings.Contains(content, ":=") &&
+				!strings.Contains(content, "(") &&
+				!strings.HasPrefix(content, "}") &&
+				strings.Contains(content, " ") {
+				// This looks like an embedded type field without json tag
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity:  r.DefaultSeverity(),
+					File:     f.Path,
+					Line:     line.NewLineNo,
+					Message:  r.Description(),
+					Snippet:  content,
+				})
 			}
 		}
 	}
 	return out
+}
+
+func isUpperCaseLetter(b byte) bool {
+	return b >= 'A' && b <= 'Z'
 }

@@ -48,6 +48,24 @@ func TestSLP036(t *testing.T) {
 			},
 			wantFindings: 0,
 		},
+		{
+			name: "short required list with suspicious word — not flagged",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "docs/api.yaml",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 5, Content: "  required: [repo, size]"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

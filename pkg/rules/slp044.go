@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -23,10 +22,6 @@ func (SLP044) Description() string {
 	return "error ignored with blank identifier - consider handling or logging"
 }
 
-// blankErrorAssignRe matches patterns like: err := something(...) or err, _ := ...
-// where the error is being ignored.
-var blankErrorAssignRe = regexp.MustCompile(`err\s*(,?\s*_)?\s*:?=`)
-
 func (r SLP044) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -41,24 +36,22 @@ func (r SLP044) Check(d *diff.Diff) []Finding {
 			content := line.Content
 			trimmed := strings.TrimSpace(content)
 
-			// Skip if this is just a declaration/import
+			// Skip comments and imports
 			if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
 				continue
 			}
 
-			// Match err, _ := ... or err := ... patterns
-			if strings.Contains(content, "err") && strings.Contains(content, "_, ") {
-				// Check if it's ignoring an error from a function call
-				if strings.Contains(content, ":=") || strings.Contains(content, "err, _ =") {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     line.NewLineNo,
-						Message:  r.Description(),
-						Snippet:  trimmed,
-					})
-				}
+		// ignoredErrorRe matches patterns where the error return value is assigned to _,
+			// Pattern 2: "_, _ := fn()" or "_, _ = fn()" — all returns ignored
+			if strings.Contains(content, ", _") && (strings.Contains(content, ":=") || strings.Contains(content, " = ")) {
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
+					File:     f.Path,
+					Line:     line.NewLineNo,
+					Message:  r.Description(),
+					Snippet:  trimmed,
+				})
 			}
 		}
 	}

@@ -28,19 +28,13 @@ func (SLP037) Description() string {
 // We look for ExecContext, Query, QueryContext followed by INSERT or UPDATE (case insensitive).
 var insertUpdateRe = regexp.MustCompile(`(?i)\.(Exec(Context)?|Query(Context)?)\s*\([^)]*(INSERT|UPDATE)`)
 
-// isGo reports whether the file is a Go file (reuse from filetype).
-func isGo(path string) bool {
-	return strings.HasSuffix(path, ".go")
-}
-
 func (r SLP037) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
 		if f.IsDelete {
 			continue
 		}
-		// Only check Go files.
-		if !isGo(f.Path) {
+		if !isGoFile(f.Path) {
 			continue
 		}
 		// Collect all added lines content for transaction detection.
@@ -53,13 +47,12 @@ func (r SLP037) Check(d *diff.Diff) []Finding {
 				insertUpdateLines = append(insertUpdateLines, line)
 			}
 		}
-		// If we found any INSERT/UPDATE lines, check for transaction handling in the added lines.
 		if len(insertUpdateLines) > 0 {
-			// Look for signs of transaction handling in the added content.
+			addedStr := addedContent.String()
 			transactionKeywords := []string{"BeginTx", "sql.Tx", "tx :=", ".Commit(", ".Rollback(", "Commit(", "Rollback("}
 			foundTransaction := false
 			for _, kw := range transactionKeywords {
-				if strings.Contains(addedContent.String(), kw) {
+				if strings.Contains(addedStr, kw) {
 					foundTransaction = true
 					break
 				}

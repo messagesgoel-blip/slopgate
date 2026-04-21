@@ -24,8 +24,9 @@ func (SLP042) Description() string {
 	return "JSON struct field without json tag may cause API contract issues"
 }
 
-// structFieldRe matches a struct field definition.
-var structFieldRe = regexp.MustCompile(`^\s*\w+\s+\w+\s*[,\{]`)
+// structFieldRe matches a Go struct field definition: Identifier Type with optional
+// pointer/slice/map/qualifiers, and optional struct tag or end-of-line.
+var structFieldRe = regexp.MustCompile(`^\s*[A-Z]\w*\s+(\*?\[\]|map\[|\*?\w+(\.\w+)*(\[\])?)\s*(\` + "`" + `|//|$)`)
 
 // jsonTagRe matches if a field has a json tag.
 var jsonTagRe = regexp.MustCompile(`json:"[^"]*"`)
@@ -40,14 +41,10 @@ func (r SLP042) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		// Collect all added lines to check if we're inside a struct.
-		var addedContent strings.Builder
 		var structLines []diff.Line
 		inStruct := false
 		for _, line := range f.AddedLines() {
 			content := line.Content
-			addedContent.WriteString(content)
-			addedContent.WriteString("\n")
 
 			// Detect struct block
 			if strings.Contains(content, "struct {") || strings.HasSuffix(strings.TrimSpace(content), "struct {") {
@@ -57,7 +54,7 @@ func (r SLP042) Check(d *diff.Diff) []Finding {
 				inStruct = false
 			}
 
-			// If inside a struct and line looks like a field definition
+			// If inside a struct and line looks like a field definition without a json tag
 			if inStruct {
 				if structFieldRe.MatchString(content) && !jsonTagRe.MatchString(content) {
 					// Skip if it's just whitespace or closing brace context
@@ -69,8 +66,8 @@ func (r SLP042) Check(d *diff.Diff) []Finding {
 			}
 		}
 
-		// Only flag if there's more than one field without tags (likely a real struct)
-		if len(structLines) > 1 {
+		// Flag if there is at least one field without tags (lowered threshold from 2 to 1)
+		if len(structLines) >= 1 {
 			for _, line := range structLines {
 				out = append(out, Finding{
 					RuleID:   r.ID(),

@@ -11,6 +11,8 @@ func TestSLP037(t *testing.T) {
 		name         string
 		input        *diff.Diff
 		wantFindings int
+		wantRuleID   string
+		wantLine     int
 	}{
 		{
 			name: "INSERT without transaction handling",
@@ -29,6 +31,8 @@ func TestSLP037(t *testing.T) {
 				},
 			},
 			wantFindings: 1,
+			wantRuleID:   "SLP037",
+			wantLine:     10,
 		},
 		{
 			name: "INSERT with transaction handling present",
@@ -48,6 +52,8 @@ func TestSLP037(t *testing.T) {
 				},
 			},
 			wantFindings: 0,
+			wantRuleID:   "",
+			wantLine:     0,
 		},
 	}
 	for _, tt := range tests {
@@ -56,6 +62,14 @@ func TestSLP037(t *testing.T) {
 			out := r.Check(tt.input)
 			if len(out) != tt.wantFindings {
 				t.Errorf("got %d findings, want %d", len(out), tt.wantFindings)
+			}
+			if tt.wantFindings > 0 && len(out) > 0 {
+				if out[0].RuleID != tt.wantRuleID {
+					t.Errorf("got RuleID %q, want %q", out[0].RuleID, tt.wantRuleID)
+				}
+				if out[0].Line != tt.wantLine {
+					t.Errorf("got Line %d, want %d", out[0].Line, tt.wantLine)
+				}
 			}
 		})
 	}
