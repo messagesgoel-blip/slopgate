@@ -36,13 +36,13 @@ func (r SLP044) Check(d *diff.Diff) []Finding {
 			content := line.Content
 			trimmed := strings.TrimSpace(content)
 
-			// Skip comments and imports
+			// Skip comments
 			if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
 				continue
 			}
 
-		// ignoredErrorRe matches patterns where the error return value is assigned to _,
-			// Pattern 2: "_, _ := fn()" or "_, _ = fn()" — all returns ignored
+			// Pattern: "something, _ := fn()" or "something, _ = fn()"
+			// Flags when the blank identifier _ is used to discard a return value.
 			if strings.Contains(content, ", _") && (strings.Contains(content, ":=") || strings.Contains(content, " = ")) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),

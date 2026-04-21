@@ -25,7 +25,8 @@ func (SLP039) Description() string {
 }
 
 // totalLenRe matches patterns like: Total: len(filtered) or Total: len(items)
-var totalLenRe = regexp.MustCompile(`(?i)Total\s*:\s*len\s*\(\s*(filtered|items|results|result)\s*\)`)
+// Requires a word boundary before Total to avoid matching SubTotal or similar.
+var totalLenRe = regexp.MustCompile(`(?i)\bTotal\s*:\s*len\s*\(\s*(filtered|items|results|result)\s*\)`)
 
 func (r SLP039) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -38,14 +39,20 @@ func (r SLP039) Check(d *diff.Diff) []Finding {
 		}
 
 		for _, line := range f.AddedLines() {
-			if totalLenRe.MatchString(line.Content) {
+			content := line.Content
+			// Skip comment lines
+			trimmed := strings.TrimSpace(content)
+			if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
+				continue
+			}
+			if totalLenRe.MatchString(content) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     line.NewLineNo,
 					Message:  r.Description(),
-					Snippet:  strings.TrimSpace(line.Content),
+					Snippet:  strings.TrimSpace(content),
 				})
 			}
 		}

@@ -36,8 +36,6 @@ var suspiciousRequiredWords = []string{
 }
 
 // isRequiredLine reports whether the line looks like a YAML `required:` field.
-// It must start with optional whitespace, then "required:", optionally followed
-// by a space and then the list (which we don't parse here).
 func isRequiredLine(line string) bool {
 	trimmed := strings.TrimLeft(line, " \t")
 	return strings.HasPrefix(trimmed, "required:")
@@ -55,12 +53,10 @@ func containsSuspiciousWord(line string) bool {
 	return false
 }
 
-// requiredItemsCount parses the number of items in a YAML required list.
-// Handles both inline list syntax (e.g., "required: [a, b, c]") and
-// multi-line syntax where items appear on subsequent lines counted separately.
-func requiredItemsCount(line string) int {
+// countInlineRequiredItems parses the number of items in an inline YAML list
+// like "required: [a, b, c]". Returns -1 if not an inline list.
+func countInlineRequiredItems(line string) int {
 	trimmed := strings.TrimSpace(line)
-	// Inline list: "required: [a, b, c]"
 	if idx := strings.Index(trimmed, "["); idx != -1 {
 		listPart := trimmed[idx+1:]
 		if end := strings.Index(listPart, "]"); end != -1 {
@@ -74,10 +70,7 @@ func requiredItemsCount(line string) int {
 		}
 		return count
 	}
-	// Flow syntax: "required:" with no inline list — items follow on next lines.
-	// We can't count from a single line, so return a large number so the
-	// threshold check doesn't suppress it.
-	return 999
+	return -1
 }
 
 func (r SLP036) Check(d *diff.Diff) []Finding {
@@ -86,12 +79,46 @@ func (r SLP036) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		// Only check YAML files.
 		if !strings.HasSuffix(f.Path, ".yaml") && !strings.HasSuffix(f.Path, ".yml") {
 			continue
 		}
-		for _, line := range f.AddedLines() {
-			if isRequiredLine(line.Content) && containsSuspiciousWord(line.Content) && requiredItemsCount(line.Content) > 3 {
+
+		lines := f.AddedLines()
+		for i, line := range lines {
+			if !isRequiredLine(line.Content) {
+				continue
+			}
+
+			// Check inline list style: "required: [a, b, c]"
+			if count := countInlineRequiredItems(line.Content); count >= 0 {
+				if containsSuspiciousWord(line.Content) && count > 3 {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     line.NewLineNo,
+						Message:  r.Description(),
+						Snippet:  strings.TrimSpace(line.Content),
+					})
+				}
+				continue
+			}
+
+			// Flow style: "required:" on its own line, items on subsequent "- item" lines.
+			// Scan forward for consecutive list items and check for suspicious words + count.
+			suspicious := containsSuspiciousWord(line.Content)
+			itemCount := 0
+			for j := i + 1; j < len(lines); j++ {
+				trimmed := strings.TrimSpace(lines[j].Content)
+				if !strings.HasPrefix(trimmed, "- ") {
+					break
+				}
+				itemCount++
+				if containsSuspiciousWord(lines[j].Content) {
+					suspicious = true
+				}
+			}
+			if suspicious && itemCount > 3 {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

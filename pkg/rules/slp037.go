@@ -25,8 +25,8 @@ func (SLP037) Description() string {
 }
 
 // insertUpdateRe matches common INSERT or UPDATE statements in Go database/sql.
-// We look for ExecContext, Query, QueryContext followed by INSERT or UPDATE (case insensitive).
-var insertUpdateRe = regexp.MustCompile(`(?i)\.(Exec(Context)?|Query(Context)?)\s*\([^)]*(INSERT|UPDATE)`)
+// Uses word boundaries to avoid matching "updated_at" as UPDATE.
+var insertUpdateRe = regexp.MustCompile(`(?i)\.(Exec(Context)?|Query(Context)?)\s*\([^)]*\b(INSERT|UPDATE)\b`)
 
 func (r SLP037) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -37,9 +37,8 @@ func (r SLP037) Check(d *diff.Diff) []Finding {
 		if !isGoFile(f.Path) {
 			continue
 		}
-		// Collect all added lines content for transaction detection.
 		var addedContent strings.Builder
-		var insertUpdateLines []diff.Line // store the lines that match INSERT/UPDATE for reporting
+		var insertUpdateLines []diff.Line
 		for _, line := range f.AddedLines() {
 			addedContent.WriteString(line.Content)
 			addedContent.WriteString("\n")
@@ -49,15 +48,16 @@ func (r SLP037) Check(d *diff.Diff) []Finding {
 		}
 		if len(insertUpdateLines) > 0 {
 			addedStr := addedContent.String()
-			transactionKeywords := []string{"BeginTx", "sql.Tx", "tx :=", ".Commit(", ".Rollback(", "Commit(", "Rollback("}
-			foundTransaction := false
-			for _, kw := range transactionKeywords {
-				if strings.Contains(addedStr, kw) {
-					foundTransaction = true
-					break
-				}
-			}
-			if !foundTransaction {
+			// Use regex to avoid substring false positives (e.g. "ctx :=" matching "tx :=")
+			txAssignRe := regexp.MustCompile(`(?:^|\s)tx\s*:?=`)
+			hasTx := strings.Contains(addedStr, "BeginTx") ||
+				strings.Contains(addedStr, "sql.Tx") ||
+				txAssignRe.MatchString(addedStr) ||
+				strings.Contains(addedStr, ".Commit(") ||
+				strings.Contains(addedStr, ".Rollback(") ||
+				strings.Contains(addedStr, "Commit(") ||
+				strings.Contains(addedStr, "Rollback(")
+			if !hasTx {
 				for _, line := range insertUpdateLines {
 					out = append(out, Finding{
 						RuleID:   r.ID(),

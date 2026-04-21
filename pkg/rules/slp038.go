@@ -30,8 +30,9 @@ func (SLP038) Description() string {
 // Looks for patterns like: WHERE ... pr_number = ? or WHERE ... PRNumber = ?
 var prQueryRe = regexp.MustCompile(`(?i)WHERE.*pr[_-]?number.*=`)
 
-// scopeByRepoOrBranchRe matches if the query scopes by repo and/or branch.
-var scopeByRepoOrBranchRe = regexp.MustCompile(`(?i)(WHERE|AND).*(repo|branch).*[=><]`)
+// scopeByRepoOrBranchRe matches if the query scopes by repo and/or branch,
+// including IN, LIKE, and IS comparisons.
+var scopeByRepoOrBranchRe = regexp.MustCompile(`(?i)(WHERE|AND).*(repo|branch).*(=|>|<|IN\s*\(|LIKE|IS\s+)`)
 
 func (r SLP038) Check(d *diff.Diff) []Finding {
 	var out []Finding

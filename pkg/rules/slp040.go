@@ -37,35 +37,42 @@ func (r SLP040) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		var addedContent strings.Builder
-		var readAllLines []diff.Line
-		for _, line := range f.AddedLines() {
-			addedContent.WriteString(line.Content)
-			addedContent.WriteString("\n")
-			if readAllRe.MatchString(line.Content) {
-				readAllLines = append(readAllLines, line)
+		lines := f.AddedLines()
+		for i, line := range lines {
+			if !readAllRe.MatchString(line.Content) {
+				continue
 			}
-		}
-
-		if len(readAllLines) > 0 {
-			content := addedContent.String()
-			hasEmptyCheck := (strings.Contains(content, "len(") && strings.Contains(content, "== 0")) ||
-				strings.Contains(content, "== nil") ||
-				strings.Contains(content, "!= nil") ||
-				(strings.Contains(content, "len(") && strings.Contains(content, "> 0"))
-			hasEmptyBodyCheck := strings.Contains(content, "empty_body") || strings.Contains(content, "Body is required")
-
-			if !hasEmptyCheck && !hasEmptyBodyCheck {
-				for _, line := range readAllLines {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     line.NewLineNo,
-						Message:  r.Description(),
-						Snippet:  strings.TrimSpace(line.Content),
-					})
+			// Check a window around this line for empty-body validation.
+			found := false
+			start := i - 5
+			if start < 0 {
+				start = 0
+			}
+			end := i + 10
+			if end > len(lines) {
+				end = len(lines)
+			}
+			for j := start; j < end; j++ {
+				c := lines[j].Content
+				if (strings.Contains(c, "len(") && strings.Contains(c, "== 0")) ||
+					strings.Contains(c, "== nil") ||
+					strings.Contains(c, "!= nil") ||
+					(strings.Contains(c, "len(") && strings.Contains(c, "> 0")) ||
+					strings.Contains(c, "empty_body") ||
+					strings.Contains(c, "Body is required") {
+					found = true
+					break
 				}
+			}
+			if !found {
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
+					File:     f.Path,
+					Line:     line.NewLineNo,
+					Message:  r.Description(),
+					Snippet:  strings.TrimSpace(line.Content),
+				})
 			}
 		}
 	}

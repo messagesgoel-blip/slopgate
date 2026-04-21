@@ -44,34 +44,46 @@ func (r SLP045) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		var addedContent strings.Builder
-		var dbCallLines []diff.Line
-		for _, line := range f.AddedLines() {
-			addedContent.WriteString(line.Content)
-			addedContent.WriteString("\n")
-			if dbCallWithoutContextRe.MatchString(line.Content) {
-				dbCallLines = append(dbCallLines, line)
+		lines := f.AddedLines()
+		for i, line := range lines {
+			if !dbCallWithoutContextRe.MatchString(line.Content) {
+				continue
 			}
-		}
+			// Check if this specific call already passes a context argument.
+			// e.g. db.Exec(ctx, ...) or db.Query(ctx, ...) already has context.
+			if strings.Contains(line.Content, "ctx") || directContextRe.MatchString(line.Content) {
+				continue
+			}
 
-		if len(dbCallLines) > 0 {
-			content := addedContent.String()
-			hasContextAssignment := contextAssignmentRe.MatchString(content)
-			hasContextParam := strings.Contains(content, "ctx context.Context")
-			hasRContext := strings.Contains(content, "r.Context()")
-			hasDirectContext := directContextRe.MatchString(content)
-
-			if !hasContextAssignment && !hasContextParam && !hasRContext && !hasDirectContext {
-				for _, line := range dbCallLines {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     line.NewLineNo,
-						Message:  r.Description(),
-						Snippet:  strings.TrimSpace(line.Content),
-					})
+			// Check a window around this line for context availability.
+			start := i - 10
+			if start < 0 {
+				start = 0
+			}
+			end := i + 5
+			if end > len(lines) {
+				end = len(lines)
+			}
+			hasContext := false
+			for j := start; j < end; j++ {
+				c := lines[j].Content
+				if contextAssignmentRe.MatchString(c) ||
+					strings.Contains(c, "ctx context.Context") ||
+					strings.Contains(c, "r.Context()") ||
+					directContextRe.MatchString(c) {
+					hasContext = true
+					break
 				}
+			}
+			if !hasContext {
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
+					File:     f.Path,
+					Line:     line.NewLineNo,
+					Message:  r.Description(),
+					Snippet:  strings.TrimSpace(line.Content),
+				})
 			}
 		}
 	}

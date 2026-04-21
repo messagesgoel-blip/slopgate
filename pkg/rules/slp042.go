@@ -42,22 +42,21 @@ func (r SLP042) Check(d *diff.Diff) []Finding {
 		}
 
 		var structLines []diff.Line
-		inStruct := false
+		structDepth := 0
 		for _, line := range f.AddedLines() {
 			content := line.Content
 
-			// Detect struct block
-			if strings.Contains(content, "struct {") || strings.HasSuffix(strings.TrimSpace(content), "struct {") {
-				inStruct = true
+			// Track struct depth to handle nested structs
+			if strings.Contains(content, "struct {") {
+				structDepth++
 			}
-			if inStruct && strings.HasPrefix(strings.TrimSpace(content), "}") {
-				inStruct = false
+			if strings.HasPrefix(strings.TrimSpace(content), "}") && structDepth > 0 {
+				structDepth--
 			}
 
 			// If inside a struct and line looks like a field definition without a json tag
-			if inStruct {
+			if structDepth > 0 {
 				if structFieldRe.MatchString(content) && !jsonTagRe.MatchString(content) {
-					// Skip if it's just whitespace or closing brace context
 					trimmed := strings.TrimSpace(content)
 					if len(trimmed) > 0 && !strings.HasPrefix(trimmed, "}") {
 						structLines = append(structLines, line)
@@ -66,7 +65,7 @@ func (r SLP042) Check(d *diff.Diff) []Finding {
 			}
 		}
 
-		// Flag if there is at least one field without tags (lowered threshold from 2 to 1)
+		// Flag if there is at least one field without tags
 		if len(structLines) >= 1 {
 			for _, line := range structLines {
 				out = append(out, Finding{

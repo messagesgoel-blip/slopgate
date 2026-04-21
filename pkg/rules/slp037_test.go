@@ -55,6 +55,47 @@ func TestSLP037(t *testing.T) {
 			wantRuleID:   "",
 			wantLine:     0,
 		},
+		{
+			name: "ctx assignment should not suppress finding",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "db.go",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 5, Content: "ctx := r.Context()"},
+									{Kind: diff.LineAdd, NewLineNo: 6, Content: "\t_, err := db.Exec(`INSERT INTO events (repo, payload) VALUES (?, ?)`, repo, payload)"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 1,
+			wantRuleID:   "SLP037",
+			wantLine:     6,
+		},
+		{
+			name: "Query with SELECT should not be flagged",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "db.go",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 10, Content: "\trows, err := db.Query(`SELECT updated_at FROM events WHERE id = ?`, id)"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
+			wantRuleID:   "",
+			wantLine:     0,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
