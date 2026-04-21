@@ -26,8 +26,8 @@ func (SLP038) Description() string {
 	return "SQL query by PR number without repo/branch scoping may leak cross-repo data"
 }
 
-// prQueryRe matches SQL queries that filter by pr_number/PR without repo/branch.
-var prQueryRe = regexp.MustCompile(`(?i)WHERE.*pr[_-]?number.*=`)
+// prQueryRe matches SQL queries that filter by pr_number/PR/pr without repo/branch.
+var prQueryRe = regexp.MustCompile(`(?i)WHERE.*\bpr[_-]?number\b.*=|WHERE.*\bPRNumber\b.*=|WHERE.*\bpr\b.*=`)
 
 // scopeByRepoOrBranchRe matches if the query scopes by repo and/or branch,
 // including IN, LIKE, and IS comparisons. Uses word boundaries to avoid
@@ -55,15 +55,22 @@ func (r SLP038) Check(d *diff.Diff) []Finding {
 				block.WriteString(" ")
 			}
 			blockStr := block.String()
-			if prQueryRe.MatchString(blockStr) && !scopeByRepoOrBranchRe.MatchString(blockStr) {
-				out = append(out, Finding{
-					RuleID:   r.ID(),
-					Severity: r.DefaultSeverity(),
-					File:     f.Path,
-					Line:     line.NewLineNo,
-					Message:  r.Description(),
-					Snippet:  strings.TrimSpace(line.Content),
-				})
+
+			// Split the block by common SQL statement delimiters so a scoped
+			// statement doesn't suppress an unscoped one in the same block.
+			statements := strings.Split(blockStr, ";")
+			for _, stmt := range statements {
+				if prQueryRe.MatchString(stmt) && !scopeByRepoOrBranchRe.MatchString(stmt) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     line.NewLineNo,
+						Message:  r.Description(),
+						Snippet:  strings.TrimSpace(line.Content),
+					})
+					break
+				}
 			}
 		}
 	}

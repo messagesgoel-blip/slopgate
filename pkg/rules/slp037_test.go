@@ -117,6 +117,28 @@ func TestSLP037(t *testing.T) {
 			wantRuleID:   "",
 			wantLine:     0,
 		},
+		{
+			name: "multiline Exec call with INSERT on separate line",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "db.go",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 5, Content: "db.Exec("},
+									{Kind: diff.LineAdd, NewLineNo: 6, Content: "\t`INSERT INTO events (repo, payload) VALUES (?, ?)`, repo, payload,"},
+									{Kind: diff.LineAdd, NewLineNo: 7, Content: ")"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 1,
+			wantRuleID:   "SLP037",
+			wantLine:     5,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

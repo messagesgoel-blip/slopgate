@@ -29,6 +29,10 @@ func (SLP037) Description() string {
 // Includes QueryRow variants since they can also contain write statements.
 var insertUpdateRe = regexp.MustCompile(`(?i)\.(Exec(Context)?|Query(Context)?|QueryRow(Context)?)\s*\([^)]*\b(INSERT|UPDATE)\b`)
 
+// dbCallStartRe matches the start of a DB call (Exec, Query, QueryRow) to find
+// the line that begins the call when the INSERT/UPDATE is on a different line.
+var dbCallStartRe = regexp.MustCompile(`(?i)\.(Exec(Context)?|Query(Context)?|QueryRow(Context)?)\s*\(`)
+
 // txAssignRe matches "tx :=" or "tx, err :=" etc., with word boundary to avoid "ctx :=".
 var txAssignRe = regexp.MustCompile(`(?:^|\s)tx(?:\s*,\s*\w+)*\s*:?=`)
 
@@ -54,23 +58,29 @@ func (r SLP037) Check(d *diff.Diff) []Finding {
 		// Check per-hunk so a transaction in one hunk doesn't suppress
 		// findings in an unrelated hunk.
 		for _, h := range f.Hunks {
+			var addedLines []diff.Line
 			var addedContent strings.Builder
-			var insertUpdateLines []diff.Line
 			for _, line := range h.Lines {
 				if line.Kind != diff.LineAdd {
 					continue
 				}
+				addedLines = append(addedLines, line)
 				addedContent.WriteString(line.Content)
 				addedContent.WriteString("\n")
-				if insertUpdateRe.MatchString(line.Content) {
-					insertUpdateLines = append(insertUpdateLines, line)
-				}
 			}
-			if len(insertUpdateLines) == 0 {
+			addedStr := addedContent.String()
+			if !insertUpdateRe.MatchString(addedStr) {
 				continue
 			}
-			if !hasTransactionSignal(addedContent.String()) {
-				for _, line := range insertUpdateLines {
+			if hasTransactionSignal(addedStr) {
+				continue
+			}
+			// The regex may match across lines. For single-line matches, report
+			// that line. For multi-line matches, find the line starting the DB call.
+			reported := make(map[int]bool)
+			for _, line := range addedLines {
+				if insertUpdateRe.MatchString(line.Content) && !reported[line.NewLineNo] {
+					reported[line.NewLineNo] = true
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),
@@ -79,6 +89,22 @@ func (r SLP037) Check(d *diff.Diff) []Finding {
 						Message:  r.Description(),
 						Snippet:  strings.TrimSpace(line.Content),
 					})
+				}
+			}
+			// If no single line matched but the whole block did, find the DB call start.
+			if len(reported) == 0 {
+				for _, line := range addedLines {
+					if dbCallStartRe.MatchString(line.Content) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     line.NewLineNo,
+							Message:  r.Description(),
+							Snippet:  strings.TrimSpace(line.Content),
+						})
+						break
+					}
 				}
 			}
 		}
