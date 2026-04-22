@@ -45,7 +45,9 @@ func (r SLP039) Check(d *diff.Diff) []Finding {
 			if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
 				continue
 			}
-			if totalLenRe.MatchString(content) {
+			// Strip string literals to avoid matching SQL strings or fmt strings
+			stripped := stripStringLiterals(content)
+			if totalLenRe.MatchString(stripped) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
