@@ -26,6 +26,7 @@ var goKeywords = map[string]bool{
 	"new": true, "make": true, "len": true, "cap": true,
 	"append": true, "copy": true, "delete": true, "close": true,
 	"complex": true, "real": true, "imag": true,
+	"min": true, "max": true, "clear": true,
 }
 
 // undefinedCallPattern matches a bare identifier followed immediately by '('.

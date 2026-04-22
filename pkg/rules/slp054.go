@@ -8,7 +8,8 @@ import (
 )
 
 // SLP054 flags Go files whose package declaration does not match the
-// containing directory name.
+// containing directory name, with exceptions for _test packages and
+// package main in cmd/ directories.
 type SLP054 struct{}
 
 func (SLP054) ID() string                { return "SLP054" }
@@ -32,8 +33,15 @@ func (r SLP054) Check(d *diff.Diff) []Finding {
 			pkg := strings.TrimSpace(strings.TrimPrefix(content, "package "))
 			// Strip _test suffix for test files.
 			expected := dir
-			if strings.HasSuffix(f.Path, "_test.go") && !strings.HasSuffix(expected, "_test") {
-				expected = expected + "_test"
+			if strings.HasSuffix(f.Path, "_test.go") {
+				// package foo_test and package foo are both valid in foo_test.go.
+				if pkg == expected+"_test" || pkg == expected {
+					continue
+				}
+			}
+			// package main is valid in cmd/ directories regardless of dir name.
+			if pkg == "main" && strings.Contains(filepath.Dir(f.Path), "cmd") {
+				continue
 			}
 			if pkg != expected {
 				out = append(out, Finding{

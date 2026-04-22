@@ -51,7 +51,7 @@ func (r SLP069) Check(d *diff.Diff) []Finding {
 			var s scanner.Scanner
 			s.Init(file, []byte(ln.Content), nil, scanner.ScanComments)
 			for {
-				pos, tok, lit := s.Scan()
+				_, tok, lit := s.Scan()
 				if tok == token.EOF {
 					break
 				}
@@ -69,7 +69,6 @@ func (r SLP069) Check(d *diff.Diff) []Finding {
 				if info.hasSnake && info.hasCamel {
 					break
 				}
-				_ = pos
 			}
 		}
 		byDir[dir] = append(byDir[dir], info)

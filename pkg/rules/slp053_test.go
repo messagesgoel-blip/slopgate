@@ -54,6 +54,22 @@ func TestSLP053_FiresInGoFile(t *testing.T) {
 	}
 }
 
+func TestSLP053_FiresWhenCommentSeparatedByContextLine(t *testing.T) {
+	d := parseDiff(t, `diff --git a/config.yaml b/config.yaml
+--- a/config.yaml
++++ b/config.yaml
+@@ -1,3 +1,5 @@
+ app:
++  # 3 second timeout chosen empirically
+   name: demo
++  timeout: 3000
+`)
+	got := SLP053{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding (comment should not carry across context line), got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP053_Description(t *testing.T) {
 	r := SLP053{}
 	if r.ID() != "SLP053" {

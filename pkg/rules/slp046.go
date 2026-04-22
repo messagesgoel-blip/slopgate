@@ -59,8 +59,8 @@ func (r SLP046) Check(d *diff.Diff) []Finding {
 		return nil
 	}
 
-	// flagged tracks which files we've already reported so we don't duplicate.
-	flagged := make(map[string]bool)
+	// Collect cross-file call pairs: for each (fileA, funcName, fileB), report
+	// that funcName defined in fileA is called from fileB.
 	var out []Finding
 
 	for fileA, funcsA := range fileFuncs {
@@ -74,30 +74,16 @@ func (r SLP046) Check(d *diff.Diff) []Finding {
 				if funcsB[funcName] {
 					continue
 				}
-				// Check if bodyB calls funcName.
-				if strings.Contains(bodyB, funcName+"(") {
-					if !flagged[fileA] {
-						flagged[fileA] = true
-						out = append(out, Finding{
-							RuleID:   r.ID(),
-							Severity: r.DefaultSeverity(),
-							File:     fileA,
-							Line:     0,
-							Message:  "function " + funcName + " defined in " + fileA + " is called from " + fileB + " — consider colocating related logic",
-							Snippet:  "",
-						})
-					}
-					if !flagged[fileB] {
-						flagged[fileB] = true
-						out = append(out, Finding{
-							RuleID:   r.ID(),
-							Severity: r.DefaultSeverity(),
-							File:     fileB,
-							Line:     0,
-							Message:  "function " + funcName + " defined in " + fileA + " is called from " + fileB + " — consider colocating related logic",
-							Snippet:  "",
-						})
-					}
+				// Use word-boundary regex to detect bare calls (not method calls).
+				if callPattern(funcName).MatchString(bodyB) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     fileA,
+						Line:     0,
+						Message:  "function " + funcName + " defined in " + fileA + " is called from " + fileB + " — consider colocating related logic",
+						Snippet:  "",
+					})
 				}
 			}
 		}

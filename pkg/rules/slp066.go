@@ -21,9 +21,7 @@ func (SLP066) Description() string {
 	return "concurrent map access without mutex protection"
 }
 
-// mapIndexPattern detects map read/write operations like m[key] or m[key] = value.
-var mapIndexPattern = []string{"[", "]"}
-
+// hasMapIndexOp detects map read/write operations like m[key] or m[key] = value.
 func hasMapIndexOp(line string) bool {
 	// Simple heuristic: line contains both '[' and ']' and also "map[" or an
 	// identifier followed by '[' (e.g., "m[key]").

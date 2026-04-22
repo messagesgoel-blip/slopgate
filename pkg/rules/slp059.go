@@ -17,7 +17,8 @@ func (SLP059) Description() string {
 }
 
 var stringLiteralPattern = regexp.MustCompile(`"[^"]*"`)
-var goVarPattern = regexp.MustCompile(`\b[a-z][a-zA-Z0-9_]*\b`)
+var goIdentPattern = regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\b`)
+var execCommandRe = regexp.MustCompile(`\bexec\.Command\s*\(`)
 
 func stripQuotedStrings(s string) string {
 	return stringLiteralPattern.ReplaceAllString(s, "")
@@ -30,25 +31,21 @@ func (r SLP059) Check(d *diff.Diff) []Finding {
 			continue
 		}
 		for _, ln := range f.AddedLines() {
-			var idx int
-			var matched string
-			if i := strings.Index(ln.Content, "exec.Command("); i != -1 {
-				idx = i
-				matched = "exec.Command("
-			} else if i := strings.Index(ln.Content, "exec.Command ("); i != -1 {
-				idx = i
-				matched = "exec.Command ("
-			} else {
+			// Find exec.Command call using word-boundary regex.
+			m := execCommandRe.FindStringIndex(ln.Content)
+			if m == nil {
 				continue
 			}
-			rest := ln.Content[idx+len(matched):]
+			rest := ln.Content[m[1]:]
 			argEnd := strings.Index(rest, ")")
 			if argEnd == -1 {
 				argEnd = len(rest)
 			}
 			args := rest[:argEnd]
+			// Strip string literals before checking for interpolation.
+			unquoted := stripQuotedStrings(args)
 			// Any interpolation or concatenation is an immediate red flag.
-			if strings.Contains(args, "$") || strings.Contains(args, "+") || strings.Contains(args, "fmt.Sprintf") {
+			if strings.Contains(unquoted, "$") || strings.Contains(unquoted, "+") || strings.Contains(unquoted, "fmt.Sprintf") {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
@@ -59,8 +56,7 @@ func (r SLP059) Check(d *diff.Diff) []Finding {
 				})
 				continue
 			}
-			unquoted := stripQuotedStrings(args)
-			if goVarPattern.MatchString(unquoted) {
+			if goIdentPattern.MatchString(unquoted) {
 				// Note: we cannot statically resolve whether a variable is a safe
 				// compile-time constant. A local const string is safe, but a
 				// variable assigned elsewhere may contain user input. We flag all

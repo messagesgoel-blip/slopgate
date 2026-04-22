@@ -23,7 +23,7 @@ func TestSLP067_FiresOnHTTPGetWithoutClose(t *testing.T) {
 	if got[0].File != "client.go" {
 		t.Errorf("file: %q", got[0].File)
 	}
-	if !strings.Contains(got[0].Message, "resource acquired without deferred close") {
+	if !strings.Contains(got[0].Message, "without deferred Close()") {
 		t.Errorf("message: %q", got[0].Message)
 	}
 }

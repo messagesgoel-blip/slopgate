@@ -3,7 +3,6 @@ package rules
 import (
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
@@ -22,6 +21,7 @@ func (SLP048) Description() string {
 }
 
 var slp048ErrCheckRe = regexp.MustCompile(`if\s+err\s*!=\s*nil`)
+var slp048FuncReturnsErrRe = regexp.MustCompile(`func\s+\w+\s*\([^)]*\)\s*(\([^)]*\)\s*)?\w*error`)
 
 func (r SLP048) Check(d *diff.Diff) []Finding {
 	// Group files by package directory.
@@ -65,7 +65,7 @@ func (r SLP048) Check(d *diff.Diff) []Finding {
 		// file in the same directory does check errors.
 		returnsError := false
 		for _, ln := range added {
-			if strings.Contains(ln.Content, "error") && strings.Contains(ln.Content, "func ") {
+			if slp048FuncReturnsErrRe.MatchString(ln.Content) {
 				returnsError = true
 				break
 			}

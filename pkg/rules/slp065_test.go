@@ -88,6 +88,40 @@ func TestSLP065_NoFireForNonGo(t *testing.T) {
 	}
 }
 
+func TestSLP065_NoFireForNamedErrOnLHS(t *testing.T) {
+	// `_, err := doSomething()` — err is named on LHS, so it's handled.
+	d := parseDiff(t, `diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,1 +1,4 @@
+ package foo
++func Bar() {
++	_, err := doSomething()
++}
+`)
+	got := SLP065{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for named err on LHS, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP065_NoFireForInlineErrInit(t *testing.T) {
+	// `if err := doSomething(); err != nil {` — inline if-init is handled.
+	d := parseDiff(t, `diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,1 +1,3 @@
+ package foo
++if err := doSomething(); err != nil {
++	return
++}
+`)
+	got := SLP065{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for inline if-init, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP065_Description(t *testing.T) {
 	r := SLP065{}
 	if r.ID() != "SLP065" {

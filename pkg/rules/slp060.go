@@ -8,49 +8,51 @@ import (
 )
 
 // SLP060 flags interfaces with only one struct declaration (or none) added
-// in the same diff. This is a heuristic, not a verified implementation count.
+// in the same file. This is a heuristic, not a verified implementation count.
 type SLP060 struct{}
 
 func (SLP060) ID() string                { return "SLP060" }
 func (SLP060) DefaultSeverity() Severity { return SeverityInfo }
 func (SLP060) Description() string {
-	return "interface with only one struct declaration found — this heuristic counts structs, not verified implementations"
+	return "interface with few struct declarations found — may be premature abstraction"
 }
 
-var interfaceDeclPattern = regexp.MustCompile(`^\s*type\s+(\w+)\s+interface\b`)
-var structDeclPattern = regexp.MustCompile(`^\s*type\s+(\w+)\s+struct\b`)
+var slp060InterfaceDeclPattern = regexp.MustCompile(`^\s*type\s+(\w+)\s+interface\b`)
+var slp060StructDeclPattern = regexp.MustCompile(`^\s*type\s+(\w+)\s+struct\b`)
 
 func (r SLP060) Check(d *diff.Diff) []Finding {
-	var interfaceFindings []Finding
-	structCount := 0
+	var out []Finding
 
 	for _, f := range d.Files {
 		if f.IsDelete || !strings.HasSuffix(f.Path, ".go") {
 			continue
 		}
+
+		var interfaceFindings []Finding
+		structCount := 0
+
 		for _, ln := range f.AddedLines() {
-			if structDeclPattern.MatchString(ln.Content) {
+			if slp060StructDeclPattern.MatchString(ln.Content) {
 				structCount++
 				continue
 			}
-			if m := interfaceDeclPattern.FindStringSubmatch(ln.Content); m != nil {
+			if m := slp060InterfaceDeclPattern.FindStringSubmatch(ln.Content); m != nil {
 				interfaceFindings = append(interfaceFindings, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
-					Message:  "interface " + m[1] + " has only one struct declaration found — this heuristic counts structs, not verified implementations; consider using a concrete type if appropriate",
+					Message:  "interface " + m[1] + " added with few struct types — may be premature abstraction",
 					Snippet:  strings.TrimSpace(ln.Content),
 				})
 			}
 		}
+
+		// Only flag if this file has 0 or 1 struct declarations alongside interface(s).
+		if len(interfaceFindings) > 0 && structCount <= 1 {
+			out = append(out, interfaceFindings...)
+		}
 	}
 
-	if len(interfaceFindings) == 0 {
-		return nil
-	}
-	if structCount <= 1 {
-		return interfaceFindings
-	}
-	return nil
+	return out
 }

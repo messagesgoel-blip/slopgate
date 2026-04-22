@@ -21,7 +21,7 @@ func (SLP062) Description() string {
 }
 
 // slp062FuncSignature matches a Go function signature line.
-var slp062FuncSignature = regexp.MustCompile(`^func\s*(?:\([^)]+\)\s*)?\w+\s*\(`)
+var slp062FuncSignature = regexp.MustCompile(`^func\s*(?:\([^)]+\)\s*)?\w+\s*(?:\[(?:[^\[\]]|\[[^\[\]]*\])*\])?\s*\(`)
 
 func (r SLP062) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -117,18 +117,30 @@ func countBodyLines(added []diff.Line, start, depth int) (int, int) {
 	return bodyLines, j - 1
 }
 
-// stripGoLiteralsAndComments removes Go string literals and comments from a
-// line so brace counting doesn't miscount braces inside them.
+// stripGoLiteralsAndComments removes Go string literals, comments, and rune
+// literals from a line so brace counting doesn't miscount braces inside them.
 func stripGoLiteralsAndComments(s string) string {
 	var b strings.Builder
 	inString := false
 	inRawString := false
-	inComment := false
+	inBlockComment := false
+	inRune := false
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		if inComment {
-			if c == '\n' {
-				inComment = false
+		if inBlockComment {
+			if c == '*' && i+1 < len(s) && s[i+1] == '/' {
+				inBlockComment = false
+				i++ // skip past the '/'
+			}
+			continue
+		}
+		if inRune {
+			if c == '\\' && i+1 < len(s) {
+				i++ // skip escaped char
+				continue
+			}
+			if c == '\'' {
+				inRune = false
 			}
 			continue
 		}
@@ -149,7 +161,11 @@ func stripGoLiteralsAndComments(s string) string {
 			continue
 		}
 		if c == '/' && i+1 < len(s) && s[i+1] == '/' {
-			inComment = true
+			break // line comment: skip rest of line
+		}
+		if c == '/' && i+1 < len(s) && s[i+1] == '*' {
+			inBlockComment = true
+			i++ // skip past the '*'
 			continue
 		}
 		if c == '"' {
@@ -158,6 +174,10 @@ func stripGoLiteralsAndComments(s string) string {
 		}
 		if c == '`' {
 			inRawString = true
+			continue
+		}
+		if c == '\'' {
+			inRune = true
 			continue
 		}
 		b.WriteByte(c)

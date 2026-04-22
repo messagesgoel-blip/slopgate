@@ -24,21 +24,24 @@ diff --git a/pkg/b/b.go b/pkg/b/b.go
 +func Caller() { Helper() }
 `)
 	got := SLP046{}.Check(d)
-	if len(got) != 2 {
-		t.Fatalf("expected 2 findings, got %d: %+v", len(got), got)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "Helper") {
+		t.Errorf("message should mention Helper: %q", got[0].Message)
+	}
+	if !strings.Contains(got[0].Message, "pkg/a/a.go") {
+		t.Errorf("message should mention pkg/a/a.go: %q", got[0].Message)
+	}
+	if !strings.Contains(got[0].Message, "pkg/b/b.go") {
+		t.Errorf("message should mention pkg/b/b.go: %q", got[0].Message)
 	}
 	files := map[string]bool{}
 	for _, f := range got {
 		files[f.File] = true
-		if !strings.Contains(f.Message, "Helper") {
-			t.Errorf("message should mention Helper: %q", f.Message)
-		}
 	}
 	if !files["pkg/a/a.go"] {
 		t.Errorf("expected finding for pkg/a/a.go")
-	}
-	if !files["pkg/b/b.go"] {
-		t.Errorf("expected finding for pkg/b/b.go")
 	}
 }
 

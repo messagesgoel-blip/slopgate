@@ -27,6 +27,8 @@ func (r SLP047) Check(d *diff.Diff) []Finding {
 		// Only look at file types that use // comments.
 		if !isGoFile(f.Path) && !strings.HasSuffix(f.Path, ".rs") &&
 			!strings.HasSuffix(f.Path, ".cpp") && !strings.HasSuffix(f.Path, ".c") &&
+			!strings.HasSuffix(f.Path, ".h") && !strings.HasSuffix(f.Path, ".hpp") &&
+			!strings.HasSuffix(f.Path, ".cc") && !strings.HasSuffix(f.Path, ".cxx") &&
 			!strings.HasSuffix(f.Path, ".java") && !strings.HasSuffix(f.Path, ".kt") {
 			continue
 		}

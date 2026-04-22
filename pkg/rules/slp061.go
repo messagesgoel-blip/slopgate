@@ -65,9 +65,23 @@ func (r SLP061) Check(d *diff.Diff) []Finding {
 				if depth == 0 {
 					break
 				}
-				// Heuristic field line: contains a space (field + type).
-				if depth == 1 && strings.Contains(trimmed, " ") {
-					structFields[structName]++
+				// Count fields: handle comma-separated declarations and embedded fields.
+				if depth == 1 {
+					// Strip field tags (e.g. `json:"name"`).
+					tagIdx := strings.Index(trimmed, "`")
+					fieldPart := trimmed
+					if tagIdx >= 0 {
+						fieldPart = trimmed[:tagIdx]
+					}
+					if strings.Contains(fieldPart, ",") && strings.Contains(fieldPart, " ") {
+						// Comma-separated: count commas + 1.
+						structFields[structName] += strings.Count(fieldPart, ",") + 1
+					} else if strings.Contains(fieldPart, " ") {
+						structFields[structName]++
+					} else {
+						// Embedded field (e.g. io.Reader, *T).
+						structFields[structName]++
+					}
 				}
 				j++
 			}
@@ -101,7 +115,7 @@ func (r SLP061) Check(d *diff.Diff) []Finding {
 						}
 						break
 					}
-					if strings.Contains(next, "func") || strings.HasPrefix(next, "//") {
+					if strings.HasPrefix(next, "func ") || strings.HasPrefix(next, "//") {
 						break
 					}
 					j++

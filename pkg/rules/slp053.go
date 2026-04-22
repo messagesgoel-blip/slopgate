@@ -31,6 +31,7 @@ func (r SLP053) Check(d *diff.Diff) []Finding {
 			prevAddedComment := false
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
+					prevAddedComment = false
 					continue
 				}
 				content := strings.TrimSpace(ln.Content)

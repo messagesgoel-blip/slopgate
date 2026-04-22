@@ -56,19 +56,18 @@ func (r SLP063) Check(d *diff.Diff) []Finding {
 					}
 					trimmed := strings.TrimSpace(bl.Content)
 					if trimmed == "" || strings.HasPrefix(trimmed, "//") {
-						// Advance brace counting even for comments.
-						depth += strings.Count(bl.Content, "{") - strings.Count(bl.Content, "}")
+						// Comment-only or blank lines don't contain real field definitions,
+						// but their braces still affect depth. Use count-based tracking.
+						depth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
+						if depth <= 0 {
+							break
+						}
 						j++
 						continue
 					}
-					if strings.Contains(trimmed, "{") {
-						depth++
-					}
-					if strings.Contains(trimmed, "}") {
-						depth--
-						if depth == 0 {
-							break
-						}
+					depth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
+					if depth <= 0 {
+						break
 					}
 					// Heuristic field definition: contains a space (at least two
 					// tokens: name and type) and is not an embedded struct or

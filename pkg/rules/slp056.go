@@ -26,7 +26,26 @@ var secretPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)private_key\s*[:=]`),
 }
 
-var skipWords = []string{"example", "sample", "dummy", "test", "placeholder", "fake", "mock", "todo", "fixme"}
+// skipWordsLower contains words that indicate example/test data, lowercased.
+// Checked against tokens split on non-alphanumeric boundaries to avoid substring matches.
+var skipWordsLower = map[string]bool{
+	"example": true, "sample": true, "dummy": true, "test": true,
+	"placeholder": true, "fake": true, "mock": true, "todo": true, "fixme": true,
+}
+
+// tokenSplitRe splits a string into tokens on non-alphanumeric boundaries.
+var tokenSplitRe = regexp.MustCompile(`[^a-zA-Z0-9]+`)
+
+func shouldSkip(content string) bool {
+	lower := strings.ToLower(content)
+	tokens := tokenSplitRe.Split(lower, -1)
+	for _, tok := range tokens {
+		if skipWordsLower[tok] {
+			return true
+		}
+	}
+	return false
+}
 
 func (r SLP056) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -35,15 +54,7 @@ func (r SLP056) Check(d *diff.Diff) []Finding {
 			continue
 		}
 		for _, ln := range f.AddedLines() {
-			lower := strings.ToLower(ln.Content)
-			skip := false
-			for _, w := range skipWords {
-				if strings.Contains(lower, w) {
-					skip = true
-					break
-				}
-			}
-			if skip {
+			if shouldSkip(ln.Content) {
 				continue
 			}
 			for _, re := range secretPatterns {

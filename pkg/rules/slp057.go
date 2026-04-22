@@ -39,11 +39,11 @@ var goDynamic = []struct {
 	desc string
 }{
 	{regexp.MustCompile(`\breflect\.Value\.Call\b`), "reflect.Value.Call"},
-	{regexp.MustCompile(`"unsafe"`), "import \"unsafe\""},
-	{regexp.MustCompile(`\bunsafe\.Pointer\b`), "unsafe.Pointer"},
+	{regexp.MustCompile(`(?m)^\s*(?:import\s+"unsafe"|_\s*"unsafe")`), `import "unsafe"`},
+	{regexp.MustCompile(`\bunsafe\.(Pointer|Sizeof|Alignof|Offsetof|Add|Slice)\b`), "unsafe.*"},
 }
 
-func (SLP057) Check(d *diff.Diff) []Finding {
+func (r SLP057) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
 		if f.IsDelete {
@@ -83,8 +83,8 @@ func (SLP057) Check(d *diff.Diff) []Finding {
 
 			if matched {
 				out = append(out, Finding{
-					RuleID:   "SLP057",
-					Severity: SeverityBlock,
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
 					Message:  "dynamic code execution detected — " + desc + " is dangerous with untrusted input",
