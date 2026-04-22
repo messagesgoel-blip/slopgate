@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"go/scanner"
+	"go/token"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,8 +19,8 @@ func (SLP069) Description() string {
 	return "mixed naming conventions (snake_case and CamelCase) in the same package"
 }
 
-var snakePattern = regexp.MustCompile(`[a-z]+_[a-z_]+`)
-var camelPattern = regexp.MustCompile(`[A-Z][a-zA-Z0-9]+`)
+var snakePattern = regexp.MustCompile(`^[a-z]+_[a-z_]+$`)
+var camelPattern = regexp.MustCompile(`^[A-Z][a-zA-Z0-9]+$`)
 
 func (r SLP069) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -43,16 +45,31 @@ func (r SLP069) Check(d *diff.Diff) []Finding {
 		dir := filepath.Dir(f.Path)
 		info := &fileInfo{path: f.Path}
 		for _, ln := range f.AddedLines() {
-			if !info.hasSnake && snakePattern.MatchString(ln.Content) {
-				info.hasSnake = true
-				info.firstSnakeLine = ln.NewLineNo
-				info.firstSnakeSnippet = strings.TrimSpace(ln.Content)
-			}
-			if !info.hasCamel && camelPattern.MatchString(ln.Content) {
-				info.hasCamel = true
-			}
-			if info.hasSnake && info.hasCamel {
-				break
+			// Use Go scanner to extract identifiers only, skipping strings/comments.
+			fs := token.NewFileSet()
+			file := fs.AddFile(f.Path, fs.Base(), len(ln.Content))
+			var s scanner.Scanner
+			s.Init(file, []byte(ln.Content), nil, scanner.ScanComments)
+			for {
+				pos, tok, lit := s.Scan()
+				if tok == token.EOF {
+					break
+				}
+				if tok != token.IDENT {
+					continue
+				}
+				if !info.hasSnake && snakePattern.MatchString(lit) {
+					info.hasSnake = true
+					info.firstSnakeLine = ln.NewLineNo
+					info.firstSnakeSnippet = strings.TrimSpace(ln.Content)
+				}
+				if !info.hasCamel && camelPattern.MatchString(lit) {
+					info.hasCamel = true
+				}
+				if info.hasSnake && info.hasCamel {
+					break
+				}
+				_ = pos
 			}
 		}
 		byDir[dir] = append(byDir[dir], info)
@@ -64,10 +81,8 @@ func (r SLP069) Check(d *diff.Diff) []Finding {
 				continue
 			}
 			otherCamel := false
+			// Check both other files and the same file for CamelCase.
 			for _, other := range files {
-				if other.path == fi.path {
-					continue
-				}
 				if other.hasCamel {
 					otherCamel = true
 					break

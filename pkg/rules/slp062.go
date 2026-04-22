@@ -2,6 +2,7 @@ package rules
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -36,7 +37,7 @@ func (r SLP062) Check(d *diff.Diff) []Finding {
 				Severity: r.DefaultSeverity(),
 				File:     f.Path,
 				Line:     0,
-				Message:  "file adds " + itoa(len(added)) + " lines — consider refactoring into smaller files",
+				Message:  "file adds " + strconv.Itoa(len(added)) + " lines — consider refactoring into smaller files",
 				Snippet:  "",
 			})
 		}
@@ -51,65 +52,117 @@ func (r SLP062) Check(d *diff.Diff) []Finding {
 			// Extract function name for the message.
 			funcName := extractFuncName(trimmed)
 			startLine := ln.NewLineNo
-			// Brace depth counting on THIS line only.
-			depth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
+			// Brace depth counting on THIS line only (strip string literals and comments first).
+			clean := stripGoLiteralsAndComments(ln.Content)
+			depth := strings.Count(clean, "{") - strings.Count(clean, "}")
 			if depth <= 0 {
 				// Opening brace is on a subsequent added line.
 				j := i + 1
 				for j < len(added) && depth <= 0 {
-					depth += strings.Count(added[j].Content, "{") - strings.Count(added[j].Content, "}")
+					cleanNext := stripGoLiteralsAndComments(added[j].Content)
+					depth += strings.Count(cleanNext, "{") - strings.Count(cleanNext, "}")
 					j++
 				}
 				if depth <= 0 {
 					continue
 				}
-				// Start counting from the signature line; body lines
-				// start at i+1.
-				bodyLines := 1 // signature line counts as part of the function
-				for j < len(added) && depth > 0 {
-					bodyLines++
-					depth += strings.Count(added[j].Content, "{") - strings.Count(added[j].Content, "}")
-					j++
-				}
+				bodyLines, nextIdx := countBodyLines(added, j, depth)
 				if bodyLines > 50 {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),
 						File:     f.Path,
 						Line:     startLine,
-						Message:  "function " + funcName + " is " + itoa(bodyLines) + " lines — consider breaking it up",
+						Message:  "function " + funcName + " is " + strconv.Itoa(bodyLines) + " lines — consider breaking it up",
 						Snippet:  trimmed,
 					})
 				}
-				if j > i {
-					i = j - 1
+				if nextIdx > i {
+					i = nextIdx
 				}
 				continue
 			}
 			// Opening brace is on the signature line.
-			bodyLines := 1
-			j := i + 1
-			for j < len(added) && depth > 0 {
-				bodyLines++
-				depth += strings.Count(added[j].Content, "{") - strings.Count(added[j].Content, "}")
-				j++
-			}
+			bodyLines, nextIdx := countBodyLines(added, i+1, depth)
 			if bodyLines > 50 {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     startLine,
-					Message:  "function " + funcName + " is " + itoa(bodyLines) + " lines — consider breaking it up",
+					Message:  "function " + funcName + " is " + strconv.Itoa(bodyLines) + " lines — consider breaking it up",
 					Snippet:  trimmed,
 				})
 			}
-			if j > i {
-				i = j - 1
+			if nextIdx > i {
+				i = nextIdx
 			}
 		}
 	}
 	return out
+}
+
+// countBodyLines counts lines from index `start` in `added` until `depth`
+// reaches 0, using cleaned (literal/comment-free) content for brace counting.
+// It returns the number of body lines and the last consumed index.
+func countBodyLines(added []diff.Line, start, depth int) (int, int) {
+	bodyLines := 1 // signature counts as part of the function
+	j := start
+	for j < len(added) && depth > 0 {
+		bodyLines++
+		clean := stripGoLiteralsAndComments(added[j].Content)
+		depth += strings.Count(clean, "{") - strings.Count(clean, "}")
+		j++
+	}
+	return bodyLines, j - 1
+}
+
+// stripGoLiteralsAndComments removes Go string literals and comments from a
+// line so brace counting doesn't miscount braces inside them.
+func stripGoLiteralsAndComments(s string) string {
+	var b strings.Builder
+	inString := false
+	inRawString := false
+	inComment := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if inComment {
+			if c == '\n' {
+				inComment = false
+			}
+			continue
+		}
+		if inRawString {
+			if c == '`' {
+				inRawString = false
+			}
+			continue
+		}
+		if inString {
+			if c == '\\' && i+1 < len(s) {
+				i++ // skip escaped char
+				continue
+			}
+			if c == '"' {
+				inString = false
+			}
+			continue
+		}
+		if c == '/' && i+1 < len(s) && s[i+1] == '/' {
+			inComment = true
+			continue
+		}
+		if c == '"' {
+			inString = true
+			continue
+		}
+		if c == '`' {
+			inRawString = true
+			continue
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
 }
 
 func extractFuncName(line string) string {

@@ -48,14 +48,13 @@ func (r SLP051) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				// Find all bare calls.
-				for _, m := range undefinedCallPattern.FindAllStringSubmatch(content, -1) {
-					name := m[1]
+				for _, m := range undefinedCallPattern.FindAllStringSubmatchIndex(content, -1) {
+					name := content[m[2]:m[3]]
 					if goKeywords[name] || isSafetyTestName(name) {
 						continue
 					}
-					// Skip method calls (contain dot before identifier).
-					idx := strings.Index(content, name+"(")
-					if idx > 0 && content[idx-1] == '.' {
+					// Skip method calls: check the character immediately before the match start.
+					if m[2] > 0 && content[m[2]-1] == '.' {
 						continue
 					}
 					// Skip if there is a local func definition for this name somewhere in the file.

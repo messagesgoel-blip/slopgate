@@ -39,7 +39,8 @@ var goDynamic = []struct {
 	desc string
 }{
 	{regexp.MustCompile(`\breflect\.Value\.Call\b`), "reflect.Value.Call"},
-	{regexp.MustCompile(`\bunsafe\b`), "unsafe"},
+	{regexp.MustCompile(`"unsafe"`), "import \"unsafe\""},
+	{regexp.MustCompile(`\bunsafe\.Pointer\b`), "unsafe.Pointer"},
 }
 
 func (SLP057) Check(d *diff.Diff) []Finding {

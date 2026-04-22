@@ -25,9 +25,13 @@ func (r SLP052) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		isTest := strings.Contains(strings.ToLower(f.Path), "_test.") ||
-			strings.Contains(strings.ToLower(f.Path), ".test.") ||
-			strings.Contains(strings.ToLower(f.Path), ".spec.")
+		lowerPath := strings.ToLower(f.Path)
+		isTest := strings.Contains(lowerPath, "_test.") ||
+			strings.Contains(lowerPath, ".test.") ||
+			strings.Contains(lowerPath, ".spec.") ||
+			strings.Contains(lowerPath, "/test/") ||
+			strings.Contains(lowerPath, "/tests/") ||
+			strings.Contains(lowerPath, "/testdata/")
 		for _, h := range f.Hunks {
 			for _, ln := range h.Lines {
 				if ln.Kind == diff.LineDelete && !isTest {

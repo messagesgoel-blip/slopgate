@@ -35,6 +35,9 @@ var slp065BlankLHS = regexp.MustCompile(`(^|[^a-zA-Z0-9_])_\s*(:=|=|,)`)
 // slp065ErrCheck matches `if err != nil`.
 var slp065ErrCheck = regexp.MustCompile(`if\s+err\s*!=\s*nil`)
 
+// slp065ExplicitSuppression matches an intentional `_ = someFunc()` style suppression.
+var slp065ExplicitSuppression = regexp.MustCompile(`^\s*_\s*=`)
+
 func (r SLP065) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -53,15 +56,19 @@ func (r SLP065) Check(d *diff.Diff) []Finding {
 				}
 
 				// Case A: explicit suppression with _ on LHS of a function call.
+				// We intentionally skip `_ = someFunc()` because that's an explicit
+				// acknowledged suppression, not an accidental ignore.
 				if slp065BlankLHS.MatchString(ln.Content) && slp065FuncCall.MatchString(ln.Content) {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "error return ignored — handle or explicitly suppress with _",
-						Snippet:  trimmed,
-					})
+					if !slp065ExplicitSuppression.MatchString(ln.Content) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  "error return ignored — handle or explicitly suppress with _",
+							Snippet:  trimmed,
+						})
+					}
 					continue
 				}
 

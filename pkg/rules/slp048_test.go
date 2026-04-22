@@ -46,7 +46,7 @@ func TestSLP048_IgnoresConsistentErrorHandling(t *testing.T) {
 +	if err != nil { return err }
 +	return nil
 +}
- diff --git a/pkg/b.go b/pkg/b.go
+diff --git a/pkg/b.go b/pkg/b.go
 --- a/pkg/b.go
 +++ b/pkg/b.go
 @@ -1,1 +1,5 @@

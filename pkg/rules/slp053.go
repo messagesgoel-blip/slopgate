@@ -27,10 +27,6 @@ func (r SLP053) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		lower := strings.ToLower(f.Path)
-		isConf := strings.HasSuffix(lower, ".json") || strings.HasSuffix(lower, ".yaml") ||
-			strings.HasSuffix(lower, ".yml") || strings.HasSuffix(lower, ".toml") ||
-			strings.HasSuffix(lower, ".conf") || strings.HasSuffix(lower, ".ini")
 		for _, h := range f.Hunks {
 			prevAddedComment := false
 			for _, ln := range h.Lines {
@@ -45,10 +41,6 @@ func (r SLP053) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				m := configKeyPattern.FindStringSubmatch(content)
-				if m == nil && !isConf {
-					prevAddedComment = false
-					continue
-				}
 				if m == nil {
 					prevAddedComment = false
 					continue

@@ -22,7 +22,9 @@ var resourcePatterns = []string{
 	"db.Query",
 	"db.QueryContext",
 	"db.QueryRow",
-	"rows.Next",
+	"os.Open(",
+	"os.Create(",
+	"sql.Open(",
 }
 
 func hasResourceAcquisition(line string) bool {
@@ -32,6 +34,27 @@ func hasResourceAcquisition(line string) bool {
 		}
 	}
 	return false
+}
+
+// resourceVar extracts a likely variable name from a resource acquisition line.
+// For assignments like "resp, err := http.Get(...)" it returns "resp".
+func resourceVar(line string) string {
+	line = strings.TrimSpace(line)
+	if idx := strings.Index(line, ":="); idx > 0 {
+		lhs := strings.TrimSpace(line[:idx])
+		parts := strings.Split(lhs, ",")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+	if idx := strings.Index(line, "="); idx > 0 {
+		lhs := strings.TrimSpace(line[:idx])
+		parts := strings.Split(lhs, ",")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+	return ""
 }
 
 func (r SLP067) Check(d *diff.Diff) []Finding {
@@ -45,12 +68,23 @@ func (r SLP067) Check(d *diff.Diff) []Finding {
 			if !hasResourceAcquisition(ln.Content) {
 				continue
 			}
+			varName := resourceVar(ln.Content)
 			foundClose := false
 			for j := i + 1; j < len(added); j++ {
-				if strings.Contains(added[j].Content, ".Close()") ||
-					strings.Contains(added[j].Content, "defer") {
-					foundClose = true
-					break
+				next := added[j].Content
+				// Require both the variable name AND the close/defer token.
+				if varName != "" {
+					if strings.Contains(next, varName+".Close()") ||
+						strings.Contains(next, "defer "+varName+".") {
+						foundClose = true
+						break
+					}
+				} else {
+					// Fallback: any defer or .Close() if we couldn't identify var.
+					if strings.Contains(next, ".Close()") || strings.Contains(next, "defer") {
+						foundClose = true
+						break
+					}
 				}
 			}
 			if !foundClose {

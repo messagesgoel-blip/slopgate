@@ -16,9 +16,9 @@ func (SLP058) Description() string {
 	return "SQL built with string concatenation"
 }
 
-var sqlConcatPattern = regexp.MustCompile(`(?i)(select|insert|update|delete|where|from|join).*(\+|fmt\.Sprintf|\$\{|%s)`)
+var sqlConcatPattern = regexp.MustCompile(`(?i)(select|insert|update|delete|where|from|join).*(\+|\$\{|%s)|fmt\.Sprintf.*(select|insert|update|delete|where|from|join)`)
 
-func (SLP058) Check(d *diff.Diff) []Finding {
+func (r SLP058) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
 		if f.IsDelete {
@@ -27,8 +27,8 @@ func (SLP058) Check(d *diff.Diff) []Finding {
 		for _, ln := range f.AddedLines() {
 			if sqlConcatPattern.MatchString(ln.Content) {
 				out = append(out, Finding{
-					RuleID:   "SLP058",
-					Severity: SeverityBlock,
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
 					Message:  "SQL built with string concatenation — use parameterized queries",

@@ -2,6 +2,7 @@ package rules
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -83,7 +84,7 @@ func (r SLP063) Check(d *diff.Diff) []Finding {
 						Severity: r.DefaultSeverity(),
 						File:     f.Path,
 						Line:     startLine,
-						Message:  "struct " + structName + " has " + itoa(fieldCount) + " fields — consider splitting into smaller types",
+						Message:  "struct " + structName + " has " + strconv.Itoa(fieldCount) + " fields — consider splitting into smaller types",
 						Snippet:  strings.TrimSpace(ln.Content),
 					})
 				}

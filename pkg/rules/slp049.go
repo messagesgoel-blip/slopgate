@@ -24,6 +24,9 @@ func (SLP049) Description() string {
 // assertKeywordRe detects common testify / t assertion helpers.
 var assertKeywordRe = regexp.MustCompile(`\b(assert|require|t\.Error|t\.Fatal)\b`)
 
+// identRE matches a valid identifier token.
+var identRE = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
 func (r SLP049) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -74,11 +77,16 @@ func hasSameIdentifierBothSides(s string) bool {
 			}
 		}
 	}
-	// Check for duplicate tokens among the remaining tokens (catches assert.Equal(t, input, input))
+	// Check for duplicate tokens among the remaining tokens (catches assert.Equal(t, input, input)).
+	// Skip single-letter identifiers and common test variable names to reduce false positives.
 	seen := make(map[string]bool)
+	ignored := map[string]bool{"t": true, "s": true, "c": true}
 	for _, tok := range tokens {
+		if len(tok) < 2 || ignored[tok] {
+			continue
+		}
 		// Only consider identifier-like tokens.
-		if matched, _ := regexp.MatchString(`^[A-Za-z_][A-Za-z0-9_]*$`, tok); !matched {
+		if !identRE.MatchString(tok) {
 			continue
 		}
 		if seen[tok] {

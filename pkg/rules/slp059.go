@@ -23,30 +23,35 @@ func stripQuotedStrings(s string) string {
 	return stringLiteralPattern.ReplaceAllString(s, "")
 }
 
-func (SLP059) Check(d *diff.Diff) []Finding {
+func (r SLP059) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
 		if f.IsDelete || !strings.HasSuffix(f.Path, ".go") {
 			continue
 		}
 		for _, ln := range f.AddedLines() {
-			idx := strings.Index(ln.Content, "exec.Command(")
-			if idx == -1 {
-				idx = strings.Index(ln.Content, "exec.Command (")
-			}
-			if idx == -1 {
+			var idx int
+			var matched string
+			if i := strings.Index(ln.Content, "exec.Command("); i != -1 {
+				idx = i
+				matched = "exec.Command("
+			} else if i := strings.Index(ln.Content, "exec.Command ("); i != -1 {
+				idx = i
+				matched = "exec.Command ("
+			} else {
 				continue
 			}
-			rest := ln.Content[idx+len("exec.Command("):]
+			rest := ln.Content[idx+len(matched):]
 			argEnd := strings.Index(rest, ")")
 			if argEnd == -1 {
 				argEnd = len(rest)
 			}
 			args := rest[:argEnd]
+			// Any interpolation or concatenation is an immediate red flag.
 			if strings.Contains(args, "$") || strings.Contains(args, "+") || strings.Contains(args, "fmt.Sprintf") {
 				out = append(out, Finding{
-					RuleID:   "SLP059",
-					Severity: SeverityBlock,
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
 					Message:  "exec.Command argument may contain user input — sanitize before executing",
@@ -56,9 +61,13 @@ func (SLP059) Check(d *diff.Diff) []Finding {
 			}
 			unquoted := stripQuotedStrings(args)
 			if goVarPattern.MatchString(unquoted) {
+				// Note: we cannot statically resolve whether a variable is a safe
+				// compile-time constant. A local const string is safe, but a
+				// variable assigned elsewhere may contain user input. We flag all
+				// non-literal variables as potentially unsafe.
 				out = append(out, Finding{
-					RuleID:   "SLP059",
-					Severity: SeverityBlock,
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
 					Message:  "exec.Command argument may contain user input — sanitize before executing",

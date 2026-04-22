@@ -62,7 +62,7 @@ func (r SLP050) Check(d *diff.Diff) []Finding {
 				continue
 			}
 
-			// Scan subsequent added lines for validation.
+			// Scan subsequent added lines for validation using word-boundary matching.
 			validated := make(map[string]bool)
 			for j := i + 1; j < len(added); j++ {
 				next := added[j]
@@ -75,7 +75,7 @@ func (r SLP050) Check(d *diff.Diff) []Finding {
 				}
 				if slp050ValidationRe.MatchString(c) {
 					for _, p := range paramNames {
-						if strings.Contains(c, p) {
+						if paramRegex(p).MatchString(c) {
 							validated[p] = true
 						}
 					}
@@ -97,6 +97,11 @@ func (r SLP050) Check(d *diff.Diff) []Finding {
 		}
 	}
 	return out
+}
+
+// paramRegex returns a regex matching the parameter name as a bare identifier.
+func paramRegex(name string) *regexp.Regexp {
+	return regexp.MustCompile(`(?m)(^|[^\w])` + regexp.QuoteMeta(name) + `($|[^\w])`)
 }
 
 func needsValidation(typeStr string) bool {

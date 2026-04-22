@@ -36,23 +36,17 @@ func hasMock(content string) bool {
 // We reuse the same token list as SLP001's library assertions plus Go's
 // standard testing.T assertions.
 func hasAssertionLine(line string) bool {
-	// Standard Go testing assertions.
-	tSuffixes := []string{".Error(", ".Errorf(", ".Fatal(", ".Fatalf(", ".FailNow(", ".Fail("}
-	for _, s := range tSuffixes {
-		if strings.Contains(line, "t"+s) {
-			return true
+	// Standard Go testing assertions (match any identifier before the suffix).
+	for _, s := range []string{".Error(", ".Errorf(", ".Fatal(", ".Fatalf(", ".FailNow(", ".Fail("} {
+		if idx := strings.Index(line, s); idx > 0 {
+			// Ensure there is an identifier character before the dot.
+			if c := line[idx-1]; (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' {
+				return true
+			}
 		}
 	}
 	// Library assertions from SLP001.
-	libraryTokens := []string{
-		"assert.", "require.",
-		"Expect(", "Eventually(", "Consistently(",
-		"So(",
-		"is.",
-		"qt.",
-		"c.Check(", "c.Assert(",
-	}
-	for _, tok := range libraryTokens {
+	for _, tok := range LibraryAssertTokens {
 		if strings.Contains(line, tok) {
 			return true
 		}

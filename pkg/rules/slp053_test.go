@@ -59,4 +59,10 @@ func TestSLP053_Description(t *testing.T) {
 	if r.ID() != "SLP053" {
 		t.Errorf("ID = %q", r.ID())
 	}
+	if r.Description() == "" {
+		t.Errorf("Description is empty")
+	}
+	if r.DefaultSeverity() != SeverityInfo {
+		t.Errorf("DefaultSeverity = %v, want SeverityInfo", r.DefaultSeverity())
+	}
 }

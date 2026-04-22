@@ -21,10 +21,7 @@ func (SLP048) Description() string {
 	return "error handling pattern differs from other files in this package — be consistent"
 }
 
-var (
-	slp048ErrCheckRe    = regexp.MustCompile(`if\s+err\s*!=\s*nil`)
-	slp048PackageDeclRe = regexp.MustCompile(`^package\s+(\S+)`)
-)
+var slp048ErrCheckRe = regexp.MustCompile(`if\s+err\s*!=\s*nil`)
 
 func (r SLP048) Check(d *diff.Diff) []Finding {
 	// Group files by package directory.

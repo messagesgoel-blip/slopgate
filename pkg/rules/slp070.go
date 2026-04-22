@@ -16,8 +16,14 @@ func (SLP070) Description() string {
 	return "diff touches too many top-level directories"
 }
 
+// rootBucket is the sentinel returned for paths with no directory separator.
+const rootBucket = "."
+
 func topLevelDir(path string) string {
-	before, _, _ := strings.Cut(path, "/")
+	before, _, found := strings.Cut(path, "/")
+	if !found {
+		return rootBucket
+	}
 	return before
 }
 

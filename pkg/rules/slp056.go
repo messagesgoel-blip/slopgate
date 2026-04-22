@@ -26,9 +26,9 @@ var secretPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)private_key\s*[:=]`),
 }
 
-var skipWords = []string{"example", "sample", "dummy", "test", "placeholder", "fake", "mock", "TODO", "FIXME"}
+var skipWords = []string{"example", "sample", "dummy", "test", "placeholder", "fake", "mock", "todo", "fixme"}
 
-func (SLP056) Check(d *diff.Diff) []Finding {
+func (r SLP056) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
 		if f.IsDelete {
@@ -49,12 +49,12 @@ func (SLP056) Check(d *diff.Diff) []Finding {
 			for _, re := range secretPatterns {
 				if re.MatchString(ln.Content) {
 					out = append(out, Finding{
-						RuleID:   "SLP056",
-						Severity: SeverityBlock,
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
 						File:     f.Path,
 						Line:     ln.NewLineNo,
 						Message:  "hardcoded secret pattern detected — use environment variables or a secret manager",
-						Snippet:  strings.TrimSpace(ln.Content),
+						Snippet:  "[REDACTED]",
 					})
 					break
 				}

@@ -21,7 +21,11 @@ func (SLP046) Description() string {
 	return "function defined in one file is called from another file — consider colocating related logic"
 }
 
-var slp046FuncDefRe = regexp.MustCompile(`^func\s+(?:\([^)]+\)\s+)?([A-Za-z_]\w*)`)
+// callPattern returns a regexp matching a bare call to funcName, ensuring it
+// is not preceded by a dot and is followed by '('.
+func callPattern(funcName string) *regexp.Regexp {
+	return regexp.MustCompile(`(?m)(^|[^.\w])` + regexp.QuoteMeta(funcName) + `\s*\(`)
+}
 
 func (r SLP046) Check(d *diff.Diff) []Finding {
 	// fileFuncs maps file path -> set of function names defined in that file
@@ -37,7 +41,7 @@ func (r SLP046) Check(d *diff.Diff) []Finding {
 		var bodyParts []string
 		for _, ln := range f.AddedLines() {
 			bodyParts = append(bodyParts, ln.Content)
-			m := slp046FuncDefRe.FindStringSubmatch(ln.Content)
+			m := funcDefPattern.FindStringSubmatch(ln.Content)
 			if m != nil {
 				funcs[m[1]] = true
 			}

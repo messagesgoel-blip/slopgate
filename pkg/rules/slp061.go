@@ -2,6 +2,7 @@ package rules
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -60,14 +61,9 @@ func (r SLP061) Check(d *diff.Diff) []Finding {
 					j++
 					continue
 				}
-				if strings.Contains(trimmed, "{") {
-					depth++
-				}
-				if strings.Contains(trimmed, "}") {
-					depth--
-					if depth == 0 {
-						break
-					}
+				depth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
+				if depth == 0 {
+					break
 				}
 				// Heuristic field line: contains a space (field + type).
 				if depth == 1 && strings.Contains(trimmed, " ") {
@@ -125,25 +121,11 @@ func (r SLP061) Check(d *diff.Diff) []Finding {
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     startLine,
-					Message:  "factory/builder for " + structName + " with only " + itoa(count) + " fields is over-engineered — use struct literal",
+					Message:  "factory/builder for " + structName + " with only " + strconv.Itoa(count) + " fields is over-engineered — use struct literal",
 					Snippet:  trimmed,
 				})
 			}
 		}
 	}
 	return out
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [4]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
 }

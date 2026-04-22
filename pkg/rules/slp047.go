@@ -46,18 +46,19 @@ func (r SLP047) Check(d *diff.Diff) []Finding {
 				if commentText == "" {
 					continue
 				}
-				// Find next non-empty added line.
+				// Find next non-empty added line, but stop if we hit a non-empty non-added line first.
 				var nextLine string
 				for j := i + 1; j < len(lines); j++ {
 					nxt := lines[j]
-					if nxt.Kind != diff.LineAdd {
+					nxtContent := strings.TrimSpace(nxt.Content)
+					if nxtContent == "" {
 						continue
 					}
-					nxtContent := strings.TrimSpace(nxt.Content)
-					if nxtContent != "" {
-						nextLine = nxtContent
+					if nxt.Kind != diff.LineAdd {
 						break
 					}
+					nextLine = nxtContent
+					break
 				}
 				if nextLine == "" {
 					continue

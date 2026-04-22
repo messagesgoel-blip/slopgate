@@ -7,12 +7,43 @@ import (
 )
 
 // SLP066 flags concurrent map access without mutex protection in Go files.
+//
+// Heuristic: if the diff contains goroutines or WaitGroup usage and also
+// contains map index/read/write operations, flag unless a sync.Mutex /
+// sync.RWMutex / sync.Map is also present. This is intentionally coarse —
+// precisely matching mutex guards to specific map variables requires full
+// AST analysis which is out of scope for diff-based linting.
 type SLP066 struct{}
 
 func (SLP066) ID() string                { return "SLP066" }
 func (SLP066) DefaultSeverity() Severity { return SeverityBlock }
 func (SLP066) Description() string {
 	return "concurrent map access without mutex protection"
+}
+
+// mapIndexPattern detects map read/write operations like m[key] or m[key] = value.
+var mapIndexPattern = []string{"[", "]"}
+
+func hasMapIndexOp(line string) bool {
+	// Simple heuristic: line contains both '[' and ']' and also "map[" or an
+	// identifier followed by '[' (e.g., "m[key]").
+	if !strings.Contains(line, "[") || !strings.Contains(line, "]") {
+		return false
+	}
+	// Explicit map literal or index op.
+	if strings.Contains(line, "map[") {
+		return true
+	}
+	// Look for identifier[
+	for i := 0; i+1 < len(line); i++ {
+		if line[i+1] == '[' {
+			c := line[i]
+			if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (r SLP066) Check(d *diff.Diff) []Finding {
@@ -37,7 +68,7 @@ func (r SLP066) Check(d *diff.Diff) []Finding {
 			continue
 		}
 		for _, ln := range added {
-			if strings.Contains(ln.Content, "map[") {
+			if hasMapIndexOp(ln.Content) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

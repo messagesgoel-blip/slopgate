@@ -53,18 +53,18 @@ func TestSLP058_FiresOnInterpolation(t *testing.T) {
 	}
 }
 
-func TestSLP058_FiresOnFormatSpecifier(t *testing.T) {
+func TestSLP058_IgnoresPythonDBPlaceholders(t *testing.T) {
 	d := parseDiff(t, `diff --git a/db.py b/db.py
 --- a/db.py
 +++ b/db.py
 @@ -1,2 +1,3 @@
  def get_user(id):
 +
-+    cursor.execute("SELECT * FROM users WHERE id = %s", id)
+     cursor.execute("SELECT * FROM users WHERE id = %s", id)
 `)
 	got := SLP058{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for Python DB placeholder, got %d: %+v", len(got), got)
 	}
 }
 
