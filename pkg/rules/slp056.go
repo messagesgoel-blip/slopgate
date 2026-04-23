@@ -97,7 +97,7 @@ func slp056MatchesPrivateKey(content string) bool {
 		strings.Contains(lower, "read_file") || strings.Contains(rhs, "(") || strings.Contains(rhs, ".") {
 		return false
 	}
-	return false
+	return true
 }
 
 func (r SLP056) Check(d *diff.Diff) []Finding {

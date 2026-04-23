@@ -17,8 +17,8 @@ func (SLP060) Description() string {
 	return "interface with few struct declarations found — may be premature abstraction"
 }
 
-var slp060InterfaceDeclPattern = regexp.MustCompile(`^\s*type\s+(\w+)\s+interface\b`)
-var slp060StructDeclPattern = regexp.MustCompile(`^\s*type\s+(\w+)\s+struct\b`)
+var slp060InterfaceDeclPattern = regexp.MustCompile(`^[+\s]*type\s+(\w+)\s+interface\b`)
+var slp060StructDeclPattern = regexp.MustCompile(`^[+\s]*type\s+(\w+)\s+struct\b`)
 
 func (r SLP060) Check(d *diff.Diff) []Finding {
 	var out []Finding
