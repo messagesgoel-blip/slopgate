@@ -19,7 +19,9 @@ func (SLP053) Description() string {
 }
 
 // configKeyPattern matches lines that look like config key = value.
-var configKeyPattern = regexp.MustCompile(`(?i)(timeout|limit|max|min|retry|delay|wait|ttl|expire|batch)\s*[:=]\s*(\d+)`)
+var configKeyPattern = regexp.MustCompile(`(?i)\b(timeout|limit|max|min|retry|delay|wait|ttl|expire|batch)\b\s*[:=]\s*(\d+)`)
+
+var slp053InlineCommentPattern = regexp.MustCompile(`\s(?://|#|;|--)\s*\S`)
 
 func (r SLP053) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -41,13 +43,13 @@ func (r SLP053) Check(d *diff.Diff) []Finding {
 					prevAddedComment = true
 					continue
 				}
-				m := configKeyPattern.FindStringSubmatch(content)
+				m := configKeyPattern.FindStringSubmatchIndex(content)
 				if m == nil {
 					prevAddedComment = false
 					continue
 				}
-				key, val := m[1], m[2]
-				if !prevAddedComment {
+				key, val := content[m[2]:m[3]], content[m[4]:m[5]]
+				if !prevAddedComment && !slp053InlineCommentPattern.MatchString(content[m[1]:]) {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),

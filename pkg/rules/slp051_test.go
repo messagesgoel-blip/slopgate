@@ -78,6 +78,60 @@ func TestSLP051_IgnoresMethodCalls(t *testing.T) {
 	}
 }
 
+func TestSLP051_IgnoresCallsInsideCommentsAndStrings(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,2 +1,6 @@
+ package a
+
++func Run() {
++	// helper()
++	println("helper()")
++}
+`)
+	got := SLP051{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for comments/strings, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP051_IgnoresGenericLocalFunctions(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,2 +1,7 @@
+ package a
+
++func helper[T any](v T) T { return v }
++
++func Run() {
++	helper(1)
++}
+`)
+	got := SLP051{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for generic local function, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP051_IgnoresPredeclaredTypeConversions(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,2 +1,5 @@
+ package a
+
++func Run(v []byte) {
++	_ = string(v)
++}
+`)
+	got := SLP051{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for string conversion, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP051_Description(t *testing.T) {
 	r := SLP051{}
 	if r.ID() != "SLP051" {

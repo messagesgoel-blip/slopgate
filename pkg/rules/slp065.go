@@ -29,7 +29,7 @@ var slp065ErrAssignLHS = regexp.MustCompile(`(^|[^a-zA-Z0-9_])err\s*(:=|=)`)
 var slp065FuncCall = regexp.MustCompile(`\w+\s*\(`)
 var slp065BlankLHS = regexp.MustCompile(`(^|[^a-zA-Z0-9_])_\s*(:=|=|,)`)
 var slp065ErrCheck = regexp.MustCompile(`if\s+err\s*!=\s*nil`)
-var slp065InlineErrInit = regexp.MustCompile(`if\s+err\s*:=.*;\s*err\s*!=\s*nil`)
+var slp065InlineErrInit = regexp.MustCompile(`if\s+[^;]*\berr\s*:=.*;\s*err\s*!=\s*nil`)
 var slp065ExplicitSuppression = regexp.MustCompile(`^\s*_\s*=`)
 var slp065NamedErrOnLHS = regexp.MustCompile(`_\s*,\s*err\s*:?=`)
 

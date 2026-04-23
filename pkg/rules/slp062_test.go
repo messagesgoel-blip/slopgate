@@ -110,6 +110,52 @@ func TestSLP062_NoFireForNonGo(t *testing.T) {
 	}
 }
 
+func TestSLP062_FiresOnMultilineSignatureOver50Lines(t *testing.T) {
+	var sb strings.Builder
+	sb.WriteString(`diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,1 +1,56 @@
+ package foo
++func Big(
++	arg int,
++) int {
+`)
+	for i := 0; i < 49; i++ {
+		sb.WriteString("+\t_ = arg\n")
+	}
+	sb.WriteString("+\treturn arg\n")
+	sb.WriteString("+}\n")
+	d := parseDiff(t, sb.String())
+	got := SLP062{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for multiline signature, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP062_NoFireAcrossDisjointAddedRegions(t *testing.T) {
+	var sb strings.Builder
+	sb.WriteString(`diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,1 +1,4 @@
+ package foo
++func Big() {
++	_ = 1
++	_ = 2
+@@ -20,1 +23,52 @@
+`)
+	for i := 0; i < 51; i++ {
+		sb.WriteString("+\t_ = 3\n")
+	}
+	sb.WriteString("+}\n")
+	d := parseDiff(t, sb.String())
+	got := SLP062{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings across disjoint added regions, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP062_Description(t *testing.T) {
 	r := SLP062{}
 	if r.ID() != "SLP062" {

@@ -35,6 +35,8 @@ var mapIndexRe = regexp.MustCompile(`\b([a-zA-Z_]\w*)\s*\[`)
 
 // mutexDeclRe matches mutex declarations, capturing the variable name.
 var mutexDeclRe = regexp.MustCompile(`\b(\w+)\s+sync\.(?:Mutex|RWMutex)\b`)
+var syncMapDeclRe = regexp.MustCompile(`(?:var\s+(\w+)\s+sync\.Map\b|(\w+)\s*(?::=|=)\s*sync\.Map(?:\{\})?)`)
+var slp066GoroutineRe = regexp.MustCompile(`\bgo\s+(?:func\s*\(|[A-Za-z_]\w*(?:\.\w+)?\s*\()`)
 
 // indexedMapIdents returns the set of identifier names used in map index
 // expressions (e.g., "m" from "m[key]"), excluding slice/array type patterns
@@ -57,7 +59,10 @@ func indexedMapIdents(line string) []string {
 //  1. A mutex variable whose name contains the map name (e.g., cacheMu guards cache).
 //  2. A mutex variable declared within 5 lines of the map declaration (proximity heuristic).
 //  3. sync.Map usage (inherently safe).
-func guardedByMutex(mapName string, added []diff.Line) bool {
+func guardedByMutex(mapName string, added []diff.Line, syncMapNames map[string]bool) bool {
+	if syncMapNames[mapName] {
+		return true
+	}
 	// Find declaration line index for the map variable.
 	mapDeclIdx := -1
 	for i, ln := range added {
@@ -81,25 +86,20 @@ func guardedByMutex(mapName string, added []diff.Line) bool {
 		idx  int
 	}
 	var mutexes []mutexInfo
-	hasSyncMap := false
 	for i, ln := range added {
-		if strings.Contains(ln.Content, "sync.Map") {
-			hasSyncMap = true
-		}
 		if m := mutexDeclRe.FindStringSubmatch(ln.Content); m != nil {
 			mutexes = append(mutexes, mutexInfo{name: m[1], idx: i})
 		}
-	}
-
-	if hasSyncMap {
-		return true
 	}
 
 	for _, mu := range mutexes {
 		// Guard by naming convention: mutex name contains map name (e.g., cacheMu, muCache).
 		lowerMu := strings.ToLower(mu.name)
 		lowerMap := strings.ToLower(mapName)
-		if strings.Contains(lowerMu, lowerMap) || strings.Contains(lowerMap, lowerMu) {
+		if strings.Contains(lowerMu, lowerMap) {
+			return true
+		}
+		if len(lowerMu) >= 3 && strings.Contains(lowerMap, lowerMu) {
 			return true
 		}
 		// Guard by proximity: mutex declared within 5 lines of map declaration.
@@ -123,9 +123,22 @@ func (r SLP066) Check(d *diff.Diff) []Finding {
 			continue
 		}
 		added := f.AddedLines()
+		syncMapNames := make(map[string]bool)
+		for _, ln := range added {
+			if m := syncMapDeclRe.FindStringSubmatch(ln.Content); m != nil {
+				name := m[1]
+				if name == "" {
+					name = m[2]
+				}
+				if name != "" {
+					syncMapNames[name] = true
+				}
+			}
+		}
 		hasConcurrent := false
 		for _, ln := range added {
-			if strings.Contains(ln.Content, "go ") || strings.Contains(ln.Content, "sync.WaitGroup") {
+			clean := stripCommentAndStrings(ln.Content)
+			if slp066GoroutineRe.MatchString(clean) || strings.Contains(clean, "sync.WaitGroup") {
 				hasConcurrent = true
 				break
 			}
@@ -136,11 +149,11 @@ func (r SLP066) Check(d *diff.Diff) []Finding {
 		// Track which map identifiers have already been reported to avoid duplicates.
 		reported := make(map[string]bool)
 		for _, ln := range added {
-			for _, mapIdent := range indexedMapIdents(ln.Content) {
+			for _, mapIdent := range indexedMapIdents(stripCommentAndStrings(ln.Content)) {
 				if reported[mapIdent] {
 					continue
 				}
-				if guardedByMutex(mapIdent, added) {
+				if guardedByMutex(mapIdent, added, syncMapNames) {
 					continue
 				}
 				reported[mapIdent] = true

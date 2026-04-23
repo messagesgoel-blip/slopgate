@@ -65,6 +65,29 @@ func resourceVar(line string) string {
 	return ""
 }
 
+func slp067BraceDelta(line string) int {
+	clean := stripCommentAndStrings(line)
+	return strings.Count(clean, "{") - strings.Count(clean, "}")
+}
+
+func slp067ScopeDepth(added []diff.Line, end int) int {
+	depth := 0
+	for i := 0; i <= end && i < len(added); i++ {
+		depth += slp067BraceDelta(added[i].Content)
+	}
+	return depth
+}
+
+func slp067LineHasClose(line, varName string) bool {
+	if varName == "" {
+		return strings.Contains(line, ".Close()") || strings.Contains(line, "defer")
+	}
+	return strings.Contains(line, varName+".Close()") ||
+		strings.Contains(line, varName+".Body.Close()") ||
+		strings.Contains(line, "defer "+varName+".") ||
+		strings.Contains(line, "defer "+varName+".Body.")
+}
+
 func (r SLP067) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -78,30 +101,29 @@ func (r SLP067) Check(d *diff.Diff) []Finding {
 			}
 			varName := resourceVar(ln.Content)
 			foundClose := false
+			startDepth := slp067ScopeDepth(added, i)
+			runningDepth := startDepth
 			for j := i + 1; j < len(added); j++ {
 				next := added[j].Content
-				// Check for defer varName.Close() or defer varName.xxx.Close().
-				if varName != "" {
-					if strings.Contains(next, varName+".Close()") ||
-						strings.Contains(next, "defer "+varName+".") {
-						foundClose = true
-						break
-					}
+				if slp067LineHasClose(next, varName) {
+					foundClose = true
+					break
 				}
 				// Check for anonymous defer closure: "defer func() { ... varName.Close() ... }()"
 				if strings.Contains(next, "defer func(") || strings.Contains(next, "defer func ()") {
 					// Scan the anon-defer block for a Close() call.
+					blockDepth := runningDepth + slp067BraceDelta(next)
 					for k := j + 1; k < len(added) && k < j+10; k++ {
 						blockLine := added[k].Content
-						if varName != "" && strings.Contains(blockLine, varName+".Close()") {
-							foundClose = true
-							break
-						}
-						if varName == "" && strings.Contains(blockLine, ".Close()") {
+						if slp067LineHasClose(blockLine, varName) {
 							foundClose = true
 							break
 						}
 						if strings.Contains(blockLine, "}()") {
+							break
+						}
+						blockDepth += slp067BraceDelta(blockLine)
+						if blockDepth < startDepth {
 							break
 						}
 					}
@@ -109,12 +131,9 @@ func (r SLP067) Check(d *diff.Diff) []Finding {
 						break
 					}
 				}
-				// Fallback: any .Close() or defer if we couldn't identify var.
-				if varName == "" {
-					if strings.Contains(next, ".Close()") || strings.Contains(next, "defer") {
-						foundClose = true
-						break
-					}
+				runningDepth += slp067BraceDelta(next)
+				if runningDepth < startDepth {
+					break
 				}
 			}
 			if !foundClose {

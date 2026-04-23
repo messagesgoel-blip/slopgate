@@ -68,6 +68,21 @@ func TestSLP058_IgnoresPythonDBPlaceholders(t *testing.T) {
 	}
 }
 
+func TestSLP058_FiresOnPythonSQLConcat(t *testing.T) {
+	d := parseDiff(t, `diff --git a/db.py b/db.py
+--- a/db.py
++++ b/db.py
+@@ -1,2 +1,3 @@
+ def get_user(id):
++
++    cursor.execute("SELECT * FROM users WHERE id = " + id)
+`)
+	got := SLP058{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for Python SQL concatenation, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP058_IgnoresPlainSQL(t *testing.T) {
 	d := parseDiff(t, `diff --git a/db.go b/db.go
 --- a/db.go

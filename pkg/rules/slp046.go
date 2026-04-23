@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -30,6 +31,7 @@ func callPattern(funcName string) *regexp.Regexp {
 func (r SLP046) Check(d *diff.Diff) []Finding {
 	// fileFuncs maps file path -> set of function names defined in that file
 	fileFuncs := make(map[string]map[string]bool)
+	filePkgs := make(map[string]string)
 	// fileBodies maps file path -> concatenated added lines content (for call scanning)
 	fileBodies := make(map[string]string)
 
@@ -37,6 +39,7 @@ func (r SLP046) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || !isGoFile(f.Path) {
 			continue
 		}
+		filePkgs[f.Path] = slp046PackageName(f)
 		funcs := make(map[string]bool)
 		var bodyParts []string
 		for _, ln := range f.AddedLines() {
@@ -68,6 +71,9 @@ func (r SLP046) Check(d *diff.Diff) []Finding {
 			if fileA == fileB {
 				continue
 			}
+			if filePkgs[fileA] != "" && filePkgs[fileA] == filePkgs[fileB] {
+				continue
+			}
 			bodyB := fileBodies[fileB]
 			for funcName := range funcsA {
 				// Skip if fileB also defines this function (duplicate name).
@@ -90,4 +96,23 @@ func (r SLP046) Check(d *diff.Diff) []Finding {
 	}
 
 	return out
+}
+
+func slp046PackageName(f diff.File) string {
+	for _, h := range f.Hunks {
+		for _, ln := range h.Lines {
+			if ln.Kind == diff.LineDelete {
+				continue
+			}
+			fields := strings.Fields(strings.TrimSpace(ln.Content))
+			if len(fields) >= 2 && fields[0] == "package" {
+				return fields[1]
+			}
+		}
+	}
+	dir := filepath.Base(filepath.Dir(f.Path))
+	if dir == "." || dir == string(filepath.Separator) {
+		return ""
+	}
+	return dir
 }

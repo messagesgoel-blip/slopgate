@@ -20,7 +20,8 @@ func (SLP069) Description() string {
 }
 
 var snakePattern = regexp.MustCompile(`^[a-z]+_[a-z_]+$`)
-var camelPattern = regexp.MustCompile(`^[A-Z][a-zA-Z0-9]+$`)
+var pascalPattern = regexp.MustCompile(`^[A-Z][a-zA-Z0-9]*$`)
+var lowerCamelPattern = regexp.MustCompile(`^[a-z]+(?:[A-Z][a-zA-Z0-9]*)+$`)
 
 func (r SLP069) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -44,31 +45,33 @@ func (r SLP069) Check(d *diff.Diff) []Finding {
 		}
 		dir := filepath.Dir(f.Path)
 		info := &fileInfo{path: f.Path}
-		for _, ln := range f.AddedLines() {
-			// Use Go scanner to extract identifiers only, skipping strings/comments.
-			fs := token.NewFileSet()
-			file := fs.AddFile(f.Path, fs.Base(), len(ln.Content))
-			var s scanner.Scanner
-			s.Init(file, []byte(ln.Content), nil, scanner.ScanComments)
-			for {
-				_, tok, lit := s.Scan()
-				if tok == token.EOF {
-					break
-				}
-				if tok != token.IDENT {
-					continue
-				}
-				if !info.hasSnake && snakePattern.MatchString(lit) {
-					info.hasSnake = true
-					info.firstSnakeLine = ln.NewLineNo
-					info.firstSnakeSnippet = strings.TrimSpace(ln.Content)
-				}
-				if !info.hasCamel && camelPattern.MatchString(lit) {
-					info.hasCamel = true
-				}
-				if info.hasSnake && info.hasCamel {
-					break
-				}
+		source, addedLines, snippets := slp069Source(f.AddedLines())
+		fs := token.NewFileSet()
+		file := fs.AddFile(f.Path, fs.Base(), len(source))
+		var s scanner.Scanner
+		s.Init(file, []byte(source), nil, scanner.ScanComments)
+		for {
+			pos, tok, lit := s.Scan()
+			if tok == token.EOF {
+				break
+			}
+			if tok != token.IDENT {
+				continue
+			}
+			line := fs.Position(pos).Line
+			if !addedLines[line] {
+				continue
+			}
+			if !info.hasSnake && snakePattern.MatchString(lit) {
+				info.hasSnake = true
+				info.firstSnakeLine = line
+				info.firstSnakeSnippet = snippets[line]
+			}
+			if !info.hasCamel && (pascalPattern.MatchString(lit) || lowerCamelPattern.MatchString(lit)) {
+				info.hasCamel = true
+			}
+			if info.hasSnake && info.hasCamel {
+				break
 			}
 		}
 		byDir[dir] = append(byDir[dir], info)
@@ -101,4 +104,24 @@ func (r SLP069) Check(d *diff.Diff) []Finding {
 	}
 
 	return out
+}
+
+func slp069Source(added []diff.Line) (string, map[int]bool, map[int]string) {
+	maxLine := 0
+	lineContent := make(map[int]string, len(added))
+	addedLines := make(map[int]bool, len(added))
+	snippets := make(map[int]string, len(added))
+	for _, ln := range added {
+		if ln.NewLineNo > maxLine {
+			maxLine = ln.NewLineNo
+		}
+		lineContent[ln.NewLineNo] = ln.Content
+		addedLines[ln.NewLineNo] = true
+		snippets[ln.NewLineNo] = strings.TrimSpace(ln.Content)
+	}
+	lines := make([]string, maxLine)
+	for i := 1; i <= maxLine; i++ {
+		lines[i-1] = lineContent[i]
+	}
+	return strings.Join(lines, "\n"), addedLines, snippets
 }

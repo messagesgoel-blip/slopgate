@@ -16,12 +16,33 @@ func (SLP059) Description() string {
 	return "unsanitized os/exec command with user input"
 }
 
-var stringLiteralPattern = regexp.MustCompile(`"[^"]*"`)
 var goIdentPattern = regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\b`)
 var execCommandRe = regexp.MustCompile(`\bexec\.Command\s*\(`)
 
-func stripQuotedStrings(s string) string {
-	return stringLiteralPattern.ReplaceAllString(s, "")
+func slp059CollectExecCall(added []diff.Line, start int) string {
+	var parts []string
+	depth := 0
+	foundCall := false
+	for i := start; i < len(added); i++ {
+		if i > start && added[i].NewLineNo != added[i-1].NewLineNo+1 {
+			break
+		}
+		clean := stripCommentAndStrings(added[i].Content)
+		if !foundCall {
+			m := execCommandRe.FindStringIndex(clean)
+			if m == nil {
+				break
+			}
+			clean = clean[m[0]:]
+			foundCall = true
+		}
+		parts = append(parts, clean)
+		depth += strings.Count(clean, "(") - strings.Count(clean, ")")
+		if foundCall && depth <= 0 {
+			break
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 func (r SLP059) Check(d *diff.Diff) []Finding {
@@ -30,20 +51,22 @@ func (r SLP059) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || !strings.HasSuffix(f.Path, ".go") {
 			continue
 		}
-		for _, ln := range f.AddedLines() {
-			// Find exec.Command call using word-boundary regex.
-			m := execCommandRe.FindStringIndex(ln.Content)
-			if m == nil {
+		added := f.AddedLines()
+		for i, ln := range added {
+			cleanLine := stripCommentAndStrings(ln.Content)
+			if execCommandRe.FindStringIndex(cleanLine) == nil {
 				continue
 			}
-			rest := ln.Content[m[1]:]
-			argEnd := strings.Index(rest, ")")
-			if argEnd == -1 {
-				argEnd = len(rest)
+			call := slp059CollectExecCall(added, i)
+			if call == "" {
+				continue
 			}
-			args := rest[:argEnd]
-			// Strip string literals before checking for interpolation.
-			unquoted := stripQuotedStrings(args)
+			callMatch := execCommandRe.FindStringIndex(call)
+			if callMatch == nil {
+				continue
+			}
+			args := call[callMatch[1]:]
+			unquoted := args
 			// Any interpolation or concatenation is an immediate red flag.
 			if strings.Contains(unquoted, "$") || strings.Contains(unquoted, "+") || strings.Contains(unquoted, "fmt.Sprintf") {
 				out = append(out, Finding{

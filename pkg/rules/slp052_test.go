@@ -72,6 +72,33 @@ diff --git a/a/foo_test.go b/a/foo_test.go
 	}
 }
 
+func TestSLP052_FiresOnProdDeleteWithTestDelete(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,5 +1,2 @@
+ package a
+
+-func OldFeature() {
+-	return 42
+-}
+
+diff --git a/a/foo_test.go b/a/foo_test.go
+--- a/a/foo_test.go
++++ b/a/foo_test.go
+@@ -1,5 +1,2 @@
+ package a
+
+-func TestOldFeature(t *testing.T) {
+-	OldFeature()
+-}
+`)
+	got := SLP052{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for deleted production code plus deleted tests, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP052_Description(t *testing.T) {
 	r := SLP052{}
 	if r.ID() != "SLP052" {

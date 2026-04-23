@@ -21,6 +21,12 @@ var langAgnosticDynamic = []struct {
 	desc string
 }{
 	{regexp.MustCompile(`\beval\s*\(`), "eval("},
+}
+
+var jsDynamic = []struct {
+	re   *regexp.Regexp
+	desc string
+}{
 	{regexp.MustCompile(`\bnew\s+Function\s*\(`), "new Function("},
 	{regexp.MustCompile(`\bFunction\s*\(`), "Function("},
 }
@@ -40,6 +46,7 @@ var goDynamic = []struct {
 }{
 	{regexp.MustCompile(`\breflect\.Value\.Call\b`), "reflect.Value.Call"},
 	{regexp.MustCompile(`(?m)^\s*(?:import\s+"unsafe"|_\s*"unsafe")`), `import "unsafe"`},
+	{regexp.MustCompile(`(?m)^\s*"unsafe"\s*$`), `import "unsafe"`},
 	{regexp.MustCompile(`\bunsafe\.(Pointer|Sizeof|Alignof|Offsetof|Add|Slice)\b`), "unsafe.*"},
 }
 
@@ -58,6 +65,16 @@ func (r SLP057) Check(d *diff.Diff) []Finding {
 					matched = true
 					desc = p.desc
 					break
+				}
+			}
+
+			if !matched && isJSOrTSFile(f.Path) {
+				for _, p := range jsDynamic {
+					if p.re.MatchString(ln.Content) {
+						matched = true
+						desc = p.desc
+						break
+					}
 				}
 			}
 

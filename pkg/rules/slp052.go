@@ -30,7 +30,7 @@ func isTestPath(path string) bool {
 func (r SLP052) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	var prodDeleteCount int
-	var testAdd bool
+	var testTouched bool
 	for _, f := range d.Files {
 		lowerPath := strings.ToLower(f.Path)
 		isTest := isTestPath(lowerPath)
@@ -39,19 +39,19 @@ func (r SLP052) Check(d *diff.Diff) []Finding {
 				if ln.Kind == diff.LineDelete && !isTest {
 					prodDeleteCount++
 				}
-				if ln.Kind == diff.LineAdd && isTest {
-					testAdd = true
+				if isTest && (ln.Kind == diff.LineAdd || ln.Kind == diff.LineDelete) {
+					testTouched = true
 				}
 			}
 		}
 	}
-	if prodDeleteCount >= 3 && testAdd {
+	if prodDeleteCount >= 3 && testTouched {
 		out = append(out, Finding{
 			RuleID:   r.ID(),
 			Severity: r.DefaultSeverity(),
 			File:     "",
 			Line:     0,
-			Message:  "production code deleted while tests modified — verify features not removed to fix tests",
+			Message:  r.Description(),
 			Snippet:  "",
 		})
 	}

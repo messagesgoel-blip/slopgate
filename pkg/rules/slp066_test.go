@@ -110,6 +110,73 @@ func TestSLP066_NoFireWithSyncMap(t *testing.T) {
 	}
 }
 
+func TestSLP066_SyncMapDoesNotMaskRegularMap(t *testing.T) {
+	d := parseDiff(t, `diff --git a/worker.go b/worker.go
+--- a/worker.go
++++ b/worker.go
+@@ -1,1 +1,9 @@
+ package worker
++
++var safe sync.Map
++var cache = map[string]int{}
++
++func Run() {
++	go updateCache()
++	cache["key"] = 1
++}
+`)
+	got := SLP066{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for regular map even when sync.Map exists, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP066_ShortMutexNameDoesNotMatchBySubstring(t *testing.T) {
+	d := parseDiff(t, `diff --git a/worker.go b/worker.go
+--- a/worker.go
++++ b/worker.go
+@@ -1,1 +1,15 @@
+ package worker
++
++var summary = map[string]int{}
++var pad1 int
++var pad2 int
++var pad3 int
++var pad4 int
++var pad5 int
++var pad6 int
++var mu sync.Mutex
++
++func Run() {
++	go updateSummary()
++	summary["key"] = 1
++}
+`)
+	got := SLP066{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for short mutex-name substring mismatch, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP066_IgnoresGoInComments(t *testing.T) {
+	d := parseDiff(t, `diff --git a/worker.go b/worker.go
+--- a/worker.go
++++ b/worker.go
+@@ -1,1 +1,6 @@
+ package worker
++
++var cache = map[string]int{}
++// TODO: go fix this later
++func Run() {
++	cache["key"] = 1
++}
+`)
+	got := SLP066{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when only comments contain 'go ', got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP066_Meta(t *testing.T) {
 	r := SLP066{}
 	if r.ID() != "SLP066" {

@@ -52,39 +52,8 @@ func (r SLP062) Check(d *diff.Diff) []Finding {
 			// Extract function name for the message.
 			funcName := extractFuncName(trimmed)
 			startLine := ln.NewLineNo
-			// Brace depth counting on THIS line only (strip string literals and comments first).
-			clean := stripGoLiteralsAndComments(ln.Content)
-			depth := strings.Count(clean, "{") - strings.Count(clean, "}")
-			if depth <= 0 {
-				// Opening brace is on a subsequent added line.
-				j := i + 1
-				for j < len(added) && depth <= 0 {
-					cleanNext := stripGoLiteralsAndComments(added[j].Content)
-					depth += strings.Count(cleanNext, "{") - strings.Count(cleanNext, "}")
-					j++
-				}
-				if depth <= 0 {
-					continue
-				}
-				bodyLines, nextIdx := countBodyLines(added, j, depth)
-				if bodyLines > 50 {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     startLine,
-						Message:  "function " + funcName + " is " + strconv.Itoa(bodyLines) + " lines — consider breaking it up",
-						Snippet:  trimmed,
-					})
-				}
-				if nextIdx > i {
-					i = nextIdx
-				}
-				continue
-			}
-			// Opening brace is on the signature line.
-			bodyLines, nextIdx := countBodyLines(added, i+1, depth)
-			if bodyLines > 50 {
+			bodyLines, nextIdx, closed := slp062CountFunctionLines(added, i)
+			if closed && bodyLines > 50 {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
@@ -102,19 +71,31 @@ func (r SLP062) Check(d *diff.Diff) []Finding {
 	return out
 }
 
-// countBodyLines counts lines from index `start` in `added` until `depth`
-// reaches 0, using cleaned (literal/comment-free) content for brace counting.
-// It returns the number of body lines and the last consumed index.
-func countBodyLines(added []diff.Line, start, depth int) (int, int) {
-	bodyLines := 1 // signature counts as part of the function
-	j := start
-	for j < len(added) && depth > 0 {
+// slp062CountFunctionLines counts added lines belonging to the function
+// starting at `start`. It stops when the function scope closes or when added
+// lines become non-contiguous, and reports whether the function was fully
+// closed within the scanned region.
+func slp062CountFunctionLines(added []diff.Line, start int) (int, int, bool) {
+	bodyLines := 0
+	depth := 0
+	started := false
+	last := start
+	for j := start; j < len(added); j++ {
+		if j > start && added[j].NewLineNo != added[j-1].NewLineNo+1 {
+			return bodyLines, last, false
+		}
 		bodyLines++
 		clean := stripGoLiteralsAndComments(added[j].Content)
+		if strings.Contains(clean, "{") {
+			started = true
+		}
 		depth += strings.Count(clean, "{") - strings.Count(clean, "}")
-		j++
+		last = j
+		if started && depth <= 0 {
+			return bodyLines, last, true
+		}
 	}
-	return bodyLines, j - 1
+	return bodyLines, last, false
 }
 
 // stripGoLiteralsAndComments removes Go string literals, comments, and rune

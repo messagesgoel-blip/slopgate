@@ -24,8 +24,6 @@ func (SLP050) Description() string {
 var (
 	// funcDeclRe captures the function name and parenthesised parameter list.
 	slp050FuncDeclRe = regexp.MustCompile(`^func\s+(?:\([^)]+\)\s+)?([A-Za-z_]\w*)\s*\((.*)\)`)
-	// validationRe matches common nil/empty checks.
-	slp050ValidationRe = regexp.MustCompile(`==\s*nil|==\s*""|==\s*0|len\s*\(\w+\)\s*==\s*0`)
 )
 
 func (r SLP050) Check(d *diff.Diff) []Finding {
@@ -62,23 +60,28 @@ func (r SLP050) Check(d *diff.Diff) []Finding {
 				continue
 			}
 
-			// Scan subsequent added lines for validation using word-boundary matching.
+			paramChecks := make(map[string]*slp050ParamChecks, len(paramNames))
+			for _, p := range paramNames {
+				paramChecks[p] = newSLP050ParamChecks(p)
+			}
+
+			// Scan subsequent added lines for validation until the current function ends.
 			validated := make(map[string]bool)
-			for j := i + 1; j < len(added); j++ {
+			depth := slp050BraceDelta(ln.Content)
+			bodyStarted := strings.Contains(stripCommentAndStrings(ln.Content), "{")
+			for j := i + 1; j < len(added) && (!bodyStarted || depth > 0); j++ {
 				next := added[j]
-				c := next.Content
-				// Stop scanning at the next top-level declaration.
-				trimmed := strings.TrimSpace(c)
-				if strings.HasPrefix(trimmed, "func ") ||
-					strings.HasPrefix(trimmed, "type ") {
-					break
-				}
-				if slp050ValidationRe.MatchString(c) {
+				clean := stripCommentAndStrings(next.Content)
+				if clean != "" {
 					for _, p := range paramNames {
-						if paramRegex(p).MatchString(c) {
+						if paramChecks[p].matches(clean) {
 							validated[p] = true
 						}
 					}
+				}
+				depth += slp050BraceDelta(next.Content)
+				if !bodyStarted && strings.Contains(clean, "{") {
+					bodyStarted = true
 				}
 			}
 
@@ -97,6 +100,34 @@ func (r SLP050) Check(d *diff.Diff) []Finding {
 		}
 	}
 	return out
+}
+
+type slp050ParamChecks struct {
+	nilCheck   *regexp.Regexp
+	emptyCheck *regexp.Regexp
+	lenCheck   *regexp.Regexp
+}
+
+func newSLP050ParamChecks(name string) *slp050ParamChecks {
+	ident := regexp.QuoteMeta(name)
+	return &slp050ParamChecks{
+		nilCheck: regexp.MustCompile(`\b` + ident + `\b\s*(?:==|!=)\s*nil|\bnil\s*(?:==|!=)\s*\b` + ident + `\b`),
+		emptyCheck: regexp.MustCompile(
+			`\b` + ident + `\b\s*(?:==|!=)\s*""|""\s*(?:==|!=)\s*\b` + ident + `\b`,
+		),
+		lenCheck: regexp.MustCompile(
+			`len\s*\(\s*` + ident + `\s*\)\s*(?:==|!=|>=|<=)\s*0|len\s*\(\s*` + ident + `\s*\)\s*>\s*0|len\s*\(\s*` + ident + `\s*\)\s*<\s*1`,
+		),
+	}
+}
+
+func (c *slp050ParamChecks) matches(line string) bool {
+	return c.nilCheck.MatchString(line) || c.emptyCheck.MatchString(line) || c.lenCheck.MatchString(line)
+}
+
+func slp050BraceDelta(line string) int {
+	clean := stripCommentAndStrings(line)
+	return strings.Count(clean, "{") - strings.Count(clean, "}")
 }
 
 // paramRegex returns a regex matching the parameter name as a bare identifier.

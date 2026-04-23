@@ -123,6 +123,48 @@ func TestSLP061_FiresOnPointerReturn(t *testing.T) {
 	}
 }
 
+func TestSLP061_FiresWhenFieldTypeContainsComma(t *testing.T) {
+	d := parseDiff(t, `diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,1 +1,8 @@
+ package foo
++type Config struct {
++	Handler func(a, b string)
++	Mode    string
++}
++func NewConfig() Config {
++	return Config{}
++}
+`)
+	got := SLP061{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when comma appears inside a field type, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP061_FiresOnMultilineSignaturePointerReturn(t *testing.T) {
+	d := parseDiff(t, `diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,1 +1,10 @@
+ package foo
++type User struct {
++	Name string
++}
++func NewUser(
++) *User {
++	return &User{
++		Name: "sanjay",
++	}
++}
+`)
+	got := SLP061{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for multiline pointer-return factory, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP061_Description(t *testing.T) {
 	r := SLP061{}
 	if r.ID() != "SLP061" {

@@ -68,6 +68,54 @@ func TestSLP059_IgnoresHardcodedArgs(t *testing.T) {
 	}
 }
 
+func TestSLP059_IgnoresCommentOnlyExecCommand(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,2 +1,3 @@
+ package main
++
++// exec.Command("sh", "-c", userInput)
+`)
+	got := SLP059{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for comment-only exec.Command, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP059_IgnoresHardcodedRawStrings(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,2 +1,3 @@
+ package main
++
++cmd := exec.Command(`+"`echo`"+`, `+"`hello`"+`)
+`)
+	got := SLP059{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for raw-string literals, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP059_FiresOnMultilineVariableArg(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,2 +1,6 @@
+ package main
++
++cmd := exec.Command(
++	"sh",
++	userInput,
++)
+`)
+	got := SLP059{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for multiline variable arg, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP059_IgnoresNonGoFile(t *testing.T) {
 	d := parseDiff(t, `diff --git a/script.py b/script.py
 --- a/script.py

@@ -22,8 +22,7 @@ var secretPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)secret\s*[:=]\s*["']\w+`),
 	regexp.MustCompile(`(?i)token\s*[:=]\s*["']\w+`),
 	regexp.MustCompile(`(?i)bearer\s+\w+`),
-	regexp.MustCompile(`(?i)aws_access_key_id\s*[:=]\s*\w+`),
-	regexp.MustCompile(`(?i)private_key\s*[:=]`),
+	regexp.MustCompile(`(?i)aws_access_key_id\s*[:=]\s*(?:"[^"]+"|'[^']+'|[A-Z0-9]{16,})`),
 }
 
 // skipWordsLower contains words that indicate example/test data, lowercased.
@@ -36,13 +35,55 @@ var skipWordsLower = map[string]bool{
 // tokenSplitRe splits a string into tokens on non-alphanumeric boundaries.
 var tokenSplitRe = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 
-func shouldSkip(content string) bool {
+func hasSkipWordToken(content string) bool {
 	lower := strings.ToLower(content)
 	tokens := tokenSplitRe.Split(lower, -1)
 	for _, tok := range tokens {
 		if skipWordsLower[tok] {
 			return true
 		}
+	}
+	return false
+}
+
+func slp056CommentOnlyLine(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	return strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") ||
+		strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") ||
+		strings.HasPrefix(trimmed, "--")
+}
+
+func slp056StripInlineComment(content string) string {
+	for _, marker := range []string{"//", "#", "--"} {
+		if idx := strings.Index(content, marker); idx >= 0 {
+			return content[:idx]
+		}
+	}
+	return content
+}
+
+func slp056ShouldSkip(content string) bool {
+	if slp056CommentOnlyLine(content) {
+		return hasSkipWordToken(content)
+	}
+	return hasSkipWordToken(slp056StripInlineComment(content))
+}
+
+func slp056MatchesPrivateKey(content string) bool {
+	re := regexp.MustCompile(`(?i)\bprivate_key\b\s*[:=]\s*(.*)$`)
+	m := re.FindStringSubmatch(content)
+	if m == nil {
+		return false
+	}
+	rhs := strings.TrimSpace(m[1])
+	if rhs == "" || strings.HasPrefix(rhs, `"`) || strings.HasPrefix(rhs, `'`) ||
+		strings.HasPrefix(rhs, "`") || strings.HasPrefix(strings.ToUpper(rhs), "-----BEGIN") {
+		return true
+	}
+	lower := strings.ToLower(rhs)
+	if strings.Contains(lower, "getenv") || strings.Contains(lower, "os.environ") ||
+		strings.Contains(lower, "read_file") || strings.Contains(rhs, "(") || strings.Contains(rhs, ".") {
+		return false
 	}
 	return false
 }
@@ -54,21 +95,27 @@ func (r SLP056) Check(d *diff.Diff) []Finding {
 			continue
 		}
 		for _, ln := range f.AddedLines() {
-			if shouldSkip(ln.Content) {
+			if slp056ShouldSkip(ln.Content) {
 				continue
 			}
-			for _, re := range secretPatterns {
-				if re.MatchString(ln.Content) {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "hardcoded secret pattern detected — use environment variables or a secret manager",
-						Snippet:  "[REDACTED]",
-					})
-					break
+			matched := slp056MatchesPrivateKey(ln.Content)
+			if !matched {
+				for _, re := range secretPatterns {
+					if re.MatchString(ln.Content) {
+						matched = true
+						break
+					}
 				}
+			}
+			if matched {
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
+					File:     f.Path,
+					Line:     ln.NewLineNo,
+					Message:  "hardcoded secret pattern detected — use environment variables or a secret manager",
+					Snippet:  "[REDACTED]",
+				})
 			}
 		}
 	}

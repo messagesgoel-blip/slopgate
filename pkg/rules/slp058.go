@@ -16,16 +16,12 @@ func (SLP058) Description() string {
 	return "SQL built with string concatenation"
 }
 
-var sqlConcatPattern = regexp.MustCompile(`(?i)(select|insert|update|delete|where|from|join).*(\+|\$\{)|fmt\.Sprintf.*(select|insert|update|delete|where|from|join)`)
+var sqlConcatPattern = regexp.MustCompile(`(?i)\b(select|insert|update|delete|where|from|join)\b.*(\+|\$\{)|fmt\.Sprintf.*\b(select|insert|update|delete|where|from|join)\b`)
 
 func (r SLP058) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
 		if f.IsDelete {
-			continue
-		}
-		// Skip Python files — %s in cursor.execute is a DB placeholder, not interpolation.
-		if strings.HasSuffix(strings.ToLower(f.Path), ".py") {
 			continue
 		}
 		for _, ln := range f.AddedLines() {

@@ -49,6 +49,27 @@ func TestSLP054_IgnoresNonGoFile(t *testing.T) {
 	}
 }
 
+func TestSLP054_IgnoresPackageMainOnlyForExactCmdSegment(t *testing.T) {
+	d := parseDiff(t, `diff --git a/cmd/server/main.go b/cmd/server/main.go
+--- a/cmd/server/main.go
++++ b/cmd/server/main.go
+@@ -1,1 +1,2 @@
++package main
+diff --git a/cmdserver/main.go b/cmdserver/main.go
+--- a/cmdserver/main.go
++++ b/cmdserver/main.go
+@@ -1,1 +1,2 @@
++package main
+`)
+	got := SLP054{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected only cmdserver/main.go to fire, got %d: %+v", len(got), got)
+	}
+	if got[0].File != "cmdserver/main.go" {
+		t.Fatalf("expected finding for cmdserver/main.go, got %+v", got[0])
+	}
+}
+
 func TestSLP054_Description(t *testing.T) {
 	r := SLP054{}
 	if r.ID() != "SLP054" {

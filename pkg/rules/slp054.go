@@ -24,13 +24,18 @@ func (r SLP054) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || !isGoFile(f.Path) {
 			continue
 		}
-		dir := filepath.Base(filepath.Dir(f.Path))
+		dirPath := filepath.Dir(f.Path)
+		dir := filepath.Base(dirPath)
+		if dir == "." || dir == string(filepath.Separator) {
+			continue
+		}
 		for _, ln := range f.AddedLines() {
-			content := strings.TrimSpace(ln.Content)
-			if !strings.HasPrefix(content, "package ") {
+			fields := strings.Fields(strings.TrimSpace(ln.Content))
+			if len(fields) < 2 || fields[0] != "package" {
 				continue
 			}
-			pkg := strings.TrimSpace(strings.TrimPrefix(content, "package "))
+			content := strings.TrimSpace(ln.Content)
+			pkg := fields[1]
 			// Strip _test suffix for test files.
 			expected := dir
 			if strings.HasSuffix(f.Path, "_test.go") {
@@ -40,7 +45,7 @@ func (r SLP054) Check(d *diff.Diff) []Finding {
 				}
 			}
 			// package main is valid in cmd/ directories regardless of dir name.
-			if pkg == "main" && strings.Contains(filepath.Dir(f.Path), "cmd") {
+			if pkg == "main" && slp054HasPathSegment(dirPath, "cmd") {
 				continue
 			}
 			if pkg != expected {
@@ -56,4 +61,15 @@ func (r SLP054) Check(d *diff.Diff) []Finding {
 		}
 	}
 	return out
+}
+
+func slp054HasPathSegment(path, segment string) bool {
+	for _, part := range strings.FieldsFunc(filepath.Clean(path), func(r rune) bool {
+		return r == '/' || r == '\\'
+	}) {
+		if part == segment {
+			return true
+		}
+	}
+	return false
 }

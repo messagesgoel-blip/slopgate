@@ -18,7 +18,8 @@ func (SLP051) Description() string {
 	return "call to potentially undefined function — implement or import it"
 }
 
-// goKeywords are Go control-flow keywords that are not function calls.
+// goKeywords are Go keywords, predeclared identifiers, builtins, and type
+// names that may legally appear before '(' without implying an undefined call.
 var goKeywords = map[string]bool{
 	"if": true, "for": true, "switch": true, "select": true,
 	"return": true, "defer": true, "go": true, "panic": true,
@@ -27,6 +28,13 @@ var goKeywords = map[string]bool{
 	"append": true, "copy": true, "delete": true, "close": true,
 	"complex": true, "real": true, "imag": true,
 	"min": true, "max": true, "clear": true,
+	"func": true,
+	"bool": true, "byte": true, "rune": true,
+	"string": true, "int": true, "int8": true, "int16": true, "int32": true, "int64": true,
+	"uint": true, "uint8": true, "uint16": true, "uint32": true, "uint64": true, "uintptr": true,
+	"float32": true, "float64": true, "complex64": true, "complex128": true,
+	"error": true, "any": true,
+	"true": true, "false": true, "nil": true,
 }
 
 // undefinedCallPattern matches a bare identifier followed immediately by '('.
@@ -38,14 +46,14 @@ func (r SLP051) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || !isGoFile(f.Path) {
 			continue
 		}
+		localFuncs := slp051LocalFuncs(f)
 		for _, h := range f.Hunks {
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
-				content := strings.TrimSpace(ln.Content)
-				// Skip comments.
-				if strings.HasPrefix(content, "//") {
+				content := strings.TrimSpace(stripCommentAndStrings(ln.Content))
+				if content == "" {
 					continue
 				}
 				// Find all bare calls.
@@ -59,7 +67,7 @@ func (r SLP051) Check(d *diff.Diff) []Finding {
 						continue
 					}
 					// Skip if there is a local func definition for this name somewhere in the file.
-					if hasLocalFunc(f, name) {
+					if localFuncs[name] {
 						continue
 					}
 					out = append(out, Finding{
@@ -78,20 +86,19 @@ func (r SLP051) Check(d *diff.Diff) []Finding {
 }
 
 // funcDefPattern matches a function/method definition.
-var funcDefPattern = regexp.MustCompile(`^func\s+(?:\([^)]+\)\s+)?([a-zA-Z_]\w*)\s*\(`)
+var funcDefPattern = regexp.MustCompile(`^func\s+(?:\([^)]+\)\s+)?([a-zA-Z_]\w*)(?:\s*\[[^\]]+\])?\s*\(`)
 
-func hasLocalFunc(f diff.File, name string) bool {
+func slp051LocalFuncs(f diff.File) map[string]bool {
+	localFuncs := make(map[string]bool)
 	for _, h := range f.Hunks {
 		for _, ln := range h.Lines {
-			if ln.Kind != diff.LineAdd {
+			if ln.Kind == diff.LineDelete {
 				continue
 			}
 			if m := funcDefPattern.FindStringSubmatch(strings.TrimSpace(ln.Content)); m != nil {
-				if m[1] == name {
-					return true
-				}
+				localFuncs[m[1]] = true
 			}
 		}
 	}
-	return false
+	return localFuncs
 }

@@ -122,6 +122,22 @@ func TestSLP065_NoFireForInlineErrInit(t *testing.T) {
 	}
 }
 
+func TestSLP065_NoFireForInlineTupleErrInit(t *testing.T) {
+	d := parseDiff(t, `diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,1 +1,3 @@
+ package foo
++if x, err := doSomething(); err != nil {
++	return
++}
+`)
+	got := SLP065{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for inline tuple if-init, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP065_Description(t *testing.T) {
 	r := SLP065{}
 	if r.ID() != "SLP065" {

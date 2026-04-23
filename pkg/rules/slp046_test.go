@@ -46,13 +46,19 @@ diff --git a/pkg/b/b.go b/pkg/b/b.go
 }
 
 func TestSLP046_IgnoresSamePackage(t *testing.T) {
-	d := parseDiff(t, `diff --git a/pkg/a/a.go b/pkg/a/a.go
---- a/pkg/a/a.go
-+++ b/pkg/a/a.go
-@@ -1,1 +1,4 @@
+	d := parseDiff(t, `diff --git a/pkg/a/helper.go b/pkg/a/helper.go
+--- a/pkg/a/helper.go
++++ b/pkg/a/helper.go
+@@ -1,1 +1,3 @@
  package a
 +
 +func Helper() {}
+diff --git a/pkg/a/local.go b/pkg/a/local.go
+--- a/pkg/a/local.go
++++ b/pkg/a/local.go
+@@ -1,1 +1,3 @@
+ package a
++
 +func Local() { Helper() }
 `)
 	got := SLP046{}.Check(d)

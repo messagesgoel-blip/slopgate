@@ -94,6 +94,67 @@ func TestSLP050_IgnoresValueType(t *testing.T) {
 	}
 }
 
+func TestSLP050_IgnoresLenGreaterThanZeroValidation(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,5 @@
+ package a
++
++func Do(s string) string {
++	if len(s) > 0 { return s }
++	return ""
++}
+`)
+	got := SLP050{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for len() > 0 validation, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP050_IgnoresCommentOnlyValidationText(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,5 @@
+ package a
++
++func Do(x *int) int {
++	// x == nil should be handled elsewhere
++	return *x
++}
+`)
+	got := SLP050{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when validation only appears in comments, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP050_StopsAtFunctionBoundary(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,9 @@
+ package a
++
++func First(x *int) int {
++	return *x
++}
++
++func Second(x *int) int {
++	if x == nil { return 0 }
++	return *x
++}
+`)
+	got := SLP050{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for the first unvalidated function, got %d: %+v", len(got), got)
+	}
+	if !strings.Contains(got[0].Message, "First") {
+		t.Fatalf("expected finding for First, got %+v", got[0])
+	}
+}
+
 func TestSLP050_Description(t *testing.T) {
 	r := SLP050{}
 	if r.ID() != "SLP050" {

@@ -70,6 +70,36 @@ func TestSLP053_FiresWhenCommentSeparatedByContextLine(t *testing.T) {
 	}
 }
 
+func TestSLP053_IgnoresInlineRationaleComment(t *testing.T) {
+	d := parseDiff(t, `diff --git a/config.yaml b/config.yaml
+--- a/config.yaml
++++ b/config.yaml
+@@ -1,2 +1,3 @@
+ app:
++  timeout: 3000 # chosen after measuring upstream latency
+   name: demo
+`)
+	got := SLP053{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings with inline rationale comment, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP053_IgnoresBoundarySubstringMatches(t *testing.T) {
+	d := parseDiff(t, `diff --git a/config.yaml b/config.yaml
+--- a/config.yaml
++++ b/config.yaml
+@@ -1,2 +1,3 @@
+ app:
++  minimum: 3
+   name: demo
+`)
+	got := SLP053{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for non-keyword boundary substring, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP053_Description(t *testing.T) {
 	r := SLP053{}
 	if r.ID() != "SLP053" {

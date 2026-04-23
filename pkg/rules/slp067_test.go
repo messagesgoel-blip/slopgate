@@ -81,6 +81,46 @@ func TestSLP067_NoFireWithExplicitClose(t *testing.T) {
 	}
 }
 
+func TestSLP067_NoFireWithExplicitBodyClose(t *testing.T) {
+	d := parseDiff(t, `diff --git a/client.go b/client.go
+--- a/client.go
++++ b/client.go
+@@ -1,1 +1,5 @@
+ package client
++
++func Fetch() {
++	resp, _ := http.Get("http://example.com")
++	resp.Body.Close()
++}
+`)
+	got := SLP067{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for explicit resp.Body.Close(), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP067_DoesNotUseLaterFunctionClose(t *testing.T) {
+	d := parseDiff(t, `diff --git a/client.go b/client.go
+--- a/client.go
++++ b/client.go
+@@ -1,1 +1,9 @@
+ package client
++
++func Fetch() {
++	resp, _ := http.Get("http://example.com")
++	_ = resp
++}
++
++func CloseLater() {
++	resp.Body.Close()
++}
+`)
+	got := SLP067{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when only a later function closes the resource, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP067_Meta(t *testing.T) {
 	r := SLP067{}
 	if r.ID() != "SLP067" {

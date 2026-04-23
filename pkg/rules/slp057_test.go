@@ -38,6 +38,21 @@ func TestSLP057_FiresOnNewFunction(t *testing.T) {
 	}
 }
 
+func TestSLP057_IgnoresFunctionCallOutsideJSTS(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,2 +1,3 @@
+ package main
++
++Function("x", "return x")
+`)
+	got := SLP057{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for Function() outside JS/TS, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP057_FiresOnPythonExec(t *testing.T) {
 	d := parseDiff(t, `diff --git a/main.py b/main.py
 --- a/main.py
@@ -98,6 +113,23 @@ func TestSLP057_FiresOnUnsafe(t *testing.T) {
 	got := SLP057{}.Check(d)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP057_FiresOnUnsafeImportBlockLine(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,2 +1,5 @@
+ package main
++
++import (
++	"unsafe"
++)
+`)
+	got := SLP057{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for unsafe import inside block, got %d: %+v", len(got), got)
 	}
 }
 

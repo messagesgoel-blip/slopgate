@@ -31,6 +31,7 @@ var slp061FactorySignatureMulti = regexp.MustCompile(`^func\s+(New\w*|Build\w*|N
 
 // slp061StructDef matches `type XXX struct {` and captures the name.
 var slp061StructDef = regexp.MustCompile(`^type\s+(\w+)\s+struct\s*\{`)
+var slp061MultiFieldNames = regexp.MustCompile(`^([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s+.+$`)
 
 func (r SLP061) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -73,9 +74,8 @@ func (r SLP061) Check(d *diff.Diff) []Finding {
 					if tagIdx >= 0 {
 						fieldPart = trimmed[:tagIdx]
 					}
-					if strings.Contains(fieldPart, ",") && strings.Contains(fieldPart, " ") {
-						// Comma-separated: count commas + 1.
-						structFields[structName] += strings.Count(fieldPart, ",") + 1
+					if m := slp061MultiFieldNames.FindStringSubmatch(fieldPart); m != nil {
+						structFields[structName] += strings.Count(m[1], ",") + 1
 					} else if strings.Contains(fieldPart, " ") {
 						structFields[structName]++
 					} else {
@@ -107,6 +107,7 @@ func (r SLP061) Check(d *diff.Diff) []Finding {
 					if strings.Contains(next, "{") {
 						// Extract the simple type name right before {
 						beforeBrace := strings.TrimSpace(strings.Split(next, "{")[0])
+						beforeBrace = strings.TrimSpace(strings.TrimPrefix(beforeBrace, ")"))
 						// Strip pointer star.
 						beforeBrace = strings.TrimPrefix(beforeBrace, "*")
 						if beforeBrace != "" && !strings.Contains(beforeBrace, " ") && !strings.Contains(beforeBrace, "(") {
