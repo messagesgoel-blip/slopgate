@@ -93,7 +93,8 @@ func TestSLP065_FiresForNamedErrOnLHSWithoutCheck(t *testing.T) {
 --- a/foo.go
 +++ b/foo.go
 @@ -1,1 +1,4 @@
-package foo
+ package foo
++
 +func Bar() {
 +	_, err := doSomething()
 +}

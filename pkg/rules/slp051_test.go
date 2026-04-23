@@ -151,7 +151,7 @@ func TestSLP051_IgnoresLocalTypeConversions(t *testing.T) {
 	}
 }
 
-func TestSLP051_Description(t *testing.T) {
+func TestSLP051_Meta(t *testing.T) {
 	r := SLP051{}
 	if r.ID() != "SLP051" {
 		t.Errorf("ID = %q", r.ID())
