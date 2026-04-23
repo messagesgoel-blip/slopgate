@@ -46,7 +46,7 @@ func (r SLP051) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || !isGoFile(f.Path) {
 			continue
 		}
-		localFuncs := slp051LocalFuncs(f)
+		localFuncs := slp051LocalSymbols(f)
 		for _, h := range f.Hunks {
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
@@ -88,17 +88,22 @@ func (r SLP051) Check(d *diff.Diff) []Finding {
 // funcDefPattern matches a function/method definition.
 var funcDefPattern = regexp.MustCompile(`^func\s+(?:\([^)]+\)\s+)?([a-zA-Z_]\w*)(?:\s*\[[^\]]+\])?\s*\(`)
 
-func slp051LocalFuncs(f diff.File) map[string]bool {
-	localFuncs := make(map[string]bool)
+var typeDefPattern = regexp.MustCompile(`^type\s+([a-zA-Z_]\w*)\b`)
+
+func slp051LocalSymbols(f diff.File) map[string]bool {
+	localSymbols := make(map[string]bool)
 	for _, h := range f.Hunks {
 		for _, ln := range h.Lines {
 			if ln.Kind == diff.LineDelete {
 				continue
 			}
 			if m := funcDefPattern.FindStringSubmatch(strings.TrimSpace(ln.Content)); m != nil {
-				localFuncs[m[1]] = true
+				localSymbols[m[1]] = true
+			}
+			if m := typeDefPattern.FindStringSubmatch(strings.TrimSpace(ln.Content)); m != nil {
+				localSymbols[m[1]] = true
 			}
 		}
 	}
-	return localFuncs
+	return localSymbols
 }
