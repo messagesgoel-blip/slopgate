@@ -98,6 +98,61 @@ func TestSLP059_IgnoresHardcodedRawStrings(t *testing.T) {
 	}
 }
 
+func TestSLP059_IgnoresLocalLiteralStringVariables(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,3 +1,6 @@
+ package main
++
++func run() {
++	programName := "echo"
++	cmd := exec.Command(programName, "hello")
++}
+`)
+	got := SLP059{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for local literal string variables, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP059_IgnoresTopLevelStringConst(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,3 +1,5 @@
+ package main
+ const programName = "echo"
+ func run() {
++	cmd := exec.Command(programName, "hello")
+ }
+`)
+	got := SLP059{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for top-level string const, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP059_FiresWhenLiteralVariableIsOutOfScope(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,3 +1,8 @@
+ package main
++
++func run(flag bool) {
++	if flag {
++		programName := "echo"
++	}
++	cmd := exec.Command(programName, "hello")
++}
+`)
+	got := SLP059{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for out-of-scope literal variable, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP059_FiresOnMultilineVariableArg(t *testing.T) {
 	d := parseDiff(t, `diff --git a/main.go b/main.go
 --- a/main.go
