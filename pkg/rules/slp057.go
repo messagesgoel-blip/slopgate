@@ -45,12 +45,12 @@ var goDynamic = []struct {
 	desc string
 }{
 	{regexp.MustCompile(`\breflect\.Value\.Call\b`), "reflect.Value.Call"},
-	{regexp.MustCompile(`(?m)^\s*(?:import\s+"unsafe"|_\s*"unsafe")`), `import "unsafe"`},
 	{regexp.MustCompile(`\bunsafe\.(Pointer|Sizeof|Alignof|Offsetof|Add|Slice)\b`), "unsafe.*"},
 }
 
 var slp057UnsafeImportBlockStartRe = regexp.MustCompile(`^\s*import\s*\(\s*$`)
 var slp057UnsafeImportSpecRe = regexp.MustCompile(`^\s*(?:_\s*)?"unsafe"\s*$`)
+var slp057SingleLineImportRe = regexp.MustCompile(`^\s*import\s+"unsafe"\s*$`)
 var slp057ImportBlockEndRe = regexp.MustCompile(`^\s*\)\s*$`)
 
 func (r SLP057) Check(d *diff.Diff) []Finding {
@@ -67,24 +67,36 @@ func (r SLP057) Check(d *diff.Diff) []Finding {
 				}
 				clean := strings.TrimSpace(stripCommentAndStrings(ln.Content))
 				rawTrimmed := strings.TrimSpace(ln.Content)
-				if isGoFile(f.Path) {
-					if slp057UnsafeImportBlockStartRe.MatchString(clean) {
-						inGoImportBlock = true
-					} else if inGoImportBlock && slp057ImportBlockEndRe.MatchString(clean) {
-						inGoImportBlock = false
-					}
-					if inGoImportBlock && ln.Kind == diff.LineAdd && slp057UnsafeImportSpecRe.MatchString(rawTrimmed) {
-						out = append(out, Finding{
-							RuleID:   r.ID(),
-							Severity: r.DefaultSeverity(),
-							File:     f.Path,
-							Line:     ln.NewLineNo,
-							Message:  "dynamic code execution detected — import \"unsafe\" is dangerous with untrusted input",
-							Snippet:  strings.TrimSpace(ln.Content),
-						})
-						continue
-					}
+			if isGoFile(f.Path) {
+				// Check for single-line import "unsafe".
+				if ln.Kind == diff.LineAdd && slp057SingleLineImportRe.MatchString(rawTrimmed) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "dynamic code execution detected — import \"unsafe\" is dangerous with untrusted input",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+					continue
 				}
+				if slp057UnsafeImportBlockStartRe.MatchString(clean) {
+					inGoImportBlock = true
+				} else if inGoImportBlock && slp057ImportBlockEndRe.MatchString(clean) {
+					inGoImportBlock = false
+				}
+				if inGoImportBlock && ln.Kind == diff.LineAdd && slp057UnsafeImportSpecRe.MatchString(rawTrimmed) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "dynamic code execution detected — import \"unsafe\" is dangerous with untrusted input",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+					continue
+				}
+			}
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
@@ -122,7 +134,7 @@ func (r SLP057) Check(d *diff.Diff) []Finding {
 				
 				if !matched && isGoFile(f.Path) {
 					for _, p := range goDynamic {
-						if p.re.MatchString(ln.Content) {
+						if p.re.MatchString(clean) {
 							matched = true
 							desc = p.desc
 							break
