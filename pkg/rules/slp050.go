@@ -141,20 +141,17 @@ func slp050CollectFuncHeader(lines []diff.Line, start, openParen int) (string, i
 		if i == start {
 			scanStart = openParen + 1
 		}
-		endIdx := len(content)
-
-		for j := scanStart; j < len(content); j++ {
+			for j := scanStart; j < len(content); j++ {
 			switch content[j] {
 			case '(':
 				depth++
 			case ')':
 				depth--
 				if depth == 0 {
-					endIdx = j + 1
 					if i > start {
 						b.WriteByte('\n')
 					}
-					b.WriteString(content[:endIdx])
+					b.WriteString(content[:j+1])
 					return b.String(), i, true
 				}
 			}
