@@ -100,9 +100,8 @@ func (r SLP048) Check(d *diff.Diff) []Finding {
 		if checkCount == 0 || checkCount == len(files) {
 			continue
 		}
-		// Flag the files that differ from the majority.
-		// Majority = at least one file checks, and some don't.
-		// We flag the minority side.
+		// Flag files missing `if err != nil` checks when the package mixes styles.
+		// This intentionally flags the no-check side.
 		for _, fi := range files {
 			if !fi.hasCheck {
 				out = append(out, Finding{
