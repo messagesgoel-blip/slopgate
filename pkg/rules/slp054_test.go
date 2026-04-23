@@ -36,6 +36,36 @@ func TestSLP054_IgnoresMatchingPackage(t *testing.T) {
 	}
 }
 
+func TestSLP054_IgnoresMatchPackages(t *testing.T) {
+	d := parseDiff(t, `diff --git a/auth/token.go b/auth/token.go
+--- a/auth/token.go
++++ b/auth/token.go
+@@ -1,2 +1,3 @@
+ package auth
++
++package auth
+ `)
+	got := SLP054{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for matching package, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP054_IgnoresTestFileWithTestSuffix(t *testing.T) {
+	d := parseDiff(t, `diff --git a/auth/token_test.go b/auth/token_test.go
+--- a/auth/token_test.go
++++ b/auth/token_test.go
+@@ -1,2 +1,3 @@
+ package auth
++
++package auth_test
+ `)
+	got := SLP054{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for _test.go with package_test, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP054_IgnoresNonGoFile(t *testing.T) {
 	d := parseDiff(t, `diff --git a/app.js b/app.js
 --- a/app.js
