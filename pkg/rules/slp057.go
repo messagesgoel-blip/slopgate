@@ -61,7 +61,7 @@ func (r SLP057) Check(d *diff.Diff) []Finding {
 		}
 		for _, h := range f.Hunks {
 			inGoImportBlock := false
-			for _, ln := range h.Lines {
+		for _, ln := range h.Lines {
 				if ln.Kind == diff.LineDelete {
 					continue
 				}
@@ -90,35 +90,36 @@ func (r SLP057) Check(d *diff.Diff) []Finding {
 				}
 				matched := false
 				desc := ""
-
+				
+				// Use cleaned content for matching to avoid comments/strings.
 				for _, p := range langAgnosticDynamic {
-					if p.re.MatchString(ln.Content) {
+					if p.re.MatchString(clean) {
 						matched = true
 						desc = p.desc
 						break
 					}
 				}
-
+				
 				if !matched && isJSOrTSFile(f.Path) {
 					for _, p := range jsDynamic {
-						if p.re.MatchString(ln.Content) {
+						if p.re.MatchString(clean) {
 							matched = true
 							desc = p.desc
 							break
 						}
 					}
 				}
-
+				
 				if !matched && isPythonFile(f.Path) {
 					for _, p := range pythonDynamic {
-						if p.re.MatchString(ln.Content) {
+						if p.re.MatchString(clean) {
 							matched = true
 							desc = p.desc
 							break
 						}
 					}
 				}
-
+				
 				if !matched && isGoFile(f.Path) {
 					for _, p := range goDynamic {
 						if p.re.MatchString(ln.Content) {
@@ -128,7 +129,7 @@ func (r SLP057) Check(d *diff.Diff) []Finding {
 						}
 					}
 				}
-
+				
 				if matched {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
