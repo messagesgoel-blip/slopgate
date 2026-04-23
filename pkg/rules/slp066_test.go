@@ -35,15 +35,17 @@ func TestSLP066_NoFireWithMutex(t *testing.T) {
 	d := parseDiff(t, `diff --git a/worker.go b/worker.go
 --- a/worker.go
 +++ b/worker.go
-@@ -1,1 +1,9 @@
- package worker
+@@ -1,1 +1,11 @@
+package worker
 +
 +var cache = map[string]int{}
 +var mu sync.Mutex
 +
 +func Run() {
 +	go updateCache()
++	mu.Lock()
 +	cache["key"] = 1
++	mu.Unlock()
 +}
 `)
 	got := SLP066{}.Check(d)
@@ -174,6 +176,26 @@ func TestSLP066_IgnoresGoInComments(t *testing.T) {
 	got := SLP066{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings when only comments contain 'go ', got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP066_IgnoresSliceIndexing(t *testing.T) {
+	d := parseDiff(t, `diff --git a/worker.go b/worker.go
+--- a/worker.go
++++ b/worker.go
+@@ -1,1 +1,7 @@
+ package worker
++
++var items = []int{1, 2, 3}
++
++func Run(i int) {
++	go work()
++	_ = items[i]
++}
+`)
+	got := SLP066{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for slice indexing, got %d: %+v", len(got), got)
 	}
 }
 

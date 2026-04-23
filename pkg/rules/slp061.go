@@ -39,55 +39,54 @@ func (r SLP061) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || !isGoFile(f.Path) {
 			continue
 		}
-		added := f.AddedLines()
 
-		// Build a map of struct name -> field count from added lines.
+		// Build a map of struct name -> field count from visible hunk lines, while
+		// counting only newly added fields.
 		structFields := map[string]int{}
-		i := 0
-		for i < len(added) {
-			ln := added[i]
-			m := slp061StructDef.FindStringSubmatch(strings.TrimSpace(ln.Content))
-			if m == nil {
-				i++
-				continue
-			}
-			structName := m[1]
-			// Count fields until closing brace.
-			j := i + 1
-			depth := 1 // we are inside struct {
-			for j < len(added) && depth > 0 {
-				bl := added[j]
-				trimmed := strings.TrimSpace(bl.Content)
-				if trimmed == "" || strings.HasPrefix(trimmed, "//") {
-					j++
+		for _, h := range f.Hunks {
+			lines := h.Lines
+			for i := 0; i < len(lines); i++ {
+				ln := lines[i]
+				if ln.Kind == diff.LineDelete {
 					continue
 				}
-				depth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
-				if depth == 0 {
-					break
+				m := slp061StructDef.FindStringSubmatch(strings.TrimSpace(ln.Content))
+				if m == nil {
+					continue
 				}
-				// Count fields: handle comma-separated declarations and embedded fields.
-				if depth == 1 {
-					// Strip field tags (e.g. `json:"name"`).
-					tagIdx := strings.Index(trimmed, "`")
-					fieldPart := trimmed
-					if tagIdx >= 0 {
-						fieldPart = trimmed[:tagIdx]
+				structName := m[1]
+				depth := 1
+				for j := i + 1; j < len(lines) && depth > 0; j++ {
+					bl := lines[j]
+					if bl.Kind == diff.LineDelete {
+						continue
 					}
-					if m := slp061MultiFieldNames.FindStringSubmatch(fieldPart); m != nil {
-						structFields[structName] += strings.Count(m[1], ",") + 1
-					} else if strings.Contains(fieldPart, " ") {
-						structFields[structName]++
-					} else {
-						// Embedded field (e.g. io.Reader, *T).
-						structFields[structName]++
+					trimmed := strings.TrimSpace(bl.Content)
+					clean := strings.TrimSpace(stripCommentAndStrings(bl.Content))
+					if clean == "" {
+						continue
 					}
+					if depth == 1 && bl.Kind == diff.LineAdd {
+						fieldPart := trimmed
+						if tagIdx := strings.Index(fieldPart, "`"); tagIdx >= 0 {
+							fieldPart = strings.TrimSpace(fieldPart[:tagIdx])
+						}
+						if fieldPart != "" && !strings.HasPrefix(fieldPart, "}") && !strings.HasPrefix(fieldPart, "{") {
+							if m := slp061MultiFieldNames.FindStringSubmatch(fieldPart); m != nil {
+								structFields[structName] += strings.Count(m[1], ",") + 1
+							} else if strings.Contains(fieldPart, " ") {
+								structFields[structName]++
+							} else {
+								structFields[structName]++
+							}
+						}
+					}
+					depth += strings.Count(clean, "{") - strings.Count(clean, "}")
 				}
-				j++
 			}
-			i = j + 1
 		}
 
+		added := f.AddedLines()
 		// Scan for factory/builder functions.
 		for i := 0; i < len(added); i++ {
 			ln := added[i]

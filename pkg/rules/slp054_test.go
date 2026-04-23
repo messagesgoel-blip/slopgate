@@ -75,4 +75,10 @@ func TestSLP054_Description(t *testing.T) {
 	if r.ID() != "SLP054" {
 		t.Errorf("ID = %q", r.ID())
 	}
+	if r.Description() == "" {
+		t.Errorf("Description is empty")
+	}
+	if r.DefaultSeverity() != SeverityWarn {
+		t.Errorf("default severity should be warn")
+	}
 }

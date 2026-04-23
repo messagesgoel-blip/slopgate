@@ -38,6 +38,21 @@ func TestSLP058_FiresOnFmtSprintf(t *testing.T) {
 	}
 }
 
+func TestSLP058_IgnoresFmtSprintfWithoutFormatVerb(t *testing.T) {
+	d := parseDiff(t, `diff --git a/db.go b/db.go
+--- a/db.go
++++ b/db.go
+@@ -1,2 +1,3 @@
+ package db
++
++query := fmt.Sprintf("SELECT * FROM users")
+`)
+	got := SLP058{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for fmt.Sprintf without formatting verb, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP058_FiresOnInterpolation(t *testing.T) {
 	d := parseDiff(t, `diff --git a/db.js b/db.js
 --- a/db.js

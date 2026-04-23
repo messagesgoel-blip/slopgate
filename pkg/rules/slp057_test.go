@@ -133,6 +133,21 @@ func TestSLP057_FiresOnUnsafeImportBlockLine(t *testing.T) {
 	}
 }
 
+func TestSLP057_IgnoresUnsafeStringLiteralOutsideImportBlock(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,2 +1,3 @@
+ package main
++
++var name = "unsafe"
+`)
+	got := SLP057{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for plain string literal, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP057_IgnoresExecInGo(t *testing.T) {
 	d := parseDiff(t, `diff --git a/main.go b/main.go
 --- a/main.go

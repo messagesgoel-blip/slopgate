@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -15,19 +16,17 @@ func (SLP067) Description() string {
 	return "resource acquired without deferred close"
 }
 
-var resourcePatterns = []string{
-	"http.Get(",
-	"http.Post(",
-	"http.Do(",
-	"db.Query",
-	"os.Open(",
-	"os.Create(",
-	"sql.Open(",
+var resourcePatterns = []*regexp.Regexp{
+	regexp.MustCompile(`\bhttp\.(?:Get|Post|Do)\s*\(`),
+	regexp.MustCompile(`\bdb\.Query(?:Context)?\s*\(`),
+	regexp.MustCompile(`\bos\.(?:Open|Create)\s*\(`),
+	regexp.MustCompile(`\bsql\.Open\s*\(`),
 }
 
 func hasResourceAcquisition(line string) bool {
-	for _, p := range resourcePatterns {
-		if strings.Contains(line, p) {
+	clean := stripCommentAndStrings(line)
+	for _, re := range resourcePatterns {
+		if re.MatchString(clean) {
 			return true
 		}
 	}
@@ -79,6 +78,7 @@ func slp067ScopeDepth(added []diff.Line, end int) int {
 }
 
 func slp067LineHasClose(line, varName string) bool {
+	line = stripCommentAndStrings(line)
 	if varName == "" {
 		return strings.Contains(line, ".Close()") || strings.Contains(line, "defer")
 	}

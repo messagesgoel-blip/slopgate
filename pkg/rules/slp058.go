@@ -16,7 +16,7 @@ func (SLP058) Description() string {
 	return "SQL built with string concatenation"
 }
 
-var sqlConcatPattern = regexp.MustCompile(`(?i)\b(select|insert|update|delete|where|from|join)\b.*(\+|\$\{)|fmt\.Sprintf.*\b(select|insert|update|delete|where|from|join)\b`)
+var sqlConcatPattern = regexp.MustCompile(`(?is)\b(select|insert|update|delete|where|from|join)\b.*(\+|\$\{)|fmt\.Sprintf\s*\([^)]*(?:\b(select|insert|update|delete|where|from|join)\b[^)]*%[vTtbcdoqxXfFeEgGsp]|%[vTtbcdoqxXfFeEgGsp][^)]*\b(select|insert|update|delete|where|from|join)\b)[^)]*\)`)
 
 func (r SLP058) Check(d *diff.Diff) []Finding {
 	var out []Finding

@@ -27,6 +27,21 @@ func isTestPath(path string) bool {
 		strings.Contains("/"+p+"/", "/testdata/")
 }
 
+func isSourcePath(path string) bool {
+	p := strings.ReplaceAll(strings.ToLower(path), "\\", "/")
+	for _, ext := range []string{".go", ".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".rb", ".rs", ".php", ".c", ".cc", ".cpp", ".h", ".hpp", ".cs", ".swift", ".kt"} {
+		if strings.HasSuffix(p, ext) {
+			return true
+		}
+	}
+	for _, dir := range []string{"/src/", "/pkg/", "/internal/", "/cmd/"} {
+		if strings.Contains("/"+p, dir) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r SLP052) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	var prodDeleteCount int
@@ -36,7 +51,7 @@ func (r SLP052) Check(d *diff.Diff) []Finding {
 		isTest := isTestPath(lowerPath)
 		for _, h := range f.Hunks {
 			for _, ln := range h.Lines {
-				if ln.Kind == diff.LineDelete && !isTest {
+				if ln.Kind == diff.LineDelete && !isTest && isSourcePath(lowerPath) {
 					prodDeleteCount++
 				}
 				if isTest && (ln.Kind == diff.LineAdd || ln.Kind == diff.LineDelete) {

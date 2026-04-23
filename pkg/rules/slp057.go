@@ -46,9 +46,12 @@ var goDynamic = []struct {
 }{
 	{regexp.MustCompile(`\breflect\.Value\.Call\b`), "reflect.Value.Call"},
 	{regexp.MustCompile(`(?m)^\s*(?:import\s+"unsafe"|_\s*"unsafe")`), `import "unsafe"`},
-	{regexp.MustCompile(`(?m)^\s*"unsafe"\s*$`), `import "unsafe"`},
 	{regexp.MustCompile(`\bunsafe\.(Pointer|Sizeof|Alignof|Offsetof|Add|Slice)\b`), "unsafe.*"},
 }
+
+var slp057UnsafeImportBlockStartRe = regexp.MustCompile(`^\s*import\s*\(\s*$`)
+var slp057UnsafeImportSpecRe = regexp.MustCompile(`^\s*(?:_\s*)?"unsafe"\s*$`)
+var slp057ImportBlockEndRe = regexp.MustCompile(`^\s*\)\s*$`)
 
 func (r SLP057) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -56,57 +59,86 @@ func (r SLP057) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		for _, ln := range f.AddedLines() {
-			matched := false
-			desc := ""
-
-			for _, p := range langAgnosticDynamic {
-				if p.re.MatchString(ln.Content) {
-					matched = true
-					desc = p.desc
-					break
+		for _, h := range f.Hunks {
+			inGoImportBlock := false
+			for _, ln := range h.Lines {
+				if ln.Kind == diff.LineDelete {
+					continue
 				}
-			}
+				clean := strings.TrimSpace(stripCommentAndStrings(ln.Content))
+				rawTrimmed := strings.TrimSpace(ln.Content)
+				if isGoFile(f.Path) {
+					if slp057UnsafeImportBlockStartRe.MatchString(clean) {
+						inGoImportBlock = true
+					} else if inGoImportBlock && slp057ImportBlockEndRe.MatchString(clean) {
+						inGoImportBlock = false
+					}
+					if inGoImportBlock && ln.Kind == diff.LineAdd && slp057UnsafeImportSpecRe.MatchString(rawTrimmed) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  "dynamic code execution detected — import \"unsafe\" is dangerous with untrusted input",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+						continue
+					}
+				}
+				if ln.Kind != diff.LineAdd {
+					continue
+				}
+				matched := false
+				desc := ""
 
-			if !matched && isJSOrTSFile(f.Path) {
-				for _, p := range jsDynamic {
+				for _, p := range langAgnosticDynamic {
 					if p.re.MatchString(ln.Content) {
 						matched = true
 						desc = p.desc
 						break
 					}
 				}
-			}
 
-			if !matched && isPythonFile(f.Path) {
-				for _, p := range pythonDynamic {
-					if p.re.MatchString(ln.Content) {
-						matched = true
-						desc = p.desc
-						break
+				if !matched && isJSOrTSFile(f.Path) {
+					for _, p := range jsDynamic {
+						if p.re.MatchString(ln.Content) {
+							matched = true
+							desc = p.desc
+							break
+						}
 					}
 				}
-			}
 
-			if !matched && isGoFile(f.Path) {
-				for _, p := range goDynamic {
-					if p.re.MatchString(ln.Content) {
-						matched = true
-						desc = p.desc
-						break
+				if !matched && isPythonFile(f.Path) {
+					for _, p := range pythonDynamic {
+						if p.re.MatchString(ln.Content) {
+							matched = true
+							desc = p.desc
+							break
+						}
 					}
 				}
-			}
 
-			if matched {
-				out = append(out, Finding{
-					RuleID:   r.ID(),
-					Severity: r.DefaultSeverity(),
-					File:     f.Path,
-					Line:     ln.NewLineNo,
-					Message:  "dynamic code execution detected — " + desc + " is dangerous with untrusted input",
-					Snippet:  strings.TrimSpace(ln.Content),
-				})
+				if !matched && isGoFile(f.Path) {
+					for _, p := range goDynamic {
+						if p.re.MatchString(ln.Content) {
+							matched = true
+							desc = p.desc
+							break
+						}
+					}
+				}
+
+				if matched {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "dynamic code execution detected — " + desc + " is dangerous with untrusted input",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+				}
 			}
 		}
 	}

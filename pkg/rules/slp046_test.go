@@ -82,6 +82,52 @@ func TestSLP046_IgnoresNoCalls(t *testing.T) {
 	}
 }
 
+func TestSLP046_FiresWhenCallerChangeIsInExistingFunction(t *testing.T) {
+	d := parseDiff(t, `diff --git a/pkg/a/helper.go b/pkg/a/helper.go
+--- a/pkg/a/helper.go
++++ b/pkg/a/helper.go
+@@ -1,1 +1,3 @@
+ package a
++
++func Helper() {}
+diff --git a/pkg/b/caller.go b/pkg/b/caller.go
+--- a/pkg/b/caller.go
++++ b/pkg/b/caller.go
+@@ -1,3 +1,4 @@
+ package b
+ func Caller() {
++	Helper()
+ }
+`)
+	got := SLP046{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for cross-file call from existing function body, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP046_FiresOnQualifiedCrossPackageCall(t *testing.T) {
+	d := parseDiff(t, `diff --git a/pkg/a/helper.go b/pkg/a/helper.go
+--- a/pkg/a/helper.go
++++ b/pkg/a/helper.go
+@@ -1,1 +1,3 @@
+ package a
++
++func Helper() {}
+diff --git a/pkg/b/caller.go b/pkg/b/caller.go
+--- a/pkg/b/caller.go
++++ b/pkg/b/caller.go
+@@ -1,3 +1,4 @@
+ package b
+ func Caller() {
++	a.Helper()
+ }
+`)
+	got := SLP046{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for qualified cross-package call, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP046_Description(t *testing.T) {
 	r := SLP046{}
 	if r.ID() != "SLP046" {

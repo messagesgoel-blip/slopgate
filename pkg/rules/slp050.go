@@ -1,6 +1,9 @@
 package rules
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"regexp"
 	"strings"
 
@@ -22,8 +25,8 @@ func (SLP050) Description() string {
 }
 
 var (
-	// funcDeclRe captures the function name and parenthesised parameter list.
-	slp050FuncDeclRe = regexp.MustCompile(`^func\s+(?:\([^)]+\)\s+)?([A-Za-z_]\w*)\s*\((.*)\)`)
+	// slp050FuncDeclRe captures the function name and opening parameter paren.
+	slp050FuncDeclRe = regexp.MustCompile(`^\s*func\s+(?:\([^)]+\)\s*)?([A-Za-z_]\w*)(?:\s*\[[^\]]+\])?\s*\(`)
 )
 
 func (r SLP050) Check(d *diff.Diff) []Finding {
@@ -32,69 +35,67 @@ func (r SLP050) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || !isGoFile(f.Path) {
 			continue
 		}
-		added := f.AddedLines()
-		for i := 0; i < len(added); i++ {
-			ln := added[i]
-			m := slp050FuncDeclRe.FindStringSubmatch(ln.Content)
-			if m == nil {
-				continue
-			}
-			funcName := m[1]
-			paramsLine := m[2]
-
-			// Extract named parameters.
-			var paramNames []string
-			for _, raw := range strings.Split(paramsLine, ",") {
-				raw = strings.TrimSpace(raw)
-				parts := strings.Fields(raw)
-				if len(parts) < 2 {
+		for _, h := range f.Hunks {
+			lines := h.Lines
+			for i := 0; i < len(lines); i++ {
+				ln := lines[i]
+				if ln.Kind != diff.LineAdd {
 					continue
 				}
-				name := parts[len(parts)-2]
-				typeStr := parts[len(parts)-1]
-				if needsValidation(typeStr) {
-					paramNames = append(paramNames, name)
+				match := slp050FuncDeclRe.FindStringSubmatchIndex(ln.Content)
+				if match == nil {
+					continue
 				}
-			}
-			if len(paramNames) == 0 {
-				continue
-			}
 
-			paramChecks := make(map[string]*slp050ParamChecks, len(paramNames))
-			for _, p := range paramNames {
-				paramChecks[p] = newSLP050ParamChecks(p)
-			}
+				funcName := ln.Content[match[2]:match[3]]
+				header, _, ok := slp050CollectFuncHeader(lines, i, match[1]-1)
+				if !ok {
+					continue
+				}
 
-			// Scan subsequent added lines for validation until the current function ends.
-			validated := make(map[string]bool)
-			depth := slp050BraceDelta(ln.Content)
-			bodyStarted := strings.Contains(stripCommentAndStrings(ln.Content), "{")
-			for j := i + 1; j < len(added) && (!bodyStarted || depth > 0); j++ {
-				next := added[j]
-				clean := stripCommentAndStrings(next.Content)
-				if clean != "" {
-					for _, p := range paramNames {
-						if paramChecks[p].matches(clean) {
-							validated[p] = true
+				paramNames := slp050ValidatedParams(header)
+				if len(paramNames) == 0 {
+					continue
+				}
+
+				paramChecks := make(map[string]*slp050ParamChecks, len(paramNames))
+				for _, p := range paramNames {
+					paramChecks[p] = newSLP050ParamChecks(p)
+				}
+
+				validated := make(map[string]bool)
+				depth := 0
+				bodyStarted := false
+				for j := i; j < len(lines); j++ {
+					next := lines[j]
+					clean := stripCommentAndStrings(next.Content)
+					if !bodyStarted && strings.Contains(clean, "{") {
+						bodyStarted = true
+					}
+					if bodyStarted && next.Kind == diff.LineAdd && clean != "" {
+						for _, p := range paramNames {
+							if paramChecks[p].matches(clean) {
+								validated[p] = true
+							}
 						}
 					}
+					depth += slp050BraceDelta(next.Content)
+					if bodyStarted && depth <= 0 {
+						break
+					}
 				}
-				depth += slp050BraceDelta(next.Content)
-				if !bodyStarted && strings.Contains(clean, "{") {
-					bodyStarted = true
-				}
-			}
 
-			for _, p := range paramNames {
-				if !validated[p] {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "function " + funcName + " accepts " + p + " without validation — add nil/empty check",
-						Snippet:  strings.TrimSpace(ln.Content),
-					})
+				for _, p := range paramNames {
+					if !validated[p] {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  "function " + funcName + " accepts " + p + " without validation — add nil/empty check",
+							Snippet:  strings.TrimSpace(ln.Content),
+						})
+					}
 				}
 			}
 		}
@@ -130,16 +131,81 @@ func slp050BraceDelta(line string) int {
 	return strings.Count(clean, "{") - strings.Count(clean, "}")
 }
 
-// paramRegex returns a regex matching the parameter name as a bare identifier.
-func paramRegex(name string) *regexp.Regexp {
-	return regexp.MustCompile(`(?m)(^|[^\w])` + regexp.QuoteMeta(name) + `($|[^\w])`)
+func slp050CollectFuncHeader(lines []diff.Line, start, openParen int) (string, int, bool) {
+	var b strings.Builder
+	depth := 1
+
+	for i := start; i < len(lines); i++ {
+		content := lines[i].Content
+		scanStart := 0
+		if i == start {
+			scanStart = openParen + 1
+		}
+		endIdx := len(content)
+
+		for j := scanStart; j < len(content); j++ {
+			switch content[j] {
+			case '(':
+				depth++
+			case ')':
+				depth--
+				if depth == 0 {
+					endIdx = j + 1
+					if i > start {
+						b.WriteByte('\n')
+					}
+					b.WriteString(content[:endIdx])
+					return b.String(), i, true
+				}
+			}
+		}
+
+		if i > start {
+			b.WriteByte('\n')
+		}
+		b.WriteString(content)
+	}
+
+	return "", 0, false
 }
 
-func needsValidation(typeStr string) bool {
-	return strings.HasPrefix(typeStr, "*") ||
-		strings.HasPrefix(typeStr, "[]") ||
-		strings.HasPrefix(typeStr, "map[") ||
-		typeStr == "interface{}" ||
-		typeStr == "any" ||
-		typeStr == "string"
+func slp050ValidatedParams(header string) []string {
+	src := "package p\n" + header + " {}\n"
+	file, err := parser.ParseFile(token.NewFileSet(), "", src, 0)
+	if err != nil || len(file.Decls) == 0 {
+		return nil
+	}
+
+	fn, ok := file.Decls[0].(*ast.FuncDecl)
+	if !ok || fn.Type == nil || fn.Type.Params == nil {
+		return nil
+	}
+
+	var out []string
+	for _, field := range fn.Type.Params.List {
+		if !slp050NeedsValidation(field.Type) {
+			continue
+		}
+		for _, name := range field.Names {
+			out = append(out, name.Name)
+		}
+	}
+	return out
+}
+
+func slp050NeedsValidation(expr ast.Expr) bool {
+	switch t := expr.(type) {
+	case *ast.StarExpr:
+		return true
+	case *ast.ArrayType:
+		return t.Len == nil
+	case *ast.MapType:
+		return true
+	case *ast.InterfaceType:
+		return len(t.Methods.List) == 0
+	case *ast.Ident:
+		return t.Name == "any" || t.Name == "string"
+	default:
+		return false
+	}
 }

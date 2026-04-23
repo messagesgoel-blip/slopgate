@@ -54,6 +54,18 @@ func slp056CommentOnlyLine(content string) bool {
 }
 
 func slp056StripInlineComment(content string) string {
+	for {
+		start := strings.Index(content, "/*")
+		if start < 0 {
+			break
+		}
+		end := strings.Index(content[start+2:], "*/")
+		if end < 0 {
+			content = content[:start]
+			break
+		}
+		content = content[:start] + content[start+2+end+2:]
+	}
 	for _, marker := range []string{"//", "#", "--"} {
 		if idx := strings.Index(content, marker); idx >= 0 {
 			return content[:idx]

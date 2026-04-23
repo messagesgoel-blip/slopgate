@@ -155,6 +155,42 @@ func TestSLP050_StopsAtFunctionBoundary(t *testing.T) {
 	}
 }
 
+func TestSLP050_FiresOnGenericPointerParam(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,4 @@
+ package a
++
++func Do[T any](x *T) T {
++	return *x
++}
+`)
+	got := SLP050{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for generic pointer param, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP050_FiresOnMultilineParamList(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,7 @@
+ package a
++
++func Do(
++	s string,
++) string {
++	return s + "!"
++}
+`)
+	got := SLP050{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for multiline parameter list, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP050_Description(t *testing.T) {
 	r := SLP050{}
 	if r.ID() != "SLP050" {

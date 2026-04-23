@@ -165,6 +165,27 @@ func TestSLP061_FiresOnMultilineSignaturePointerReturn(t *testing.T) {
 	}
 }
 
+func TestSLP061_FiresWhenStructStartIsContextInHunk(t *testing.T) {
+	d := parseDiff(t, `diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,4 +1,5 @@
+ package foo
+ type Config struct {
+	Host string
++	Port int
+ }
+@@ -6,1 +7,4 @@
++func NewConfig() Config {
++	return Config{}
++}
+`)
+	got := SLP061{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when struct context and added fields share a hunk, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP061_Description(t *testing.T) {
 	r := SLP061{}
 	if r.ID() != "SLP061" {

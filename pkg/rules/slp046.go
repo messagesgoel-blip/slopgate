@@ -25,7 +25,7 @@ func (SLP046) Description() string {
 // callPattern returns a regexp matching a bare call to funcName, ensuring it
 // is not preceded by a dot and is followed by '('.
 func callPattern(funcName string) *regexp.Regexp {
-	return regexp.MustCompile(`(?m)(^|[^.\w])` + regexp.QuoteMeta(funcName) + `\s*\(`)
+	return regexp.MustCompile(`(?m)(^|[^\w])(?:[A-Za-z_]\w*\s*\.\s*)*` + regexp.QuoteMeta(funcName) + `\s*\(`)
 }
 
 func (r SLP046) Check(d *diff.Diff) []Finding {
@@ -57,8 +57,10 @@ func (r SLP046) Check(d *diff.Diff) []Finding {
 		}
 	}
 
-	// If only one file has added functions, nothing to flag.
-	if len(fileFuncs) < 2 {
+	relevantFiles := slp046RelevantFiles(fileFuncs, fileBodies)
+
+	// If fewer than two files participate in the changed call graph, nothing to flag.
+	if len(relevantFiles) < 2 {
 		return nil
 	}
 
@@ -67,7 +69,7 @@ func (r SLP046) Check(d *diff.Diff) []Finding {
 	var out []Finding
 
 	for fileA, funcsA := range fileFuncs {
-		for fileB, funcsB := range fileFuncs {
+		for fileB := range relevantFiles {
 			if fileA == fileB {
 				continue
 			}
@@ -75,9 +77,12 @@ func (r SLP046) Check(d *diff.Diff) []Finding {
 				continue
 			}
 			bodyB := fileBodies[fileB]
+			if bodyB == "" {
+				continue
+			}
 			for funcName := range funcsA {
 				// Skip if fileB also defines this function (duplicate name).
-				if funcsB[funcName] {
+				if funcsB := fileFuncs[fileB]; funcsB != nil && funcsB[funcName] {
 					continue
 				}
 				// Use word-boundary regex to detect bare calls (not method calls).
@@ -95,6 +100,17 @@ func (r SLP046) Check(d *diff.Diff) []Finding {
 		}
 	}
 
+	return out
+}
+
+func slp046RelevantFiles(fileFuncs map[string]map[string]bool, fileBodies map[string]string) map[string]bool {
+	out := make(map[string]bool, len(fileFuncs)+len(fileBodies))
+	for path := range fileFuncs {
+		out[path] = true
+	}
+	for path := range fileBodies {
+		out[path] = true
+	}
 	return out
 }
 

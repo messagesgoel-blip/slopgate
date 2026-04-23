@@ -121,6 +121,36 @@ func TestSLP067_DoesNotUseLaterFunctionClose(t *testing.T) {
 	}
 }
 
+func TestSLP067_IgnoresResourceMentionInComment(t *testing.T) {
+	d := parseDiff(t, `diff --git a/client.go b/client.go
+--- a/client.go
++++ b/client.go
+@@ -1,1 +1,3 @@
+ package client
++
++// TODO: resp, _ := http.Get("http://example.com")
+`)
+	got := SLP067{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for comment-only resource mention, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP067_IgnoresResourceMentionInString(t *testing.T) {
+	d := parseDiff(t, `diff --git a/client.go b/client.go
+--- a/client.go
++++ b/client.go
+@@ -1,1 +1,3 @@
+ package client
++
++msg := "http.Get(http://example.com)"
+`)
+	got := SLP067{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for string-only resource mention, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP067_Meta(t *testing.T) {
 	r := SLP067{}
 	if r.ID() != "SLP067" {

@@ -147,6 +147,21 @@ func TestSLP056_DoesNotSkipRealSecretWithInlineTodo(t *testing.T) {
 	}
 }
 
+func TestSLP056_DoesNotSkipRealSecretWithInlineBlockTodo(t *testing.T) {
+	d := parseDiff(t, `diff --git a/config.go b/config.go
+--- a/config.go
++++ b/config.go
+@@ -1,1 +1,2 @@
+ package main
++
++password = "hunter2" /* TODO rotate after testing */
+`)
+	got := SLP056{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when inline block TODO accompanies a real secret, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP056_IgnoresAWSKeyFromEnv(t *testing.T) {
 	d := parseDiff(t, `diff --git a/config.go b/config.go
 --- a/config.go

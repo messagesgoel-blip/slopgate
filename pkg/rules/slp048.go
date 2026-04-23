@@ -3,6 +3,7 @@ package rules
 import (
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
@@ -21,11 +22,10 @@ func (SLP048) Description() string {
 }
 
 var slp048ErrCheckRe = regexp.MustCompile(`if\s+err\s*!=\s*nil`)
-var slp048FuncReturnsErrRe = regexp.MustCompile(`func\s+\w+\s*\([^)]*\)\s*(\([^)]*\)\s*)?\w*error`)
+var slp048FuncReturnsErrRe = regexp.MustCompile(`(?m)^\s*func\s+(?:\([^)]+\)\s*)?[A-Za-z_]\w*(?:\s*\[[^\]]+\])?\s*\([^)]*\)\s*(?:\([^)]*\berror\b[^)]*\)|\berror\b)`)
 
 func (r SLP048) Check(d *diff.Diff) []Finding {
-	// Group files by package directory.
-	// package key = directory of the file.
+	// Group files by package directory and declared package name.
 	// For each directory, track which files check errors and which don't.
 	type fileInfo struct {
 		path      string
@@ -39,11 +39,12 @@ func (r SLP048) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || !isGoFile(f.Path) {
 			continue
 		}
-		// Determine package directory.
 		dir := filepath.Dir(f.Path)
 		if dir == "." {
 			dir = ""
 		}
+		pkgName := slp046PackageName(f)
+		groupKey := dir + ":" + pkgName
 
 		added := f.AddedLines()
 		if len(added) == 0 {
@@ -63,13 +64,11 @@ func (r SLP048) Check(d *diff.Diff) []Finding {
 		// heuristic: if the file has a function that returns `error` in its signature
 		// but doesn't contain any error check, consider it inconsistent when another
 		// file in the same directory does check errors.
-		returnsError := false
+		var addedContent []string
 		for _, ln := range added {
-			if slp048FuncReturnsErrRe.MatchString(ln.Content) {
-				returnsError = true
-				break
-			}
+			addedContent = append(addedContent, ln.Content)
 		}
+		returnsError := slp048FuncReturnsErrRe.MatchString(strings.Join(addedContent, "\n"))
 
 		fi := fileInfo{
 			path:      f.Path,
@@ -80,7 +79,7 @@ func (r SLP048) Check(d *diff.Diff) []Finding {
 		// Store only files that either have checks or return errors (so they participate
 		// in inconsistency detection).
 		if hasCheck || returnsError {
-			dirFiles[dir] = append(dirFiles[dir], fi)
+			dirFiles[groupKey] = append(dirFiles[groupKey], fi)
 		}
 	}
 

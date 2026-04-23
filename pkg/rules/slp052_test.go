@@ -99,6 +99,29 @@ diff --git a/a/foo_test.go b/a/foo_test.go
 	}
 }
 
+func TestSLP052_IgnoresDocsDeletionWithTestChanges(t *testing.T) {
+	d := parseDiff(t, `diff --git a/docs/guide.md b/docs/guide.md
+--- a/docs/guide.md
++++ b/docs/guide.md
+@@ -1,5 +1,2 @@
+-old line one
+-old line two
+-old line three
+-old line four
+diff --git a/a/foo_test.go b/a/foo_test.go
+--- a/a/foo_test.go
++++ b/a/foo_test.go
+@@ -1,2 +1,3 @@
+ package a
+
++func TestDocChange(t *testing.T) {}
+`)
+	got := SLP052{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when only docs are deleted, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP052_Description(t *testing.T) {
 	r := SLP052{}
 	if r.ID() != "SLP052" {

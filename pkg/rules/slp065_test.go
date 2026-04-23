@@ -88,15 +88,31 @@ func TestSLP065_NoFireForNonGo(t *testing.T) {
 	}
 }
 
-func TestSLP065_NoFireForNamedErrOnLHS(t *testing.T) {
-	// `_, err := doSomething()` — err is named on LHS, so it's handled.
+func TestSLP065_FiresForNamedErrOnLHSWithoutCheck(t *testing.T) {
 	d := parseDiff(t, `diff --git a/foo.go b/foo.go
 --- a/foo.go
 +++ b/foo.go
 @@ -1,1 +1,4 @@
+package foo
++func Bar() {
++	_, err := doSomething()
++}
+`)
+	got := SLP065{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for named err without a follow-up check, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP065_NoFireForNamedErrOnLHSWhenCheckedNext(t *testing.T) {
+	d := parseDiff(t, `diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,1 +1,6 @@
  package foo
 +func Bar() {
 +	_, err := doSomething()
++	if err != nil { return }
 +}
 `)
 	got := SLP065{}.Check(d)
@@ -135,6 +151,38 @@ func TestSLP065_NoFireForInlineTupleErrInit(t *testing.T) {
 	got := SLP065{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings for inline tuple if-init, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP065_NoFireForInlineErrAssignmentCheck(t *testing.T) {
+	d := parseDiff(t, `diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,1 +1,3 @@
+ package foo
++if err = doSomething(); err != nil {
++	return
++}
+`)
+	got := SLP065{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for inline err assignment check, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP065_NoFireForInlineTupleErrAssignmentCheck(t *testing.T) {
+	d := parseDiff(t, `diff --git a/foo.go b/foo.go
+--- a/foo.go
++++ b/foo.go
+@@ -1,1 +1,3 @@
+ package foo
++if x, err = doSomething(); err != nil {
++	return
++}
+`)
+	got := SLP065{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for inline tuple err assignment check, got %d: %+v", len(got), got)
 	}
 }
 

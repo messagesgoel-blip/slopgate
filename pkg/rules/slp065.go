@@ -29,7 +29,7 @@ var slp065ErrAssignLHS = regexp.MustCompile(`(^|[^a-zA-Z0-9_])err\s*(:=|=)`)
 var slp065FuncCall = regexp.MustCompile(`\w+\s*\(`)
 var slp065BlankLHS = regexp.MustCompile(`(^|[^a-zA-Z0-9_])_\s*(:=|=|,)`)
 var slp065ErrCheck = regexp.MustCompile(`if\s+err\s*!=\s*nil`)
-var slp065InlineErrInit = regexp.MustCompile(`if\s+[^;]*\berr\s*:=.*;\s*err\s*!=\s*nil`)
+var slp065InlineErrInit = regexp.MustCompile(`if\s+[^;]*;\s*err\s*!=\s*nil`)
 var slp065ExplicitSuppression = regexp.MustCompile(`^\s*_\s*=`)
 var slp065NamedErrOnLHS = regexp.MustCompile(`_\s*,\s*err\s*:?=`)
 
@@ -55,14 +55,11 @@ func (r SLP065) Check(d *diff.Diff) []Finding {
 					continue
 				}
 
-				// `_, err := doSomething()` — named err on LHS means captured error.
-				if slp065NamedErrOnLHS.MatchString(ln.Content) {
-					continue
-				}
+				namedErrOnLHS := slp065NamedErrOnLHS.MatchString(ln.Content)
 
 				// `_ = someFunc()` — explicit suppression, skip.
 				// `_, _ = someFunc()` — blank tuple assign, flag unless explicit `_ =`.
-				if slp065BlankLHS.MatchString(ln.Content) && slp065FuncCall.MatchString(ln.Content) {
+				if !namedErrOnLHS && slp065BlankLHS.MatchString(ln.Content) && slp065FuncCall.MatchString(ln.Content) {
 					if !slp065ExplicitSuppression.MatchString(ln.Content) {
 						out = append(out, Finding{
 							RuleID:   r.ID(),
