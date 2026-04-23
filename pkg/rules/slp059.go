@@ -17,12 +17,14 @@ func (SLP059) Description() string {
 }
 
 var (
-	goIdentPattern          = regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\b`)
-	execCommandRe           = regexp.MustCompile(`\bexec\.Command\s*\(`)
-	slp059ConstStringDeclRe = regexp.MustCompile("^\\s*const\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+[A-Za-z_][A-Za-z0-9_]*)?\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
-	slp059VarStringDeclRe   = regexp.MustCompile("^\\s*var\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+[A-Za-z_][A-Za-z0-9_]*)?\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
-	slp059ShortStringDeclRe = regexp.MustCompile("^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*:=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
-	slp059FunctionStartLine = regexp.MustCompile(`^\s*func\b`)
+	goIdentPattern            = regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\b`)
+	execCommandRe             = regexp.MustCompile(`\bexec\.Command\s*\(`)
+	slp059ConstStringDeclRe   = regexp.MustCompile("^\\s*const\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+[A-Za-z_][A-Za-z0-9_]*)?\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
+	slp059VarStringDeclRe     = regexp.MustCompile("^\\s*var\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+[A-Za-z_][A-Za-z0-9_]*)?\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
+	slp059ShortStringDeclRe   = regexp.MustCompile("^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*:=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
+	slp059ConstBlockStartRe   = regexp.MustCompile(`^\s*const\s*\(`)
+	slp059ConstBlockAssignRe  = regexp.MustCompile("^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)")
+	slp059FunctionStartLine   = regexp.MustCompile(`^\s*func\b`)
 )
 
 func slp059FileLines(f diff.File) []diff.Line {
@@ -62,11 +64,32 @@ func slp059LiteralStringName(line string) (string, bool) {
 func slp059TopLevelStringConsts(lines []diff.Line, upto int) map[string]struct{} {
 	safe := make(map[string]struct{})
 	depth := 0
+	inConstBlock := false
 	for i := 0; i < upto; i++ {
-		clean := stripCommentAndStrings(lines[i].Content)
+		content := lines[i].Content
+		clean := stripCommentAndStrings(content)
 		if depth == 0 {
-			if name, ok := slp059LiteralStringName(clean); ok && strings.HasPrefix(strings.TrimSpace(clean), "const ") {
+			// Check for single-line const declarations (slp059LiteralStringName already validates const prefix)
+			if name, ok := slp059LiteralStringName(clean); ok {
 				safe[name] = struct{}{}
+			}
+			// Check for const block start: const (
+			if slp059ConstBlockStartRe.MatchString(clean) {
+				inConstBlock = true
+				continue
+			}
+		}
+		// Inside a const block, look for assignments like `name = "value"`
+		if inConstBlock {
+			trimmed := strings.TrimSpace(clean)
+			// End of const block
+			if trimmed == ")" {
+				inConstBlock = false
+				continue
+			}
+			// Check for string assignment in const block
+			if m := slp059ConstBlockAssignRe.FindStringSubmatch(clean); m != nil {
+				safe[m[1]] = struct{}{}
 			}
 		}
 		depth += strings.Count(clean, "{") - strings.Count(clean, "}")
