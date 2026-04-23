@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -22,6 +23,11 @@ func (r SLP058) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
 		if f.IsDelete {
+			continue
+		}
+		// Only check file types where SQL string concatenation is dangerous.
+		ext := strings.ToLower(filepath.Ext(f.Path))
+		if ext != ".go" && ext != ".js" && ext != ".jsx" && ext != ".ts" && ext != ".tsx" && !strings.HasSuffix(f.Path, ".py") {
 			continue
 		}
 		for _, ln := range f.AddedLines() {

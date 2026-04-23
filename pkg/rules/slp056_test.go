@@ -13,7 +13,7 @@ func TestSLP056_FiresOnAPIKey(t *testing.T) {
  package main
 +
 +var apiKey = "abc123secret"
-`)
+ `)
 	got := SLP056{}.Check(d)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding, got %d: %+v", len(got), got)
@@ -23,6 +23,9 @@ func TestSLP056_FiresOnAPIKey(t *testing.T) {
 	}
 	if !strings.Contains(got[0].Message, "hardcoded secret pattern detected") {
 		t.Errorf("message: %q", got[0].Message)
+	}
+	if got[0].Snippet != "[REDACTED]" {
+		t.Errorf("snippet should be redacted, got %q", got[0].Snippet)
 	}
 }
 
