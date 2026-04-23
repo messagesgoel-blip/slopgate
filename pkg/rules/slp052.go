@@ -34,7 +34,7 @@ func isSourcePath(path string) bool {
 			return true
 		}
 	}
-	for _, dir := range []string{"/src/", "/pkg/", "/internal/", "/cmd/"} {
+	for _, dir := range []string{"/src/", "/pkg/", "/internal/", "/cmd/", "/lib/", "/app/"} {
 		if strings.Contains("/"+p, dir) {
 			return true
 		}

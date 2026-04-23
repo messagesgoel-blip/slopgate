@@ -69,7 +69,8 @@ func slp059TopLevelStringConsts(lines []diff.Line, upto int) map[string]struct{}
 		content := lines[i].Content
 		clean := stripCommentAndStrings(content)
 		if depth == 0 {
-			// Check for single-line const declarations (slp059LiteralStringName already validates const prefix)
+			// Check for single-line const/var declarations and short assignments
+			// slp059LiteralStringName matches const, var, and := assignments
 			if name, ok := slp059LiteralStringName(clean); ok {
 				safe[name] = struct{}{}
 			}
@@ -194,9 +195,8 @@ func (r SLP059) Check(d *diff.Diff) []Finding {
 				continue
 			}
 			args := call[callMatch[1]:]
-			unquoted := args
 			// Any interpolation or concatenation is an immediate red flag.
-			if strings.Contains(unquoted, "$") || strings.Contains(unquoted, "+") || strings.Contains(unquoted, "fmt.Sprintf") {
+			if strings.Contains(args, "$") || strings.Contains(args, "+") || strings.Contains(args, "fmt.Sprintf") {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
@@ -207,7 +207,7 @@ func (r SLP059) Check(d *diff.Diff) []Finding {
 				})
 				continue
 			}
-			if slp059HasUnsafeIdentifier(unquoted, slp059SafeStrings(f, ln.NewLineNo)) {
+			if slp059HasUnsafeIdentifier(args, slp059SafeStrings(f, ln.NewLineNo)) {
 				// Note: this is still a best-effort heuristic. We skip local
 				// literal strings and compile-time consts that are visible in the
 				// current diff hunk, but identifiers resolved outside that scope
