@@ -42,7 +42,7 @@ func (r SLP060) Check(d *diff.Diff) []Finding {
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
-					Message:  "interface " + m[1] + " added with few struct types — may be premature abstraction",
+					Message:  "interface " + m[1] + " has only one struct declaration found — heuristic counts structs, not verified implementations",
 					Snippet:  strings.TrimSpace(ln.Content),
 				})
 			}

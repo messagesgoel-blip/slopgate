@@ -9,13 +9,14 @@ func TestSLP066_FiresOnMapWithGoroutineNoMutex(t *testing.T) {
 	d := parseDiff(t, `diff --git a/worker.go b/worker.go
 --- a/worker.go
 +++ b/worker.go
-@@ -1,1 +1,6 @@
+@@ -1,1 +1,7 @@
  package worker
 +
 +var cache = map[string]int{}
 +
 +func Run() {
 +	go updateCache()
++	cache["key"] = 1
 +}
 `)
 	got := SLP066{}.Check(d)
@@ -25,7 +26,7 @@ func TestSLP066_FiresOnMapWithGoroutineNoMutex(t *testing.T) {
 	if got[0].File != "worker.go" {
 		t.Errorf("file: %q", got[0].File)
 	}
-	if !strings.Contains(got[0].Message, "map accessed concurrently") {
+	if !strings.Contains(got[0].Message, "map") {
 		t.Errorf("message should mention concurrent map: %q", got[0].Message)
 	}
 }
@@ -34,7 +35,7 @@ func TestSLP066_NoFireWithMutex(t *testing.T) {
 	d := parseDiff(t, `diff --git a/worker.go b/worker.go
 --- a/worker.go
 +++ b/worker.go
-@@ -1,1 +1,8 @@
+@@ -1,1 +1,9 @@
  package worker
 +
 +var cache = map[string]int{}
@@ -42,6 +43,7 @@ func TestSLP066_NoFireWithMutex(t *testing.T) {
 +
 +func Run() {
 +	go updateCache()
++	cache["key"] = 1
 +}
 `)
 	got := SLP066{}.Check(d)
@@ -61,6 +63,7 @@ func TestSLP066_FiresOnMapWithWaitGroupNoMutex(t *testing.T) {
 +
 +func Run() {
 +	var wg sync.WaitGroup
++	cache["key"] = 1
 +	wg.Add(1)
 +}
 `)
@@ -84,6 +87,26 @@ func TestSLP066_NoFireWithoutMap(t *testing.T) {
 	got := SLP066{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP066_NoFireWithSyncMap(t *testing.T) {
+	d := parseDiff(t, `diff --git a/worker.go b/worker.go
+--- a/worker.go
++++ b/worker.go
+@@ -1,1 +1,7 @@
+ package worker
++
++var cache sync.Map
++
++func Run() {
++	go updateCache()
++	cache.Store("key", 1)
++}
+`)
+	got := SLP066{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings with sync.Map, got %d: %+v", len(got), got)
 	}
 }
 

@@ -56,12 +56,8 @@ func (r SLP063) Check(d *diff.Diff) []Finding {
 					}
 					trimmed := strings.TrimSpace(bl.Content)
 					if trimmed == "" || strings.HasPrefix(trimmed, "//") {
-						// Comment-only or blank lines don't contain real field definitions,
-						// but their braces still affect depth. Use count-based tracking.
-						depth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
-						if depth <= 0 {
-							break
-						}
+						// Comment-only and blank lines do not alter brace depth —
+						// braces inside comments are not structural delimiters.
 						j++
 						continue
 					}
