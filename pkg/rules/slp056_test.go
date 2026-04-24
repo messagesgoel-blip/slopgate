@@ -24,6 +24,9 @@ func TestSLP056_FiresOnAPIKey(t *testing.T) {
 	if !strings.Contains(got[0].Message, "hardcoded secret pattern detected") {
 		t.Errorf("message: %q", got[0].Message)
 	}
+	if got[0].Snippet != "[REDACTED]" {
+		t.Errorf("snippet should be redacted, got %q", got[0].Snippet)
+	}
 }
 
 func TestSLP056_FiresOnPassword(t *testing.T) {

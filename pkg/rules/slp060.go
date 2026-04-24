@@ -43,7 +43,7 @@ func (r SLP060) Check(d *diff.Diff) []Finding {
 					File:     f.Path,
 					Line:     ln.NewLineNo,
 					Message:  "interface " + m[1] + " has only one struct declaration found — heuristic counts structs, not verified implementations",
-					Snippet:  strings.TrimSpace(ln.Content),
+					Snippet:  ln.Content,
 				})
 			}
 		}
