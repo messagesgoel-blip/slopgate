@@ -22,10 +22,11 @@ func (SLP046) Description() string {
 	return "function defined in one file is called from another file — consider colocating related logic"
 }
 
-// callPattern returns a regexp matching a bare call to funcName, ensuring it
-// is not preceded by a dot and is followed by '('.
+// callPattern returns a regexp matching a bare call to funcName.
+// It matches qualified calls like pkg.Func() but ignores likely method calls
+// (receiver.Func where receiver is lowercase like r., t., x.)
 func callPattern(funcName string) *regexp.Regexp {
-	return regexp.MustCompile(`(?m)(^|[^\w])(?:[A-Za-z_]\w*\s*\.\s*)*` + regexp.QuoteMeta(funcName) + `\s*\(`)
+	return regexp.MustCompile(`(?m)(^|[^\w])` + regexp.QuoteMeta(funcName) + `\s*\(`)
 }
 
 func (r SLP046) Check(d *diff.Diff) []Finding {
