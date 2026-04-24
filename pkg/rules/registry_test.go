@@ -47,6 +47,31 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 		"SLP043": false,
 		"SLP044": false,
 		"SLP045": false,
+		"SLP046": false,
+		"SLP047": false,
+		"SLP048": false,
+		"SLP049": false,
+		"SLP050": false,
+		"SLP051": false,
+		"SLP052": false,
+		"SLP053": false,
+		"SLP054": false,
+		"SLP055": false,
+		"SLP056": false,
+		"SLP057": false,
+		"SLP058": false,
+		"SLP059": false,
+		"SLP060": false,
+		"SLP061": false,
+		"SLP062": false,
+		"SLP063": false,
+		"SLP064": false,
+		"SLP065": false,
+		"SLP066": false,
+		"SLP067": false,
+		"SLP068": false,
+		"SLP069": false,
+		"SLP070": false,
 	}
 	for _, rule := range r.All() {
 		if _, ok := want[rule.ID()]; ok {
@@ -62,7 +87,7 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 
 func TestDefault_NoExtraRules(t *testing.T) {
 	r := Default()
-	if got := len(r.All()); got != 42 {
-		t.Errorf("Default registry has %d rules, want 42", got)
+	if got := len(r.All()); got != 67 {
+		t.Errorf("Default registry has %d rules, want 67", got)
 	}
 }

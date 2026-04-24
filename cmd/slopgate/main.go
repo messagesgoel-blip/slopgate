@@ -75,6 +75,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		for _, rule := range reg.All() {
 			fmt.Fprintf(stdout, "%s\t%s\t%s\n", rule.ID(), rule.DefaultSeverity(), rule.Description())
 		}
+		for _, rule := range reg.AllSemantic() {
+			fmt.Fprintf(stdout, "%s\t%s\t%s [AST]\n", rule.ID(), rule.DefaultSeverity(), rule.Description())
+		}
 		return 0
 	}
 

@@ -45,9 +45,10 @@ func isSafetyTestName(name string) bool {
 // parameter name (usually "t" but could be anything).
 var testFuncSignature = regexp.MustCompile(`^func\s+(Test\w+)\s*\(\s*(\w+)\s*\*testing\.T\s*\)\s*\{`)
 
-// libraryAssertTokens are assertion tokens that come from third-party
+// LibraryAssertTokens are assertion tokens that come from third-party
 // test libraries and do not depend on the testing.T parameter name.
-var libraryAssertTokens = []string{
+// Exported so other rules (e.g. SLP064) can reuse the same list.
+var LibraryAssertTokens = []string{
 	// testify
 	"assert.", "require.",
 	// gomega
@@ -73,7 +74,7 @@ func hasAssertion(line, tVar string) bool {
 			return true
 		}
 	}
-	for _, tok := range libraryAssertTokens {
+	for _, tok := range LibraryAssertTokens {
 		if strings.Contains(line, tok) {
 			return true
 		}
