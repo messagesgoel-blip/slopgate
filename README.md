@@ -48,7 +48,7 @@ Exit codes:
 - `1` - blocking findings present
 - `2` - configuration or tool error
 
-## Rules (v0.0.8)
+## Rules (v0.0.10)
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
@@ -87,13 +87,29 @@ Exit codes:
 
 \* SLP020 escalates to **warn** when security-context keywords (password, token, secret, key, session, nonce, salt, credential, auth) appear nearby.
 
-### v0.0.8 Changes
+### v0.0.10 Changes
 
-- **SLP031**: New rule flagging documentation files that indicate external code intake without license validation. Detects patterns like "direct-code intake", "upstream repo", "Lovable-generated" and checks for license review confirmation.
-- **SLP032**: New rule for React/TSX components detecting missing React imports, and buttons without accessibility attributes (aria-label, title, or visible text).
-- **SLP033**: New rule for missing import statements — detects React hooks and common types used without corresponding imports, including namespace imports (`import * as React`).
-- **SLP034**: New rule for React state management anti-patterns — sequential state updates, async useEffect callbacks, direct state mutation.
-- **SLP035**: New rule for code quality issues — console/debugger statements, TODO/FIXME without ticket references, trailing whitespace, and overly long lines.
+- **SLP036-SLP045**: New semantic rules for CodeRabbit parity (query methods, transaction scoping, webhook patterns)
+- **SLP046-SLP070**: 25 new rules for AI-slop detection (file cohesion, redundant comments, SQL injection, hardcoded secrets, dynamic code execution, concurrent maps, resource leaks, etc.)
+- **SLP071-SLP080**: 10 new AST-aware semantic rules using go/parser + go/types:
+  - SLP071: Type assertion without comma-ok idiom
+  - SLP072: Potential nil pointer dereference
+  - SLP073: Resource acquired without defer close
+  - SLP074: Loop variable captured by goroutine (race condition)
+  - SLP075: Weak cryptographic functions (md5, sha1, DES, RC4)
+  - SLP076: SQL built with string concatenation
+  - SLP077: Hardcoded credentials detected in AST
+  - SLP078: Select on potentially closed channel
+  - SLP079: Ignored error returns from known functions
+  - SLP080: Interface with single implementation (possible over-abstraction)
+
+Total: 77 rules (up from 27 in v0.0.7)
+
+### v0.0.9 Changes
+
+- **SLP031-035**: React/TSX component issues, missing imports, state anti-patterns, code quality
+- **SLP036-SLP045**: Semantic rules for API docs, transaction scoping, webhook patterns, query methods
+- **SLP046-SLP070**: 25 new AI-slop detection rules
 
 ### v0.0.7 Changes
 
