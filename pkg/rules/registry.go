@@ -72,5 +72,16 @@ func Default() *Registry {
 	r.Register(SLP068{})
 	r.Register(SLP069{})
 	r.Register(SLP070{})
+	// Register semantic (AST-aware) rules.
+	r.RegisterSemantic(SLP071{})
+	r.RegisterSemantic(SLP072{})
+	r.RegisterSemantic(SLP073{})
+	r.RegisterSemantic(SLP074{})
+	r.RegisterSemantic(SLP075{})
+	r.RegisterSemantic(SLP076{})
+	r.RegisterSemantic(SLP077{})
+	r.RegisterSemantic(SLP078{})
+	r.RegisterSemantic(SLP079{})
+	r.RegisterSemantic(SLP080{})
 	return r
 }
