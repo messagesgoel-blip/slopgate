@@ -1,0 +1,4 @@
+[[rules]]
+description = "Ignore test files with fake private keys"
+# Ignore the test file that contains fake private key patterns
+file = '''pkg/rules/slp056_test.go'''

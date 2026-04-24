@@ -79,13 +79,14 @@ func slp067ScopeDepth(added []diff.Line, end int) int {
 
 func slp067LineHasClose(line, varName string) bool {
 	line = stripCommentAndStrings(line)
+	trimmed := strings.TrimSpace(line)
 	if varName == "" {
-		return strings.Contains(line, ".Close()") || strings.Contains(line, "defer")
+		return strings.Contains(trimmed, ".Close()") || strings.HasPrefix(trimmed, "defer ")
 	}
-	return strings.Contains(line, varName+".Close()") ||
-		strings.Contains(line, varName+".Body.Close()") ||
-		strings.Contains(line, "defer "+varName+".") ||
-		strings.Contains(line, "defer "+varName+".Body.")
+	return strings.Contains(trimmed, varName+".Close()") ||
+		strings.Contains(trimmed, varName+".Body.Close()") ||
+		strings.HasPrefix(trimmed, "defer "+varName+".") ||
+		strings.Contains(trimmed, "defer "+varName+".Body.")
 }
 
 func (r SLP067) Check(d *diff.Diff) []Finding {
