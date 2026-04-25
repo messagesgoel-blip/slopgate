@@ -31,7 +31,6 @@ var (
 	}
 
 	// Const/function declarations (standalone, exported)
-	// These patterns match exported const functions that start with 'export'
 	slp089ConstExportPatterns = []*regexp.Regexp{
 		regexp.MustCompile(`^export\s+const\s+\w+\s*=\s*\([^)]*\)\s*=>`),
 		regexp.MustCompile(`^export\s+const\s+\w+\s*=\s*async?\s*\(|^export\s+async\s+const\s+\w+\s*=\s*\([^)]*\)\s*=>`),
@@ -39,15 +38,16 @@ var (
 		regexp.MustCompile(`^export\s+default\s+function\s+\w+\s*\(.*?\)|^export\s+default\s+const\s+\w+\s*=\s*function|^export\s+default\s+const\s+\w+\s*=\s*\([^)]*\)\s*=>`),
 	}
 
-	// Go patterns - must start with uppercase to be exported
+	// Go patterns - exported functions and types
 	slp089GoExportPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`^func\s+[A-Z]\w*\s*\(`),
-		regexp.MustCompile(`^type\s+[A-Z]\w*\s+\w+`),
+		regexp.MustCompile(`^func(\s+\([^)]+\))?\s+[A-Z]\w*(\s*\[[\w\s,<>]+\])?\s*\(`),
+		regexp.MustCompile(`^type\s+[A-Z]\w*(\s*\[[\w\s,<>]+\])?\s+(?:struct|interface|map|func|\([^)]+\))?`),
+		regexp.MustCompile(`^type\s+[A-Z]\w*\s*=`),
 	}
 
-	// Python patterns
+	// Python patterns - top-level, non-private exports only
 	slp089PythonExportPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`^def\s+\w+\s*\(`),
+		regexp.MustCompile(`^def\s+[A-Za-z]\w*\s*\(`),
 	}
 
 	// Comment/docstring patterns
@@ -63,6 +63,9 @@ var (
 
 	// Pre-compiled regex for extracting export names
 	exportNamePattern = regexp.MustCompile(`^(?:export\s+)?(?:const\s+|function\s+|async\s+function\s+|class\s+)\s*(\w+)`)
+
+	// Pre-compiled regex for checking re-exports
+	reNamePattern = regexp.MustCompile(`\b\w+\b`)
 )
 
 // isExportDeclaration checks if a line is an export statement or export declaration
@@ -97,6 +100,10 @@ func isGoExport(content string) bool {
 
 // isPythonExport checks if a line is a Python export declaration
 func isPythonExport(content string) bool {
+	// Python exports must be at column 0 (top-level) and not start with underscore
+	if strings.HasPrefix(content, " ") || strings.HasPrefix(content, "\t") {
+		return false
+	}
 	for _, pattern := range slp089PythonExportPatterns {
 		if pattern.MatchString(content) {
 			return true
@@ -114,30 +121,27 @@ func isBraceExport(content string) bool {
 // findReexportedName checks if content (e.g., "const add = () => ...") is re-exported via export { add }
 // Returns the identifier name if found, empty string otherwise
 func findReexportedName(content string) string {
-	// Extract function/variable name from declaration like:
-	// - const add = (a, b) => ...
-	// - function foo() {}
-	// - class Bar {}
-
 	if matches := exportNamePattern.FindStringSubmatch(strings.TrimSpace(content)); len(matches) > 1 {
 		return matches[1]
 	}
 	return ""
 }
 
-
 // doExportedInHunk checks if a const/function is exported via brace export in this hunk
 // pass the const/function line index to avoid self-referencing
 func doExportedInHunk(h diff.Hunk, constLineIdx int, constName string) bool {
-	reNamePattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(constName) + `\b`)
 	for j, ln := range h.Lines {
 		if j == constLineIdx {
+			continue
+		}
+		// Skip deleted lines - they don't represent current exports
+		if ln.Kind == diff.LineDelete {
 			continue
 		}
 		if strings.HasPrefix(strings.TrimSpace(ln.Content), "export {") {
 			// Check if constName is in the export list
 			content := strings.TrimSpace(ln.Content)
-			// Match export { name } or export { name as alias } or export { name, other }
+			reNamePattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(constName) + `\b`)
 			if reNamePattern.MatchString(content) {
 				return true
 			}
@@ -148,7 +152,10 @@ func doExportedInHunk(h diff.Hunk, constLineIdx int, constName string) bool {
 
 // isExportLine checks if this line is an export-like declaration
 func isExportLine(content string, h diff.Hunk, idx int) (IsExport bool, isGo bool, isPython bool) {
-	content = strings.TrimSpace(content)
+	// Skip indented lines - they are inside functions/classes, not top-level exports
+	if strings.HasPrefix(content, " ") || strings.HasPrefix(content, "\t") {
+		// Unless it's a Go method with receiver, which has leading content but we check differently
+	}
 
 	if isExportDeclaration(content) || isConstExportDeclaration(content) {
 		return true, false, false
@@ -302,14 +309,41 @@ func (r SLP089) hasDocsBefore(h diff.Hunk, exportIdx int, filePath string, isGo,
 	foundAnyDoc := false
 
 	exportLeadingSpaces := 0
-	for _, r := range h.Lines[exportIdx].Content {
-		if r == ' ' || r == '\t' {
+	for _, ch := range h.Lines[exportIdx].Content {
+		if ch == ' ' || ch == '\t' {
 			exportLeadingSpaces++
 		} else {
 			break
 		}
 	}
 
+	// For Python, check forward for docstrings inside function body
+	if isPython || strings.Contains(strings.ToLower(filePath), ".py") {
+		for k := exportIdx + 1; k < len(h.Lines); k++ {
+			prev := h.Lines[k]
+			if prev.Kind != diff.LineAdd && prev.Kind != diff.LineContext {
+				continue
+			}
+
+			content := strings.TrimSpace(prev.Content)
+			if content == "" {
+				continue
+			}
+
+			// Check for Python docstrings (triple-quoted strings)
+			for i := range slp089DocPatterns {
+				if slp089DocPatterns[i].MatchString(content) {
+					foundAnyDoc = true
+					break
+				}
+			}
+			if foundAnyDoc {
+				break
+			}
+		}
+	}
+
+	// Check backward for docstrings (for Go and JS/TS)
 	for k := exportIdx - 1; k >= 0; k-- {
 		prev := h.Lines[k]
 		// Only check LineAdd and LineContext - ignore LineDelete (old file content)
@@ -329,8 +363,8 @@ func (r SLP089) hasDocsBefore(h diff.Hunk, exportIdx int, filePath string, isGo,
 		if isGo || strings.Contains(strings.ToLower(filePath), ".go") {
 			// Count leading spaces in original content
 			leadingSpaces := 0
-			for _, r := range prev.Content {
-				if r == ' ' || r == '\t' {
+			for _, ch := range prev.Content {
+				if ch == ' ' || ch == '\t' {
 					leadingSpaces++
 				} else {
 					break

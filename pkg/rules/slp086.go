@@ -39,8 +39,10 @@ var (
 		regexp.MustCompile(`(?i)if\s*\(\s*!?\s*\w+\.(isAdmin|isAuth|isAuthorized)`), // Auth check with optional negation
 		regexp.MustCompile(`(?i)res\.(status|send|json)\s*\([^)]*403|res\.(status|send|json)\s*\([^)]*Forbidden`),
 	}
-	// Route pattern for detecting API routes
-	routePattern = regexp.MustCompile(`(?i)(router|app|express)\.(post|put|patch|delete)\s*\(`)
+	// Route pattern for detecting API routes across languages
+	routePattern        = regexp.MustCompile(`(?i)(router|app|express)\.(post|put|patch|delete)\s*\(`)
+	goRoutePattern     = regexp.MustCompile(`(?i)\b(?:http|mux)\.HandleFunc\b|\b(?:r|e)\.(POST|PUT|PATCH|DELETE)\s*\(`)
+	pythonRoutePattern = regexp.MustCompile(`(?i)@\w+\.(route|get|post|put|delete|patch)\b`)
 )
 
 func init() {
@@ -90,11 +92,15 @@ func (r SLP086) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				content := strings.TrimSpace(ln.Content)
-				if routePattern.MatchString(content) {
+				// Check for route patterns across all languages
+				isRoute := routePattern.MatchString(content) ||
+					goRoutePattern.MatchString(content) ||
+					pythonRoutePattern.MatchString(content)
+				if isRoute {
 					routes = append(routes, routeInfo{
-						startIdx:           i,
-						endIdx:             -1, // Will be filled by closing brace
-						content:            content,
+						startIdx:             i,
+						endIdx:               -1, // Will be filled by closing brace
+						content:              content,
 						sensitiveActionFound: false,
 					})
 
@@ -114,6 +120,7 @@ func (r SLP086) Check(d *diff.Diff) []Finding {
 				depth := 0
 				routeStarted := false
 				inBlockComment := false
+				isPython := strings.HasSuffix(strings.ToLower(f.Path), ".py")
 				for j := route.startIdx; j < len(h.Lines); j++ {
 					ln := h.Lines[j]
 					// Count braces in this line, ignoring those inside comments
@@ -123,17 +130,21 @@ func (r SLP086) Check(d *diff.Diff) []Finding {
 
 						// Handle comment tracking
 						if !inBlockComment && k+1 < len(lineContent) && lineContent[k] == '/' && lineContent[k+1] == '/' {
-							// Single-line comment, skip rest of line
+							// Single-line comment (//), skip rest of line
+							break
+						}
+						// Python single-line comment (#)
+						if !inBlockComment && isPython && lineContent[k] == '#' {
 							break
 						}
 						if !inBlockComment && k+1 < len(lineContent) && lineContent[k] == '/' && lineContent[k+1] == '*' {
-							// Start of block comment
+							// Start of block comment (/*)
 							inBlockComment = true
 							k++ // Skip *
 							continue
 						}
 						if inBlockComment && k+1 < len(lineContent) && lineContent[k] == '*' && lineContent[k+1] == '/' {
-							// End of block comment
+							// End of block comment (*/)
 							inBlockComment = false
 							k++ // Skip *
 							continue
@@ -143,10 +154,11 @@ func (r SLP086) Check(d *diff.Diff) []Finding {
 						}
 
 						// Count braces only when not in comment
-						if ch == '(' || ch == '{' {
+						switch ch {
+						case '(', '{':
 							depth++
 							routeStarted = true
-						} else if ch == ')' || ch == '}' {
+						case ')', '}':
 							depth--
 						}
 					}
