@@ -87,7 +87,7 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 
 func TestDefault_NoExtraRules(t *testing.T) {
 	r := Default()
-	if got := len(r.All()); got != 67 {
-		t.Errorf("Default registry has %d rules, want 67", got)
+	if got := len(r.All()); got != 77 {
+		t.Errorf("Default registry has %d rules, want 77", got)
 	}
 }
