@@ -40,7 +40,7 @@ var (
 		regexp.MustCompile(`(?i)res\.(status|send|json)\s*\([^)]*403|res\.(status|send|json)\s*\([^)]*Forbidden`),
 	}
 	// Route pattern for detecting API routes across languages
-	routePattern        = regexp.MustCompile(`(?i)(router|app|express)\.(post|put|patch|delete)\s*\(`)
+	routePattern       = regexp.MustCompile(`(?i)(router|app|express)\.(post|put|patch|delete)\s*\(`)
 	goRoutePattern     = regexp.MustCompile(`(?i)\b(?:http|mux)\.HandleFunc\b|\b(?:r|e)\.(POST|PUT|PATCH|DELETE)\s*\(`)
 	pythonRoutePattern = regexp.MustCompile(`(?i)@\w+\.(route|get|post|put|delete|patch)\b`)
 )
@@ -105,9 +105,8 @@ func (r SLP086) Check(d *diff.Diff) []Finding {
 					})
 
 					// Check if this route handles sensitive actions using pre-compiled patterns
-					contentLower := strings.ToLower(content)
 					for _, pattern := range slp086SensitiveActionPatterns {
-						if pattern.MatchString(contentLower) {
+						if pattern.MatchString(content) {
 							routes[len(routes)-1].sensitiveActionFound = true
 							break
 						}
