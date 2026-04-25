@@ -68,8 +68,8 @@ index 123..456 100644
 @@ -1,5 +1,8 @@
  import { useMemo } from 'react'
  const MyComponent = () => {
--  const value = useMemo(() => computeExpensiveValue()) || useMemo(() => computeExpensiveValue(), [])
-+  const value = useMemo(() => computeExpensiveValue()) || useMemo(() => computeExpensiveValue(), [])
+-  const value = useMemo(() => computeExpensiveValue(), [])
++  const value = useMemo(() => computeExpensiveValue(), [])
    return <div>{value}</div>
  }
 `),

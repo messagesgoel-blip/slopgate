@@ -114,7 +114,7 @@ Exit codes:
   - SLP089: Exported function/class/module missing docstring
   - SLP090: API route without error handling
 
-Total: 87 rules (up from 77 in v0.0.10)
+Total: 87 rules (up from 77 in v0.0.9)
 
 ### v0.0.9 Changes
 

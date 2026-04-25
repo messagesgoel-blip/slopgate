@@ -178,6 +178,20 @@ func hasLineAddEquivalent(h diff.Hunk, idx int) bool {
 	return false
 }
 
+// shouldReportExport determines if an export Line should be reported based on its Kind
+func shouldReportExport(line diff.Line, hasLineAddEq func(int) bool) bool {
+	switch line.Kind {
+	case diff.LineAdd:
+		return true
+	case diff.LineContext:
+		return !hasLineAddEq(0) // We need the actual index for hasLineAddEq
+	case diff.LineDelete:
+		return true
+	default:
+		return false
+	}
+}
+
 func (r SLP089) Check(d *diff.Diff) []Finding {
 	var out []Finding
 
@@ -226,27 +240,15 @@ func (r SLP089) Check(d *diff.Diff) []Finding {
 
 				if isExport {
 					if lastExportLine >= 0 && lastExportContent != "" {
-						// Check if previous export should be reported:
-						// - If previous was LineContext, report it ONLY if no LineAdd version exists
-						// - If previous was LineAdd, report it
-						// - If previous was LineDelete, report it (no corresponding LineAdd)
+						// Use switch statement to determine if this export should be reported
 						report := false
-						if lastExportNewLineNo > 0 {
-							// LineAdd or LineContext (both have valid NewLineNo)
-							// Report if LineAdd, or if LineContext without LineAdd equivalent
-							if h.Lines[lastExportLine].Kind == diff.LineAdd {
-								report = true
-							} else if h.Lines[lastExportLine].Kind == diff.LineContext {
-								if !hasLineAddEquivalent(h, lastExportLine) {
-									report = true
-								}
-							}
-						} else {
-							// LineDelete (NewLineNo == 0)
-							// Report if no LineAdd version exists for this content
-							if !hasLineAddEquivalent(h, lastExportLine) {
-								report = true
-							}
+						switch h.Lines[lastExportLine].Kind {
+						case diff.LineAdd:
+							report = true
+						case diff.LineContext:
+							report = !hasLineAddEquivalent(h, lastExportLine)
+						case diff.LineDelete:
+							report = !hasLineAddEquivalent(h, lastExportLine)
 						}
 
 						if report {
@@ -275,19 +277,15 @@ func (r SLP089) Check(d *diff.Diff) []Finding {
 
 			// Handle last export in hunk
 			if lastExportLine >= 0 && lastExportContent != "" {
+				// Use switch statement to determine if this export should be reported
 				report := false
-				if lastExportNewLineNo > 0 {
-					if h.Lines[lastExportLine].Kind == diff.LineAdd {
-						report = true
-					} else if h.Lines[lastExportLine].Kind == diff.LineContext {
-						if !hasLineAddEquivalent(h, lastExportLine) {
-							report = true
-						}
-					}
-				} else {
-					if !hasLineAddEquivalent(h, lastExportLine) {
-						report = true
-					}
+				switch h.Lines[lastExportLine].Kind {
+				case diff.LineAdd:
+					report = true
+				case diff.LineContext:
+					report = !hasLineAddEquivalent(h, lastExportLine)
+				case diff.LineDelete:
+					report = !hasLineAddEquivalent(h, lastExportLine)
 				}
 
 				if report {
