@@ -19,7 +19,7 @@ func (SLP082) Description() string {
 
 var (
 	// Matches .map() or .forEach() followed by JSX list item
-	slp082MapPattern = regexp.MustCompile(`(?i)\.map.*<li|\.map.*<div|\.map.*<span|\.map.*<p|\.map.*<tr|\.map.*<td|\.map.*<th|\.map.*<option`)
+	slp082MapPattern     = regexp.MustCompile(`(?i)\.map.*<li|\.map.*<div|\.map.*<span|\.map.*<p|\.map.*<tr|\.map.*<td|\.map.*<th|\.map.*<option`)
 	slp082ForEachPattern = regexp.MustCompile(`(?i)\.forEach.*<li|\.forEach.*<div|\.forEach.*<span|\.forEach.*<p|\.forEach.*<tr|\.forEach.*<td|\.forEach.*<th|\.forEach.*<option`)
 
 	// Check for key prop
@@ -33,8 +33,9 @@ func (r SLP082) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		// Only check TSX files
-		if !strings.HasSuffix(strings.ToLower(f.Path), ".tsx") {
+		// Only check TSX and JSX files
+		if !strings.HasSuffix(strings.ToLower(f.Path), ".tsx") &&
+			!strings.HasSuffix(strings.ToLower(f.Path), ".jsx") {
 			continue
 		}
 

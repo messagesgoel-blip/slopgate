@@ -22,8 +22,6 @@ var (
 	slp084EventListenerPattern = regexp.MustCompile(`(?i)(addEventListener|addEventListener\s*\([^)]*['"](?:click|scroll|resize|beforeunload|hashchange|popstate)['"])`)
 	// Matches useEffect that sets timer without cleanup
 	slp084TimerPattern = regexp.MustCompile(`(?i)(setTimeout|setInterval)\s*\(`)
-	// Matches useEffect that sets state after async without cleanup guard
-	slp084AsyncStatePattern = regexp.MustCompile(`(?i)await\s+\w+.*[\s\S]*?\.then\s*\(\s*\w+\s*=>\s*\w+\s*=\s*`)
 	// Matches useEffect with async callback
 	slp084AsyncEffectPattern = regexp.MustCompile(`(?i)useEffect\s*\(\s*\(\s*\)\s*=>\s*async`)
 )

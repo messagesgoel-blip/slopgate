@@ -20,10 +20,6 @@ func (SLP085) Description() string {
 var (
 	// Common SQL DML keywords
 	slp085SqlKeywords = []string{"SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE"}
-	// SQL-like patterns that could indicate injection risk
-	slp085SqlConcatPattern = regexp.MustCompile(`(?i)\b(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)\b.*[\+\+]|(\w+_(?:query|execute|exec|run|statement))\s*\([^)]*[\+\+][^)]*\)`)
-	// Matches string concatenation with SQL
-	slp085StringConcatPattern = regexp.MustCompile(`["'][\w\s]+["']\s*\+\s*\w+|\w+\s*\+\s*["'][\w\s]+["']`)
 	// Matches template literal with SQL variables
 	slp085TemplateLiteralPattern = regexp.MustCompile("`(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)[^`]*\\${")
 )

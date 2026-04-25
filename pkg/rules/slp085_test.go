@@ -28,18 +28,17 @@ index 123..456 100644
 		},
 		{
 			name: "SQL template literal",
-			diff: `diff --git a/src/services/userService.js b/src/services/userService.js
-index 123..456 100644
---- a/src/services/userService.js
-+++ b/src/services/userService.js
-@@ -1,5 +1,8 @@
--const getUser = (id) => {
--  const query = "SELECT * FROM users WHERE id = " + id
-+const getUser = (id) => {
-+  const query = "SELECT * FROM users WHERE id = " + id
-   return db.query(query)
- }
-`,
+			diff: "diff --git a/src/services/userService.js b/src/services/userService.js\n" +
+				"index 123..456 100644\n" +
+				"--- a/src/services/userService.js\n" +
+				"+++ b/src/services/userService.js\n" +
+				"@@ -1,5 +1,8 @@\n" +
+				"-const getUser = (id) => {\n" +
+				"-  const query = \"SELECT * FROM users WHERE id = \" + id\n" +
+				"+const getUser = (id) => {\n" +
+				"+  const query = `SELECT * FROM users WHERE id = ${id}`\n" +
+				"   return db.query(query)\n" +
+				" }\n",
 			expected: 1,
 		},
 		{
