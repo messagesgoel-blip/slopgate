@@ -7,8 +7,9 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
-// SLP081 flags TSX files with React components that lack the React import.
-// This is a common pattern where components use JSX but don't import React.
+// SLP081 flags TSX/JSX files with React components that lack the React import.
+// In React 17+, JSX compiles without React import, but older versions or
+// certain config may still require it for proper JSX transform.
 type SLP081 struct{}
 
 func (SLP081) ID() string                { return "SLP081" }

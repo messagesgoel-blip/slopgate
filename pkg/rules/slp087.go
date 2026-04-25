@@ -39,7 +39,7 @@ var (
 	slp087TimeoutPatterns = []*regexp.Regexp{
 		regexp.MustCompile(`(?i)timeout(?:Ms|ms|millis|OUT)?\s*[:=]?\s*\d+`),
 		regexp.MustCompile(`(?i)signal\.abort|AbortController`),
-		regexp.MustCompile(`(?i)context\.WithTimeout|context\.TODO`),
+		regexp.MustCompile(`(?i)context\.With(?:Timeout|Deadline|Cancel)`),
 		regexp.MustCompile(`(?i)http\.Client\s*\{[^}]*Timeout`),
 		regexp.MustCompile(`(?i)timeout\s*=\s*\d+`),
 		regexp.MustCompile(`(?i)setTimeout|setImmediate`),

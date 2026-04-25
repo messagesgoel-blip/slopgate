@@ -87,9 +87,6 @@ index 123..456 100644
 }
 
 func TestSLP081_JSXPattern(t *testing.T) {
-	r := SLP081{}
-	_ = r
-
 	// Test JSX pattern detection
 	tests := []struct {
 		line     string
@@ -103,7 +100,7 @@ func TestSLP081_JSXPattern(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run("", func(t *testing.T) {
+		t.Run(tt.line, func(t *testing.T) {
 			d := parseDiff(t, `diff --git a/test.tsx b/test.tsx
 index 123..456 100644
 --- a/test.tsx

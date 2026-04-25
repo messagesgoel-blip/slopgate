@@ -33,7 +33,7 @@ var (
 		regexp.MustCompile(`(?i)\.isAdmin|\.isAuth|\.isAuthorized|session\.user|session\.id`),
 		regexp.MustCompile(`(?i)ctx\.Value\s*\([^)]*(?:user|auth|session)`),
 		regexp.MustCompile(`(?i)if\s*\(\s*\w+\s*\.\s*(isAdmin|isAuth|isAuthorized)`),
-		regexp.MustCompile(`(?i)if\s*\(\s*!`), // Check for "if (!" pattern
+		regexp.MustCompile(`(?i)if\s*\(\s*!?\s*\w+\.(isAdmin|isAuth|isAuthorized|isAuthorized)`), // Auth check with optional negation
 		regexp.MustCompile(`(?i)res\.(status|send|json)\s*\([^)]*403|res\.(status|send|json)\s*\([^)]*Forbidden`),
 	}
 )

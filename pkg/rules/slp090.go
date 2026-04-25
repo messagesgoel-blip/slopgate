@@ -45,9 +45,10 @@ var (
 		regexp.MustCompile(`(?i)handleError|throw\s+new|return\s+error|respondWithError`),
 		regexp.MustCompile(`(?i)next\s*\(\s*err|\.catch\s*\(|\.then\s*\([^)]*\)\s*=>\s*\{?\s*if\s*\(.*err|catch\s*\(\s*err`),
 
-		// Response status patterns
+		// Response status patterns - only match error responses
 		regexp.MustCompile(`(?i)status\s*\(\s*(4|5)\d{2}\s*\)|res\.(status|send|json)\s*\([^)]*(?:error|fail|4xx|5xx)`),
-		regexp.MustCompile(`(?i)res\.(status|send|json)\s*\([^)]*\)\s*;\s*$`),
+		// Match 4xx/5xx status codes or error/fail in the call
+		regexp.MustCompile(`(?i)res\.(status|send|json)\s*\(\s*(4|5)\d{2}\s*\)|res\.(status|send|json)\s*\([^)]*(?:error|fail)`),
 	}
 )
 
@@ -71,7 +72,7 @@ func (r SLP090) Check(d *diff.Diff) []Finding {
 		// Track routes and their error handling
 		for _, h := range f.Hunks {
 			inRoute := false
-			routeStartLine := 0
+			routeStartLine := -1
 			hasErrorHandling := false
 
 			for j, ln := range h.Lines {
@@ -108,7 +109,7 @@ func (r SLP090) Check(d *diff.Diff) []Finding {
 
 					// Check if we've exited the route (closing brace, next route, or end of function)
 					if strings.Contains(content, "}") && j > routeStartLine {
-						if !hasErrorHandling && routeStartLine > 0 && !isDocFile(f.Path) {
+						if !hasErrorHandling && routeStartLine >= 0 && !isDocFile(f.Path) {
 							out = append(out, Finding{
 								RuleID:   r.ID(),
 								Severity: r.DefaultSeverity(),
@@ -124,7 +125,7 @@ func (r SLP090) Check(d *diff.Diff) []Finding {
 			}
 
 			// Handle case where file ends with a route without error handling
-			if inRoute && !hasErrorHandling && routeStartLine > 0 && !isDocFile(f.Path) {
+			if inRoute && !hasErrorHandling && routeStartLine >= 0 && !isDocFile(f.Path) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

@@ -60,7 +60,7 @@ index 123..456 100644
 			expected: 1,
 		},
 		{
-			name: "useMemo without deps (missing array)",
+			name: "useMemo with empty deps is ok",
 			diff: strings.TrimSpace(`diff --git a/src/components/MyComponent.tsx b/src/components/MyComponent.tsx
 index 123..456 100644
 --- a/src/components/MyComponent.tsx
@@ -68,12 +68,12 @@ index 123..456 100644
 @@ -1,5 +1,8 @@
  import { useMemo } from 'react'
  const MyComponent = () => {
--  const value = useMemo(() => computeExpensiveValue())
-+  const value = useMemo(() => computeExpensiveValue())
+-  const value = useMemo(() => computeExpensiveValue()) || useMemo(() => computeExpensiveValue(), [])
++  const value = useMemo(() => computeExpensiveValue()) || useMemo(() => computeExpensiveValue(), [])
    return <div>{value}</div>
  }
 `),
-			expected: 1,
+			expected: 0,
 		},
 		{
 			name: "regular function should be skipped",

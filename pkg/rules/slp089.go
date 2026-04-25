@@ -29,17 +29,19 @@ var (
 		regexp.MustCompile(`(?i)^export\s+(default\s+)?module`),
 	}
 
-	// Const/function declarations (standalone, not export-prefixed)
+	// Const/function declarations (standalone, exported)
+	// These patterns match exported const functions that start with 'export'
 	slp089ConstExportPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`^const\s+\w+\s*=\s*\([^)]*\)\s*=>`),
-		regexp.MustCompile(`^const\s+\w+\s*=\s*async?\s*\(|^async\s+const\s+\w+\s*=\s*\([^)]*\)\s*=>`),
-		regexp.MustCompile(`(?i)^async\s+function\s+\w+\s*\(.*?\)|^function\s+\w+\s*\(.*?\)`),
+		regexp.MustCompile(`^export\s+const\s+\w+\s*=\s*\([^)]*\)\s*=>`),
+		regexp.MustCompile(`^export\s+const\s+\w+\s*=\s*async?\s*\(|^export\s+async\s+const\s+\w+\s*=\s*\([^)]*\)\s*=>`),
+		regexp.MustCompile(`^export\s+(async\s+)?function\s+\w+\s*\(.*?\)`),
+		regexp.MustCompile(`^export\s+default\s+function\s+\w+\s*\(.*?\)|^export\s+default\s+const\s+\w+\s*=\s*function|^export\s+default\s+const\s+\w+\s*=\s*\([^)]*\)\s*=>`),
 	}
 
-	// Go patterns
+	// Go patterns - must start with uppercase to be exported
 	slp089GoExportPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`^func\s+\w+\s*\(`),
-		regexp.MustCompile(`^type\s+\w+\s+\w+`),
+		regexp.MustCompile(`^func\s+[A-Z]\w+\s*\(`),
+		regexp.MustCompile(`^type\s+[A-Z]\w+\s+\w+`),
 	}
 
 	// Python patterns
@@ -105,13 +107,57 @@ func isBraceExport(content string) bool {
 	return strings.HasPrefix(content, "export {")
 }
 
+// findReexportedName checks if content (e.g., "const add = () => ...") is re-exported via export { add }
+// Returns the identifier name if found, empty string otherwise
+func findReexportedName(content string) string {
+	// Extract function/variable name from declaration like:
+	// - const add = (a, b) => ...
+	// - function foo() {}
+	// - class Bar {}
+
+	// Try const/function patterns
+	exportNamePattern := regexp.MustCompile(`^(?:export\s+)?(?:const\s+|function\s+|async\s+function\s+|class\s+)\s*(\w+)`)
+	if matches := exportNamePattern.FindStringSubmatch(strings.TrimSpace(content)); len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
+
+// doExportedInHunk checks if a const/function is exported via brace export in this hunk
+// pass the const/function line index to avoid self-referencing
+func doExportedInHunk(h diff.Hunk, constLineIdx int, constName string) bool {
+	for j, ln := range h.Lines {
+		if j == constLineIdx {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(ln.Content), "export {") {
+			// Check if constName is in the export list
+			content := strings.TrimSpace(ln.Content)
+			// Match export { name } or export { name as alias } or export { name, other }
+			reNamePattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(constName) + `\b`)
+			if reNamePattern.MatchString(content) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // isExportLine checks if this line is an export-like declaration
-func isExportLine(content string) (IsExport bool, isGo bool, isPython bool) {
+func isExportLine(content string, h diff.Hunk, idx int) (IsExport bool, isGo bool, isPython bool) {
 	content = strings.TrimSpace(content)
 
 	if isExportDeclaration(content) || isConstExportDeclaration(content) {
 		return true, false, false
 	}
+
+	// Check if this is a const/function that is re-exported via brace export
+	constName := findReexportedName(content)
+	if constName != "" && doExportedInHunk(h, idx, constName) {
+		return true, false, false
+	}
+
 	if isGoExport(content) {
 		return true, true, false
 	}
@@ -176,7 +222,7 @@ func (r SLP089) Check(d *diff.Diff) []Finding {
 					continue
 				}
 
-				isExport, isGo, isPython := isExportLine(content)
+				isExport, isGo, isPython := isExportLine(content, h, j)
 
 				if isExport {
 					if lastExportLine >= 0 && lastExportContent != "" {
@@ -278,7 +324,8 @@ func (r SLP089) hasDocsBefore(h diff.Hunk, exportIdx int, filePath string, isGo,
 
 	for k := exportIdx - 1; k >= 0; k-- {
 		prev := h.Lines[k]
-		if prev.Kind != diff.LineAdd && prev.Kind != diff.LineContext && prev.Kind != diff.LineDelete {
+		// Only check LineAdd and LineContext - ignore LineDelete (old file content)
+		if prev.Kind != diff.LineAdd && prev.Kind != diff.LineContext {
 			continue
 		}
 

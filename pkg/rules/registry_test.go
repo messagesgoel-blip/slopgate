@@ -87,7 +87,24 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 
 func TestDefault_NoExtraRules(t *testing.T) {
 	r := Default()
-	if got := len(r.All()); got != 77 {
-		t.Errorf("Default registry has %d rules, want 77", got)
+
+	// Check count first
+	wantCount := 77
+	if got := len(r.All()); got != wantCount {
+		t.Errorf("Default registry has %d rules, want %d", got, wantCount)
+	}
+
+	// Build set of all registered rule IDs
+	ruleIDs := make(map[string]bool)
+	for _, rule := range r.All() {
+		ruleIDs[rule.ID()] = true
+	}
+
+	// Verify SLP081-SLP090 are present
+	newRules := []string{"SLP081", "SLP082", "SLP083", "SLP084", "SLP085", "SLP086", "SLP087", "SLP088", "SLP089", "SLP090"}
+	for _, id := range newRules {
+		if !ruleIDs[id] {
+			t.Errorf("new rule %s not registered in Default()", id)
+		}
 	}
 }

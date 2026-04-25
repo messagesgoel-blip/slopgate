@@ -102,8 +102,19 @@ Exit codes:
   - SLP078: Select on potentially closed channel
   - SLP079: Ignored error returns from known functions
   - SLP080: Interface with single implementation (possible over-abstraction)
+- **SLP081-SLP090**: 10 new rules for CodeRabbit parity:
+  - SLP081: React component without React import (JSX pattern detection)
+  - SLP082: JSX list items missing React key prop
+  - SLP083: React hook without dependency array (useCallback/useMemo)
+  - SLP084: useEffect without cleanup for event listeners/timers
+  - SLP085: SQL built with string concatenation or template literals
+  - SLP086: Missing authorization check on sensitive endpoint
+  - SLP087: Webhook handler without timeout configuration
+  - SLP088: Hardcoded secrets in config/settings files
+  - SLP089: Exported function/class/module missing docstring
+  - SLP090: API route without error handling
 
-Total: 77 rules (up from 27 in v0.0.7)
+Total: 87 rules (up from 77 in v0.0.10)
 
 ### v0.0.9 Changes
 

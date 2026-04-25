@@ -62,12 +62,13 @@ func (r SLP088) Check(d *diff.Diff) []Finding {
 
 		fileLower := strings.ToLower(f.Path)
 
-		// Skip config files and .env files
-		if strings.Contains(fileLower, "config") &&
-			(strings.Contains(fileLower, ".toml") || strings.Contains(fileLower, ".yml") || strings.Contains(fileLower, ".yaml") || strings.Contains(fileLower, ".json")) {
+		// Skip config files (.toml, .yml, .yaml, .json, .env)
+		// These files are for configuration, not hardcoded secrets
+		if strings.Contains(fileLower, ".env") && !strings.Contains(fileLower, "example") {
 			continue
 		}
-		if strings.Contains(fileLower, ".env") && !strings.Contains(fileLower, "example") {
+		if (strings.Contains(fileLower, ".toml") || strings.Contains(fileLower, ".yml") ||
+			strings.Contains(fileLower, ".yaml") || strings.Contains(fileLower, ".json")) {
 			continue
 		}
 
