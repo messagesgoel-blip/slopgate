@@ -28,6 +28,8 @@ var (
 		"salary", "finance", "bill",
 		"transfer", "withdraw", "deposit",
 	}
+	// Pre-compiled regexes for sensitive actions (one per keyword)
+	slp086SensitiveActionPatterns []*regexp.Regexp
 	// Auth patterns that must appear on same side of route body
 	slp086AuthPatterns = []*regexp.Regexp{
 		regexp.MustCompile(`(?i)(checkPermission|hasPermission|authorize|hasRole|isAuthorized|requireAuth)\s*\(`),
@@ -37,7 +39,18 @@ var (
 		regexp.MustCompile(`(?i)if\s*\(\s*!?\s*\w+\.(isAdmin|isAuth|isAuthorized)`), // Auth check with optional negation
 		regexp.MustCompile(`(?i)res\.(status|send|json)\s*\([^)]*403|res\.(status|send|json)\s*\([^)]*Forbidden`),
 	}
+	// Route pattern for detecting API routes
+	routePattern = regexp.MustCompile(`(?i)(router|app|express)\.(post|put|patch|delete)\s*\(`)
 )
+
+func init() {
+	// Pre-compile regexes for sensitive action keyword matching
+	slp086SensitiveActionPatterns = make([]*regexp.Regexp, len(slp086SensitiveActions))
+	for i, action := range slp086SensitiveActions {
+		pattern := `(?i)\b` + regexp.QuoteMeta(action) + `\b`
+		slp086SensitiveActionPatterns[i] = regexp.MustCompile(pattern)
+	}
+}
 
 func (r SLP086) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -72,7 +85,6 @@ func (r SLP086) Check(d *diff.Diff) []Finding {
 			var routes []routeInfo
 
 			// First pass: identify all route definitions
-			routePattern := regexp.MustCompile(`(?i)(router|app|express)\.(post|put|patch|delete)\s*\(`)
 			for i, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
 					continue
@@ -86,11 +98,10 @@ func (r SLP086) Check(d *diff.Diff) []Finding {
 						sensitiveActionFound: false,
 					})
 
-					// Check if this route handles sensitive actions
+					// Check if this route handles sensitive actions using pre-compiled patterns
 					contentLower := strings.ToLower(content)
-					for _, action := range slp086SensitiveActions {
-						pattern := `(?i)\b` + regexp.QuoteMeta(action) + `\b`
-						if regexp.MustCompile(pattern).MatchString(contentLower) {
+					for _, pattern := range slp086SensitiveActionPatterns {
+						if pattern.MatchString(contentLower) {
 							routes[len(routes)-1].sensitiveActionFound = true
 							break
 						}
@@ -102,10 +113,36 @@ func (r SLP086) Check(d *diff.Diff) []Finding {
 			for i, route := range routes {
 				depth := 0
 				routeStarted := false
+				inBlockComment := false
 				for j := route.startIdx; j < len(h.Lines); j++ {
 					ln := h.Lines[j]
-					// Count braces in this line
-					for _, ch := range ln.Content {
+					// Count braces in this line, ignoring those inside comments
+					lineContent := ln.Content
+					for k := 0; k < len(lineContent); k++ {
+						ch := lineContent[k]
+
+						// Handle comment tracking
+						if !inBlockComment && k+1 < len(lineContent) && lineContent[k] == '/' && lineContent[k+1] == '/' {
+							// Single-line comment, skip rest of line
+							break
+						}
+						if !inBlockComment && k+1 < len(lineContent) && lineContent[k] == '/' && lineContent[k+1] == '*' {
+							// Start of block comment
+							inBlockComment = true
+							k++ // Skip *
+							continue
+						}
+						if inBlockComment && k+1 < len(lineContent) && lineContent[k] == '*' && lineContent[k+1] == '/' {
+							// End of block comment
+							inBlockComment = false
+							k++ // Skip *
+							continue
+						}
+						if inBlockComment {
+							continue // Inside block comment, skip character
+						}
+
+						// Count braces only when not in comment
 						if ch == '(' || ch == '{' {
 							depth++
 							routeStarted = true

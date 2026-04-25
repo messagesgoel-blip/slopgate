@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -40,8 +41,8 @@ var (
 
 	// Go patterns - must start with uppercase to be exported
 	slp089GoExportPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`^func\s+[A-Z]\w+\s*\(`),
-		regexp.MustCompile(`^type\s+[A-Z]\w+\s+\w+`),
+		regexp.MustCompile(`^func\s+[A-Z]\w*\s*\(`),
+		regexp.MustCompile(`^type\s+[A-Z]\w*\s+\w+`),
 	}
 
 	// Python patterns
@@ -59,6 +60,9 @@ var (
 	}
 
 	goDocPattern = regexp.MustCompile(`(?i)^\/\/\s+\w`)
+
+	// Pre-compiled regex for extracting export names
+	exportNamePattern = regexp.MustCompile(`^(?:export\s+)?(?:const\s+|function\s+|async\s+function\s+|class\s+)\s*(\w+)`)
 )
 
 // isExportDeclaration checks if a line is an export statement or export declaration
@@ -115,8 +119,6 @@ func findReexportedName(content string) string {
 	// - function foo() {}
 	// - class Bar {}
 
-	// Try const/function patterns
-	exportNamePattern := regexp.MustCompile(`^(?:export\s+)?(?:const\s+|function\s+|async\s+function\s+|class\s+)\s*(\w+)`)
 	if matches := exportNamePattern.FindStringSubmatch(strings.TrimSpace(content)); len(matches) > 1 {
 		return matches[1]
 	}
@@ -127,6 +129,7 @@ func findReexportedName(content string) string {
 // doExportedInHunk checks if a const/function is exported via brace export in this hunk
 // pass the const/function line index to avoid self-referencing
 func doExportedInHunk(h diff.Hunk, constLineIdx int, constName string) bool {
+	reNamePattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(constName) + `\b`)
 	for j, ln := range h.Lines {
 		if j == constLineIdx {
 			continue
@@ -135,7 +138,6 @@ func doExportedInHunk(h diff.Hunk, constLineIdx int, constName string) bool {
 			// Check if constName is in the export list
 			content := strings.TrimSpace(ln.Content)
 			// Match export { name } or export { name as alias } or export { name, other }
-			reNamePattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(constName) + `\b`)
 			if reNamePattern.MatchString(content) {
 				return true
 			}
@@ -178,20 +180,6 @@ func hasLineAddEquivalent(h diff.Hunk, idx int) bool {
 	return false
 }
 
-// shouldReportExport determines if an export Line should be reported based on its Kind
-func shouldReportExport(line diff.Line, hasLineAddEq func(int) bool) bool {
-	switch line.Kind {
-	case diff.LineAdd:
-		return true
-	case diff.LineContext:
-		return !hasLineAddEq(0) // We need the actual index for hasLineAddEq
-	case diff.LineDelete:
-		return true
-	default:
-		return false
-	}
-}
-
 func (r SLP089) Check(d *diff.Diff) []Finding {
 	var out []Finding
 
@@ -209,10 +197,10 @@ func (r SLP089) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		if !strings.Contains(fileLower, ".js") &&
-			!strings.Contains(fileLower, ".ts") &&
-			!strings.Contains(fileLower, ".go") &&
-			!strings.Contains(fileLower, ".py") {
+		// Use filepath.Ext for exact extension matching
+		ext := strings.ToLower(filepath.Ext(f.Path))
+		hasExtension := ext == ".js" || ext == ".ts" || ext == ".go" || ext == ".py"
+		if !hasExtension {
 			continue
 		}
 
@@ -248,7 +236,8 @@ func (r SLP089) Check(d *diff.Diff) []Finding {
 						case diff.LineContext:
 							report = !hasLineAddEquivalent(h, lastExportLine)
 						case diff.LineDelete:
-							report = !hasLineAddEquivalent(h, lastExportLine)
+							// LineDelete: do not report deletions
+							report = false
 						}
 
 						if report {
@@ -285,7 +274,8 @@ func (r SLP089) Check(d *diff.Diff) []Finding {
 				case diff.LineContext:
 					report = !hasLineAddEquivalent(h, lastExportLine)
 				case diff.LineDelete:
-					report = !hasLineAddEquivalent(h, lastExportLine)
+					// LineDelete: do not report deletions
+					report = false
 				}
 
 				if report {
