@@ -1,0 +1,75 @@
+package rules
+
+import "testing"
+
+func TestSLP100_FiresOnNoOpFunction(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,1 +1,5 @@
++func GetItems() ([]Item, error) {
++    return nil
++}
+`)
+	got := SLP100{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for no-op function")
+	}
+}
+
+func TestSLP100_FiresOnJavascriptNoOp(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.js b/handler.js
+--- a/handler.js
++++ b/handler.js
+@@ -1,1 +1,4 @@
++function getItems() {
++    return [];
++}
+`)
+	got := SLP100{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for JS no-op")
+	}
+}
+
+func TestSLP100_NoFireOnFunctionWithWork(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,1 +1,5 @@
++func GetItems() ([]Item, error) {
++    items := db.Query("SELECT * FROM items")
++    return items, nil
++}
+`)
+	got := SLP100{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for function with work, got %d", len(got))
+	}
+}
+
+func TestSLP100_IgnoresDocFiles(t *testing.T) {
+	d := parseDiff(t, `diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1,1 +1,3 @@
++  func GetItems() { return nil }
+`)
+	got := SLP100{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for doc files, got %d", len(got))
+	}
+}
+
+func TestSLP100_Description(t *testing.T) {
+	r := SLP100{}
+	if r.ID() != "SLP100" {
+		t.Errorf("ID = %q", r.ID())
+	}
+	if r.Description() == "" {
+		t.Errorf("Description is empty")
+	}
+	if r.DefaultSeverity() != SeverityBlock {
+		t.Errorf("default severity should be block")
+	}
+}
