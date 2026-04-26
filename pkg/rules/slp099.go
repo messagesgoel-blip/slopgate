@@ -20,7 +20,7 @@ func (SLP099) Description() string {
 	return "response field changed without test update — tests may be stale"
 }
 
-var slp099GoStructField = regexp.MustCompile(`^\s*\w+\s+(?:\[\])?\*?\w+(?:\.\w+)?(?:\s+\x60[^\x60]*\x60)?$`)
+var slp099GoStructField = regexp.MustCompile(`^\s*\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?(?:\s+` + "`" + `[^` + "`" + `]*` + "`" + `)?\s*$`)
 
 var slp099TSInterfaceProp = regexp.MustCompile(`(?i)^(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?$`)
 

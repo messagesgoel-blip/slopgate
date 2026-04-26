@@ -17,9 +17,10 @@ func (SLP104) Description() string {
 	return "hardcoded buffer/size limit — define a named constant instead"
 }
 
-var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*([0-9]+)(?:\s*,\s*([0-9]+))?\s*\)`)
-var slp104BufioSize = regexp.MustCompile(`bufio\.NewReaderSize\s*\((?:[^(),]+|\([^()]*\))+,\s*\d+\s*\)`)
-var slp104BufferConfig = regexp.MustCompile(`(?i)\b(?:bufferSize|maxSize|bufSize|chunkSize)\b\s*(?:[:=]|:=)\s*\d+`)
+var slp104NumLit = `(?:0x[0-9A-Fa-f][0-9A-Fa-f_]*|0b[01][01_]*|0o[0-7][0-7_]*|[0-9][0-9_]*(?:\.[0-9_]+)?(?:[eE][+\-]?[0-9_]+)?)`
+var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*(` + slp104NumLit + `)(?:\s*,\s*(` + slp104NumLit + `))?\s*\)`)
+var slp104BufioSize = regexp.MustCompile(`bufio\.NewReaderSize\s*\((?:[^(),]+|\([^()]*\))+,\s*` + slp104NumLit + `\s*\)`)
+var slp104BufferConfig = regexp.MustCompile(`(?i)\b(?:bufferSize|maxSize|bufSize|chunkSize)\b\s*(?:[:=]|:=)\s*` + slp104NumLit)
 
 func (r SLP104) Check(d *diff.Diff) []Finding {
 	var out []Finding

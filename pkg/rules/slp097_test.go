@@ -80,6 +80,32 @@ func TestSLP097_IgnoresNonJSTS(t *testing.T) {
 	}
 }
 
+func TestSLP097_FiresOnFetchWithTypedParam(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api.ts b/api.ts
+--- a/api.ts
++++ b/api.ts
+@@ -1,1 +1,3 @@
++  fetch("/api/items").then((res: Response) => res.json())
+`)
+	got := SLP097{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for fetch with typed parameter without ok check")
+	}
+}
+
+func TestSLP097_FiresOnNestedFetch(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api.ts b/api.ts
+--- a/api.ts
++++ b/api.ts
+@@ -1,1 +1,3 @@
++  fetch("/a").then(res => fetch("/b").then(r => r.json()))
+`)
+	got := SLP097{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for nested fetch without ok check")
+	}
+}
+
 func TestSLP097_Description(t *testing.T) {
 	r := SLP097{}
 	if r.ID() != "SLP097" {

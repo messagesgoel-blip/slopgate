@@ -37,7 +37,9 @@ func (r SLP101) Check(d *diff.Diff) []Finding {
 
 		for _, ln := range f.AddedLines() {
 			content := strings.TrimSpace(ln.Content)
-			if strings.HasPrefix(content, "//") || (strings.HasPrefix(content, "/*") && strings.HasSuffix(content, "*/")) {
+			if strings.HasPrefix(content, "//") ||
+				strings.HasPrefix(content, "/*") ||
+				strings.HasPrefix(content, "*") {
 				continue
 			}
 
@@ -48,7 +50,7 @@ func (r SLP101) Check(d *diff.Diff) []Finding {
 					File:     f.Path,
 					Line:     ln.NewLineNo,
 					Message:  "feature-flag conditional detected — review for intended divergence or dead code",
-					Snippet:  content,
+					Snippet:  ln.Content,
 				})
 			}
 
@@ -59,7 +61,7 @@ func (r SLP101) Check(d *diff.Diff) []Finding {
 					File:     f.Path,
 					Line:     ln.NewLineNo,
 					Message:  "empty else branch detected — remove the dead branch or implement the alternate path",
-					Snippet:  content,
+					Snippet:  ln.Content,
 				})
 			}
 		}

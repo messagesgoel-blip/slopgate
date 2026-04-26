@@ -20,6 +20,7 @@ func (SLP107) Description() string {
 
 var slp107Cleanup = regexp.MustCompile(`(?i)\b(?:Close|Destroy|Cleanup|Release|Remove|Delete|Cancel|Free)\b\s*(?:\(|$)`)
 var slp107IdentifierPattern = regexp.MustCompile(`(?i)\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*(?:close|destroy|cleanup|release|remove|delete|cancel|free)\b\s*(?:\(|$)`)
+var slp107ErrorBlockStart = regexp.MustCompile(`(?i)(?:\bif\s+err\b|\bcatch\b|\bexcept\b)`)
 
 func (r SLP107) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -51,7 +52,7 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 				cLower := strings.ToLower(content)
 
 				if !inErrorBlock {
-					if strings.Contains(cLower, "if err") || strings.Contains(cLower, "catch") || strings.Contains(cLower, "except") {
+					if strings.Contains(cLower, "if err") || slp107ErrorBlockStart.MatchString(content) {
 						inErrorBlock = true
 						errorBlockStart = k
 						if isPython {
@@ -92,7 +93,7 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 						errorBlockStart = -1
 						cleanupLines = nil
 						// Re-check if this line starts a new error block
-						if strings.Contains(cLower, "if err") || strings.Contains(cLower, "catch") || strings.Contains(cLower, "except") {
+						if strings.Contains(cLower, "if err") || slp107ErrorBlockStart.MatchString(content) {
 							inErrorBlock = true
 							errorBlockStart = k
 							errorIndentLevel = len(ln.Content) - len(strings.TrimLeft(ln.Content, " \t"))
@@ -176,7 +177,9 @@ func slp107LineMatchesCleanup(content string, identifier string) bool {
 		return false
 	}
 	if identifier == "" {
-		return slp107Cleanup.MatchString(content) || strings.Contains(lower, "defer ")
+		// For bare cleanup calls (no receiver), only accept other bare cleanup calls,
+		// not deferred method calls with receivers.
+		return slp107Cleanup.MatchString(content) && extractIdentifier(content) == ""
 	}
 	return extractIdentifier(content) == identifier
 }
@@ -206,8 +209,4 @@ func extractIdentifier(content string) string {
 		return match[1]
 	}
 	return ""
-}
-
-func isAlphaNumeric(c byte) bool {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
 }

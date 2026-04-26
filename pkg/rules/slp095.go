@@ -65,7 +65,7 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 
 			for i := range h.Lines {
 				ln := &h.Lines[i]
-				if ln.Kind != diff.LineAdd {
+				if ln.Kind == diff.LineDelete {
 					continue
 				}
 				content := strings.TrimSpace(ln.Content)
@@ -85,7 +85,7 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 						if hasErrorHandling(cLower) {
 							handling = true
 						}
-						if slp095SilentReturn.MatchString(content) {
+						if ln.Kind == diff.LineAdd && slp095SilentReturn.MatchString(content) {
 							silentLine = ln
 						}
 						if catchBraceDepth <= 0 && strings.Contains(ln.Content, "}") {
@@ -137,7 +137,7 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 				if hasErrorHandling(cLower) {
 					handling = true
 				}
-				if slp095SilentReturn.MatchString(content) {
+				if ln.Kind == diff.LineAdd && slp095SilentReturn.MatchString(content) {
 					silentLine = ln
 				}
 			}

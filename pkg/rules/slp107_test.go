@@ -157,6 +157,40 @@ func TestSLP107_IgnoresDeletedErrorBlockMarkers(t *testing.T) {
 	}
 }
 
+func TestSLP107_NonErrorLineWithException(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.py b/handler.py
+--- a/handler.py
++++ b/handler.py
+@@ -1,1 +1,4 @@
++def handle():
++    logger.exception(err)
++    conn.Close()
+`)
+	got := SLP107{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when 'exception' appears in a non-error line, got %d", len(got))
+	}
+}
+
+func TestSLP107_IdentifierlessCleanupFires(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,1 +1,7 @@
++func handle() {
++    if err != nil {
++        Close(conn)
++        return
++    }
++    defer other.Close()
++}
+`)
+	got := SLP107{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for identifierless Close(conn) only in error path with unrelated defer other.Close()")
+	}
+}
+
 func TestSLP107_Description(t *testing.T) {
 	r := SLP107{}
 	if r.ID() != "SLP107" {

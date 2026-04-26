@@ -132,6 +132,58 @@ func TestSLP104_DoesNotFireOnBareLimitIdentifier(t *testing.T) {
 	}
 }
 
+func TestSLP104_FiresOnMakeByteWithUnderscore(t *testing.T) {
+	d := parseDiff(t, `diff --git a/buf.go b/buf.go
+--- a/buf.go
++++ b/buf.go
+@@ -1,1 +1,3 @@
++buf := make([]byte, 4_096)
+`)
+	got := SLP104{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for make([]byte, 4_096)")
+	}
+}
+
+func TestSLP104_FiresOnBufioReaderSizeHex(t *testing.T) {
+	d := parseDiff(t, `diff --git a/buf.go b/buf.go
+--- a/buf.go
++++ b/buf.go
+@@ -1,1 +1,3 @@
++r := bufio.NewReaderSize(f, 0x10000)
+`)
+	got := SLP104{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for bufio.NewReaderSize with hex literal")
+	}
+}
+
+func TestSLP104_FiresOnNestedLimitReaderHex(t *testing.T) {
+	d := parseDiff(t, `diff --git a/buf.go b/buf.go
+--- a/buf.go
++++ b/buf.go
+@@ -1,1 +1,3 @@
++r := bufio.NewReaderSize(io.LimitReader(f, 0x10000), 0x10000)
+`)
+	got := SLP104{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for bufio.NewReaderSize with nested io.LimitReader and hex literal")
+	}
+}
+
+func TestSLP104_FiresOnLiteralBufferSizeUnderscore(t *testing.T) {
+	d := parseDiff(t, `diff --git a/buf.go b/buf.go
+--- a/buf.go
++++ b/buf.go
+@@ -1,1 +1,3 @@
++bufferSize := 65_536
+`)
+	got := SLP104{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for bufferSize := 65_536")
+	}
+}
+
 func TestSLP104_Description(t *testing.T) {
 	r := SLP104{}
 	if r.ID() != "SLP104" {

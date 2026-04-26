@@ -30,7 +30,7 @@ Binary files differ
 	}
 }
 
-func TestSLP111_NoFireWhenGitignoreModified(t *testing.T) {
+func TestSLP111_FiresWhenBinaryAlreadyTracked(t *testing.T) {
 	d := parseDiff(t, `diff --git a/.gitignore b/.gitignore
 --- a/.gitignore
 +++ b/.gitignore
@@ -45,6 +45,19 @@ Binary files differ
 	got := SLP111{}.Check(d)
 	if len(got) == 0 {
 		t.Fatal("expected findings even with gitignore — binary may already be tracked")
+	}
+}
+
+func TestSLP111_FiresOnExtensionlessNewFile(t *testing.T) {
+	d := parseDiff(t, `diff --git a/build/app b/build/app
+new file mode 100755
+--- /dev/null
++++ b/build/app
+Binary files differ
+`)
+	got := SLP111{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for new extensionless binary file build/app")
 	}
 }
 

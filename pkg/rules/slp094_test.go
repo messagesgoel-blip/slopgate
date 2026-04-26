@@ -97,6 +97,32 @@ func TestSLP094_FiresOnRunBlockScalarCommand(t *testing.T) {
 	}
 }
 
+func TestSLP094_FiresOnRunListEntry(t *testing.T) {
+	d := parseDiff(t, `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -1,1 +1,3 @@
++  - run: npm test || true
+`)
+	got := SLP094{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for YAML list-item run entry with || true")
+	}
+}
+
+func TestSLP094_FiresOnChainedSilentFail(t *testing.T) {
+	d := parseDiff(t, `diff --git a/build.sh b/build.sh
+--- a/build.sh
++++ b/build.sh
+@@ -1,1 +1,3 @@
++  go build || true&&echo done
+`)
+	got := SLP094{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for chained || true&& pattern")
+	}
+}
+
 func TestSLP094_Description(t *testing.T) {
 	r := SLP094{}
 	if r.ID() != "SLP094" {

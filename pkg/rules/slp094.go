@@ -18,8 +18,8 @@ func (SLP094) Description() string {
 	return "shell command suppresses failure with || true or || : — handle the error instead"
 }
 
-var slp094SilentFail = regexp.MustCompile(`\|\|\s*(?:true|:)\s*;?\s*(?:\s|$)`)
-var slp094YAMLRunLine = regexp.MustCompile(`^\s*run\s*:\s*(.*)$`)
+var slp094SilentFail = regexp.MustCompile(`\|\|\s*(?:true|:)\s*(?:;|\s*$|&&|\s)`)
+var slp094YAMLRunLine = regexp.MustCompile(`^\s*(?:-\s*)?run\s*:\s*(.*)$`)
 
 func (r SLP094) Check(d *diff.Diff) []Finding {
 	var out []Finding

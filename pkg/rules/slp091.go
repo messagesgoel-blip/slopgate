@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -66,13 +65,22 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 		if isDocFile(f.Path) {
 			continue
 		}
+		inBlockComment := false
 		for _, ln := range f.AddedLines() {
 			content := ln.Content
-			if strings.HasPrefix(strings.TrimSpace(content), "//") ||
-				strings.HasPrefix(strings.TrimSpace(content), "#") ||
-				strings.HasPrefix(strings.TrimSpace(content), "--") ||
-				strings.HasPrefix(strings.TrimSpace(content), "/*") ||
-				strings.HasPrefix(strings.TrimSpace(content), "*") {
+			trimmed := strings.TrimSpace(content)
+			if strings.HasPrefix(trimmed, "/*") {
+				inBlockComment = true
+			}
+			if inBlockComment {
+				if strings.Contains(trimmed, "*/") {
+					inBlockComment = false
+				}
+				continue
+			}
+			if strings.HasPrefix(trimmed, "//") ||
+				strings.HasPrefix(trimmed, "#") ||
+				strings.HasPrefix(trimmed, "--") {
 				continue
 			}
 
@@ -108,4 +116,4 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 	return out
 }
 
-var _ = fmt.Sprintf
+

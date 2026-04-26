@@ -62,6 +62,10 @@ func slp109BodySimilarity(a, b []string) float64 {
 	return float64(intersection) / float64(maxLen)
 }
 
+func slp109HasCallableShape(content string) bool {
+	return strings.Contains(content, "(")
+}
+
 func slp109HasFuncKeyword(content string) bool {
 	cLower := strings.ToLower(content)
 	return strings.Contains(cLower, "func ") ||
@@ -69,16 +73,6 @@ func slp109HasFuncKeyword(content string) bool {
 		strings.Contains(cLower, "public ") ||
 		strings.Contains(cLower, "private ") ||
 		strings.Contains(cLower, "static ")
-}
-
-func slp109NextNonEmptyLine(lines []diff.Line, start int) string {
-	for i := start; i < len(lines); i++ {
-		content := strings.TrimSpace(lines[i].Content)
-		if content != "" {
-			return content
-		}
-	}
-	return ""
 }
 
 func slp109CollectSignature(lines []diff.Line, start int) (string, int, bool) {
@@ -132,6 +126,9 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 					}
 					content := strings.TrimSpace(ln.Content)
 					if !slp109HasFuncKeyword(content) {
+						continue
+					}
+					if !slp109HasCallableShape(content) {
 						continue
 					}
 					sig, bodyStart, ok := slp109CollectSignature(h.Lines, idx)

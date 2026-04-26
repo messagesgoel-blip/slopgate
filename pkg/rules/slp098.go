@@ -70,14 +70,11 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 	sort.Strings(routePaths)
 
 	for _, rf := range routePaths {
-		// Heuristic: check if there's a test file related to this route file.
-		// For example, if rf is "pkg/api/handler.go", look for "pkg/api/handler_test.go".
-		// Or if rf is "src/routes/users.ts", look for "src/routes/users.test.ts" or "src/routes/users.spec.ts".
 		base := strings.TrimSuffix(rf, path.Ext(rf))
 
 		foundTest := false
 		for tf := range testFiles {
-			if slp098TestTarget(tf) == base {
+			if slp098TestMatches(tf, base) {
 				foundTest = true
 				break
 			}
@@ -90,16 +87,15 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				for _, ln := range f.AddedLines() {
-					content := strings.TrimSpace(ln.Content)
 					for _, pat := range slp098RoutePatterns {
-						if pat.MatchString(content) {
+						if pat.MatchString(ln.Content) {
 							out = append(out, Finding{
 								RuleID:   r.ID(),
 								Severity: r.DefaultSeverity(),
 								File:     f.Path,
 								Line:     ln.NewLineNo,
 								Message:  "new route added without corresponding test changes for this module in this diff",
-								Snippet:  content,
+								Snippet:  ln.Content,
 							})
 							break
 						}
@@ -110,6 +106,64 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 	}
 
 	return out
+}
+
+// slp098TestMatches returns true if testPath is considered related to sourceBase
+// (sourceBase is the route file path without extension).
+func slp098TestMatches(testPath, sourceBase string) bool {
+	direct := slp098TestTarget(testPath)
+	if direct == sourceBase {
+		return true
+	}
+
+	// Generate candidate source bases by replacing test/tests/ prefixes with common source roots.
+	// E.g. "tests/routes/users.test.ts" → check if base matches "routes/users" or "src/routes/users" etc.
+	testBase := slp098TestTarget(testPath)
+	if testBase == "" {
+		return false
+	}
+
+	// Also check if the test path lives under a parallel test/tests directory.
+	// Strip common test root prefixes and compare the remainder.
+	for _, root := range []string{"tests/", "test/"} {
+		if strings.HasPrefix(testBase, root) {
+			remainder := testBase[len(root):]
+			// Match directly or under common source roots
+			if remainder == path.Base(sourceBase) || strings.HasSuffix(sourceBase, "/"+remainder) || sourceBase == remainder {
+				return true
+			}
+		}
+	}
+
+	// Handle source files under src/, lib/, app/ — check parallel test(s)/ directory.
+	srcBase := path.Base(sourceBase)
+	testBaseName := path.Base(testBase)
+	if srcBase == testBaseName {
+		// Same filename stem — check if directories are parallel (e.g., src/foo vs tests/foo)
+		srcDir := path.Dir(sourceBase)
+		testDir := path.Dir(testBase)
+		for _, root := range []string{"tests", "test"} {
+			if strings.HasPrefix(testDir, root) {
+				remainder := strings.TrimPrefix(testDir, root)
+				remainder = strings.TrimPrefix(remainder, "/")
+				if remainder == "" || strings.HasSuffix(srcDir, remainder) {
+					return true
+				}
+			}
+		}
+		for _, srcRoot := range []string{"src", "lib", "app"} {
+			srcReplaced := strings.TrimPrefix(srcDir, srcRoot+"/")
+			if srcReplaced == srcDir {
+				continue
+			}
+			for _, testRoot := range []string{"tests", "test"} {
+				if testDir == testRoot+"/"+srcReplaced || testDir == testRoot {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func slp098TestTarget(testPath string) string {

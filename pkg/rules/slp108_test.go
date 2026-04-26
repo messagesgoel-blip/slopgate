@@ -60,7 +60,7 @@ func TestSLP108_NoFireOnFetchWithTimeout(t *testing.T) {
 +++ b/api.ts
 @@ -1,1 +1,5 @@
 +  const res = fetch("url", { signal: AbortSignal.timeout(5000) });
-+`)
+`)
 	got := SLP108{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings for fetch with timeout, got %d", len(got))
@@ -74,7 +74,7 @@ func TestSLP108_FiresOnOpenWithTimeoutNoDefer(t *testing.T) {
 @@ -1,1 +1,5 @@
 +  ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 +  db, err := sql.Open("postgres", connStr)
-+`)
+`)
 	got := SLP108{}.Check(d)
 	if len(got) == 0 {
 		t.Fatal("expected finding for open with timeout but no defer")

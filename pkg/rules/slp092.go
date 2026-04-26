@@ -43,9 +43,28 @@ func (r SLP092) Check(d *diff.Diff) []Finding {
 		hasNoEnvelopeMock := false
 		hasEnvelopeDestructure := false
 
-		for _, ln := range f.AddedLines() {
-			if slp092NoEnvelopeMock.MatchString(ln.Content) && !slp092EnvelopeKey.MatchString(ln.Content) {
-				hasNoEnvelopeMock = true
+		lines := f.AddedLines()
+		for i, ln := range lines {
+			if slp092NoEnvelopeMock.MatchString(ln.Content) {
+				// Forward-scan until the mock block closes to check for envelope key.
+				// Check braceDepth BEFORE advancing to avoid scanning past the mock block.
+				envelopeFound := false
+				braceDepth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
+				if slp092EnvelopeKey.MatchString(ln.Content) {
+					envelopeFound = true
+				}
+				for j := i + 1; j < len(lines) && !envelopeFound; j++ {
+					if braceDepth <= 0 {
+						break
+					}
+					braceDepth += strings.Count(lines[j].Content, "{") - strings.Count(lines[j].Content, "}")
+					if slp092EnvelopeKey.MatchString(lines[j].Content) {
+						envelopeFound = true
+					}
+				}
+				if !envelopeFound {
+					hasNoEnvelopeMock = true
+				}
 			}
 			if slp092EnvelopeDestructure.MatchString(ln.Content) {
 				hasEnvelopeDestructure = true
@@ -63,8 +82,26 @@ func (r SLP092) Check(d *diff.Diff) []Finding {
 		}
 
 		if hasNoEnvelopeMock && hasEnvelopeDestructure {
-			for _, ln := range f.AddedLines() {
-				if slp092NoEnvelopeMock.MatchString(ln.Content) && !slp092EnvelopeKey.MatchString(ln.Content) {
+			for i, ln := range lines {
+				if !slp092NoEnvelopeMock.MatchString(ln.Content) {
+					continue
+				}
+				// Forward-scan: check braceDepth BEFORE advancing to avoid scanning past mock block.
+				envelopeFound := false
+				braceDepth := strings.Count(ln.Content, "{") - strings.Count(ln.Content, "}")
+				if slp092EnvelopeKey.MatchString(ln.Content) {
+					envelopeFound = true
+				}
+				for j := i + 1; j < len(lines) && !envelopeFound; j++ {
+					if braceDepth <= 0 {
+						break
+					}
+					braceDepth += strings.Count(lines[j].Content, "{") - strings.Count(lines[j].Content, "}")
+					if slp092EnvelopeKey.MatchString(lines[j].Content) {
+						envelopeFound = true
+					}
+				}
+				if !envelopeFound {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),

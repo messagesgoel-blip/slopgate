@@ -82,6 +82,24 @@ diff --git a/user_profile_test.go b/user_profile_test.go
 	}
 }
 
+func TestSLP098_FiresWhenRelatedTestInTestsDir(t *testing.T) {
+	d := parseDiff(t, `diff --git a/routes.go b/routes.go
+--- a/routes.go
++++ b/routes.go
+@@ -1,1 +1,3 @@
++  mux.HandleFunc("/api/users", usersHandler)
+diff --git a/tests/routes/users.test.ts b/tests/routes/users.test.ts
+--- a/tests/routes/users.test.ts
++++ b/tests/routes/users.test.ts
+@@ -1,1 +1,0 @@
+-  describe("users route", () => {})
+`)
+	got := SLP098{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when related test in tests/ dir has no added lines, got %d", len(got))
+	}
+}
+
 func TestSLP098_Description(t *testing.T) {
 	r := SLP098{}
 	if r.ID() != "SLP098" {

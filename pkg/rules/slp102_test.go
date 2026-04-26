@@ -77,6 +77,22 @@ func TestSLP102_IgnoresNonJSTS(t *testing.T) {
 	}
 }
 
+func TestSLP102_DoesNotFireForOneLineAsyncArrowNearAwait(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api.ts b/api.ts
+--- a/api.ts
++++ b/api.ts
+@@ -1,1 +1,4 @@
++const getItems = async () => []
++async function fetchData() {
++    const result = await somePromise;
++}
+`)
+	got := SLP102{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for one-line async arrow near unrelated await, got %d", len(got))
+	}
+}
+
 func TestSLP102_Description(t *testing.T) {
 	r := SLP102{}
 	if r.ID() != "SLP102" {
