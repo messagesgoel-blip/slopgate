@@ -8,7 +8,7 @@ import (
 
 // SLP112 flags generated files committed without their corresponding source
 // files. This catches common AI slop patterns like committing .pb.go, .min.js,
-// or .generated.ts files without the .proto, .tsx source in the same commit.
+// or _generated.ts files without the .proto, .js source in the same commit.
 type SLP112 struct{}
 
 func (SLP112) ID() string                { return "SLP112" }
@@ -40,7 +40,9 @@ func (r SLP112) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	allFiles := make(map[string]bool)
 	for _, f := range d.Files {
-		allFiles[f.Path] = true
+		if !f.IsDelete {
+			allFiles[f.Path] = true
+		}
 	}
 
 	for _, f := range d.Files {

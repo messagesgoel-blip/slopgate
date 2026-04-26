@@ -30,16 +30,15 @@ var slp098RoutePatterns = []*regexp.Regexp{
 
 func (r SLP098) Check(d *diff.Diff) []Finding {
 	var out []Finding
-	hasNewRoute := false
-	hasTestChange := false
 	routeFiles := make(map[string]bool)
+	testFiles := make(map[string]bool)
 
 	for _, f := range d.Files {
 		if f.IsDelete {
 			continue
 		}
 		if isTestFile(f.Path) {
-			hasTestChange = true
+			testFiles[f.Path] = true
 			continue
 		}
 		if isDocFile(f.Path) {
@@ -58,29 +57,45 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 				break
 			}
 		}
-		if routeFiles[f.Path] {
-			hasNewRoute = true
-		}
 	}
 
-	if hasNewRoute && !hasTestChange {
-		for _, f := range d.Files {
-			if !routeFiles[f.Path] {
-				continue
+	for rf := range routeFiles {
+		// Heuristic: check if there's a test file related to this route file.
+		// For example, if rf is "pkg/api/handler.go", look for "pkg/api/handler_test.go".
+		// Or if rf is "src/routes/users.ts", look for "src/routes/users.test.ts" or "src/routes/users.spec.ts".
+		base := rf
+		if i := strings.LastIndex(rf, "."); i >= 0 {
+			base = rf[:i]
+		}
+
+		foundTest := false
+		for tf := range testFiles {
+			if strings.HasPrefix(tf, base) {
+				foundTest = true
+				break
 			}
-			for _, ln := range f.AddedLines() {
-				content := strings.TrimSpace(ln.Content)
-				for _, pat := range slp098RoutePatterns {
-					if pat.MatchString(content) {
-						out = append(out, Finding{
-							RuleID:   r.ID(),
-							Severity: r.DefaultSeverity(),
-							File:     f.Path,
-							Line:     ln.NewLineNo,
-							Message:  "new route added without corresponding test changes in this diff",
-							Snippet:  content,
-						})
-						break
+		}
+
+		if !foundTest {
+			// Emit findings for this file
+			for _, f := range d.Files {
+				if f.Path != rf {
+					continue
+				}
+				for _, ln := range f.AddedLines() {
+					content := strings.TrimSpace(ln.Content)
+					for _, pat := range slp098RoutePatterns {
+						if pat.MatchString(content) {
+							out = append(out, Finding{
+								RuleID:   r.ID(),
+								Severity: r.DefaultSeverity(),
+								File:     f.Path,
+								Line:     ln.NewLineNo,
+								Message:  "new route added without corresponding test changes for this module in this diff",
+								Snippet:  content,
+							})
+							break
+						}
 					}
 				}
 			}

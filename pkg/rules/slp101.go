@@ -27,8 +27,7 @@ func (r SLP101) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || isDocFile(f.Path) {
 			continue
 		}
-		if strings.Contains(strings.ToLower(f.Path), ".test.") ||
-			strings.Contains(strings.ToLower(f.Path), ".spec.") {
+		if isTestFile(f.Path) {
 			continue
 		}
 		if !isJSOrTSFile(f.Path) && !isGoFile(f.Path) && !isJavaFile(f.Path) {
@@ -55,7 +54,7 @@ func (r SLP101) Check(d *diff.Diff) []Finding {
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
-					Message:  "empty else branch detected —aleb the dead branch or implement the alternate path",
+					Message:  "empty else branch detected — remove the dead branch or implement the alternate path",
 					Snippet:  content,
 				})
 			}

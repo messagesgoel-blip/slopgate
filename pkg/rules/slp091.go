@@ -33,12 +33,13 @@ var slp091Timestamp = regexp.MustCompile(`(?i)"(?:expires?_?(?:at|in)|ttl|deadli
 var testFileSuffixes = []string{
 	"_test.go", "_test.py", ".test.js", ".test.ts", ".test.tsx", ".test.jsx",
 	".spec.js", ".spec.ts", ".spec.tsx", ".spec.jsx",
-	"Test.java", "Tests.java", "_test.rs",
+	"test.java", "tests.java", "_test.rs",
 }
 
 func isTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	for _, s := range testFileSuffixes {
+		// Use lowercase comparison for both suffix and containment
 		if strings.HasSuffix(lower, s) || strings.Contains(lower, s) {
 			return true
 		}
@@ -55,9 +56,15 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		if !isTestFile(f.Path) && !strings.Contains(f.Path, "/test/") && !strings.Contains(f.Path, "/tests/") && !strings.Contains(f.Path, "/testdata/") {
+		// Check for test file markers or inclusion in test directories (including root-level)
+		isTest := isTestFile(f.Path) ||
+			strings.HasPrefix(f.Path, "test/") || strings.HasPrefix(f.Path, "tests/") || strings.HasPrefix(f.Path, "testdata/") ||
+			strings.Contains(f.Path, "/test/") || strings.Contains(f.Path, "/tests/") || strings.Contains(f.Path, "/testdata/")
+
+		if !isTest {
 			continue
 		}
+
 		if isDocFile(f.Path) {
 			continue
 		}

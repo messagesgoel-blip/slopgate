@@ -28,11 +28,20 @@ var slp093MockTerms = []string{
 }
 
 var slp093AssertTerms = []string{
-	"expect(", "assert", ".toEqual", ".toBe", ".toHaveBeenCalled",
+	"expect(", "assert.", "assert(", ".toEqual", ".toBe", ".toHaveBeenCalled",
 	"assert.Equal", "assert.EqualValues", "assert.JSONEq",
 	"assert.NotNil", "assert.Nil", "assert.True", "assert.False",
 	"should(", ".must(",
 	"require.", "t.Fatalf", "t.Errorf", "t.Error", "t.Fatal", "t.Skip",
+}
+
+func isCommentOnlyLine(content string) bool {
+	trim := strings.TrimSpace(content)
+	if trim == "" || strings.HasPrefix(trim, "//") || strings.HasPrefix(trim, "#") ||
+		strings.HasPrefix(trim, "/*") || strings.HasPrefix(trim, "*") {
+		return true
+	}
+	return false
 }
 
 func (r SLP093) Check(d *diff.Diff) []Finding {
@@ -49,7 +58,7 @@ func (r SLP093) Check(d *diff.Diff) []Finding {
 			mockCount := 0
 			assertCount := 0
 			for _, ln := range h.Lines {
-				if ln.Kind != diff.LineAdd {
+				if ln.Kind != diff.LineAdd || isCommentOnlyLine(ln.Content) {
 					continue
 				}
 				content := strings.ToLower(ln.Content)
@@ -68,7 +77,7 @@ func (r SLP093) Check(d *diff.Diff) []Finding {
 			}
 			if mockCount > 0 && assertCount == 0 {
 				for _, ln := range h.Lines {
-					if ln.Kind != diff.LineAdd {
+					if ln.Kind != diff.LineAdd || isCommentOnlyLine(ln.Content) {
 						continue
 					}
 					content := strings.ToLower(ln.Content)

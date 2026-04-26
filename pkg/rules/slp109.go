@@ -90,11 +90,14 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 				}
 				content := strings.TrimSpace(ln.Content)
 
-				if !inFunc && strings.Contains(content, "(") && strings.Contains(content, ")") && (strings.Contains(content, "{") || strings.HasSuffix(content, "{")) {
-					hasFuncKW := strings.Contains(strings.ToLower(content), "func ") ||
-						strings.Contains(strings.ToLower(content), "function ") ||
-						strings.Contains(strings.ToLower(content), "def ") ||
-						strings.Contains(strings.ToLower(content), "fn ")
+				if !inFunc && strings.Contains(content, "(") && strings.Contains(content, ")") && strings.Contains(content, "{") {
+					cLower := strings.ToLower(content)
+					hasFuncKW := strings.Contains(cLower, "func ") ||
+						strings.Contains(cLower, "function ") ||
+						strings.Contains(cLower, "public ") ||
+						strings.Contains(cLower, "private ") ||
+						strings.Contains(cLower, "static ")
+
 					if hasFuncKW {
 						inFunc = true
 						braceDepth = 0

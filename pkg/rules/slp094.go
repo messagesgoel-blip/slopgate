@@ -15,10 +15,10 @@ type SLP094 struct{}
 func (SLP094) ID() string                { return "SLP094" }
 func (SLP094) DefaultSeverity() Severity { return SeverityBlock }
 func (SLP094) Description() string {
-	return "shell command suppresses failure with || true — handle the error instead"
+	return "shell command suppresses failure with || true or || : — handle the error instead"
 }
 
-var slp094SilentFail = regexp.MustCompile(`\|\|\s*(?:true|:\s*)(?:\s|$)`)
+var slp094SilentFail = regexp.MustCompile(`\|\|\s*(?:true|:)\s*;?\s*(?:\s|$)`)
 
 func (r SLP094) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -37,7 +37,7 @@ func (r SLP094) Check(d *diff.Diff) []Finding {
 					File:     f.Path,
 					Line:     ln.NewLineNo,
 					Message:  "|| true or || : suppresses command failure — handle the error or explicitly comment why it's safe",
-					Snippet:  strings.TrimSpace(ln.Content),
+					Snippet:  ln.Content,
 				})
 			}
 		}
@@ -58,8 +58,15 @@ func isShellLikeFile(path string) bool {
 		return true
 	}
 	if strings.HasSuffix(lower, ".yml") || strings.HasSuffix(lower, ".yaml") {
+		// CI token as standalone segment
+		isCI := base == "ci.yml" || base == "ci.yaml" ||
+			strings.HasPrefix(base, "ci.") || strings.HasPrefix(base, "ci-") ||
+			strings.HasSuffix(base, "-ci.yml") || strings.HasSuffix(base, "-ci.yaml") ||
+			strings.HasSuffix(base, ".ci.yml") || strings.HasSuffix(base, ".ci.yaml") ||
+			base == "ci"
+
 		return strings.Contains(lower, ".github/workflows") ||
-			strings.Contains(base, "ci") ||
+			isCI ||
 			strings.HasPrefix(base, "workflow")
 	}
 	return false

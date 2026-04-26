@@ -36,12 +36,73 @@ func TestSLP107_NoFireOnCleanupInNormalPath(t *testing.T) {
 	d := parseDiff(t, `diff --git a/handler.go b/handler.go
 --- a/handler.go
 +++ b/handler.go
-@@ -1,1 +1,3 @@
+@@ -1,7 +1,11 @@
++  if err != nil {
++      conn.Close()
++      return err
++  }
++  
 +  defer conn.Close()
-`)
++`)
 	got := SLP107{}.Check(d)
 	if len(got) != 0 {
-		t.Fatalf("expected 0 findings for normal cleanup, got %d", len(got))
+		t.Fatalf("expected 0 findings for normal cleanup in mixed path, got %d", len(got))
+	}
+}
+
+func TestSLP107_PythonExceptBlock(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.py b/handler.py
+--- a/handler.py
++++ b/handler.py
+@@ -1,5 +1,9 @@
++def handle():
++    try:
++        do_something()
++    except Exception:
++        conn.close()
++    
++    print("Success")
++`)
+	got := SLP107{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for Python except block cleanup")
+	}
+}
+
+func TestSLP107_PythonNoFire(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.py b/handler.py
+--- a/handler.py
++++ b/handler.py
+@@ -1,5 +1,9 @@
++def handle():
++    try:
++        do_something()
++    except Exception:
++        conn.close()
++    
++    conn.close()
++`)
+	got := SLP107{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for Python with success path cleanup, got %d", len(got))
+	}
+}
+
+func TestSLP107_NoFireIfSuccessPathHasCleanup(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,7 +1,11 @@
++  if err != nil {
++      conn.Close()
++      return err
++  }
++  
++  defer conn.Close()
+ `)
+	got := SLP107{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings because success path has cleanup, got %d", len(got))
 	}
 }
 

@@ -17,9 +17,9 @@ func (SLP104) Description() string {
 	return "hardcoded buffer/size limit — define a named constant instead"
 }
 
-var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*([0-9]+)(?:\s*,\s*[0-9]+)?\s*\)`)
+var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*([0-9]+)(?:\s*,\s*([0-9]+))?\s*\)`)
 var slp104BufioSize = regexp.MustCompile(`bufio\.NewReaderSize\s*\([^,]+,\s*\d+\s*\)`)
-var slp104BufferConfig = regexp.MustCompile(`(?i)(?:bufferSize|maxSize|bufSize|chunkSize|limit)\s*[:=]\s*\d+`)
+var slp104BufferConfig = regexp.MustCompile(`(?i)(?:bufferSize|maxSize|bufSize|chunkSize|limit)\s*(?:[:=]|:=)\s*\d+`)
 
 func (r SLP104) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -27,9 +27,7 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || isDocFile(f.Path) {
 			continue
 		}
-		if strings.Contains(strings.ToLower(f.Path), ".test.") ||
-			strings.Contains(strings.ToLower(f.Path), ".spec.") ||
-			isTestFile(f.Path) {
+		if isTestFile(f.Path) {
 			continue
 		}
 		if !isGoFile(f.Path) && !isJSOrTSFile(f.Path) {
@@ -41,8 +39,13 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 			var msg string
 			switch {
 			case slp104MakeByte.MatchString(trimmed):
-				if m := slp104MakeByte.FindStringSubmatch(trimmed); m != nil && m[1] != "0" {
-					msg = "hardcoded buffer size in make — use a named constant"
+				if m := slp104MakeByte.FindStringSubmatch(trimmed); m != nil {
+					lenVal := m[1]
+					capVal := m[2]
+					// Flag if len > 0 or if cap is explicitly provided (even if len is 0)
+					if lenVal != "0" || capVal != "" {
+						msg = "hardcoded buffer size in make — use a named constant"
+					}
 				}
 			case slp104BufioSize.MatchString(trimmed):
 				msg = "hardcoded buffer size in bufio — use a named constant"

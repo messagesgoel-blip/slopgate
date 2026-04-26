@@ -21,7 +21,7 @@ func (SLP099) Description() string {
 
 var slp099GoStructField = regexp.MustCompile(`^\s*\w+\s+(?:\[\])?\*?\w+(?:\.\w+)?\s+\x60[^\x60]*\x60`)
 
-var slp099TSInterfaceProp = regexp.MustCompile(`(?i)^\s+(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?$`)
+var slp099TSInterfaceProp = regexp.MustCompile(`(?i)(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?$`)
 
 var slp099ResponseKeywords = []string{"Response", "response", "Res", "res", "DTO", "dto", "Output", "output", "Result", "result", "Payload"}
 

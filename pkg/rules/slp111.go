@@ -43,11 +43,9 @@ func (r SLP111) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		ext := strings.ToLower(f.Path)
+		ext := ""
 		if pe := path.Ext(f.Path); pe != "" {
 			ext = strings.ToLower(pe)
-		} else {
-			ext = ""
 		}
 
 		if slp111BinaryExtensions[ext] {

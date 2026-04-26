@@ -18,7 +18,7 @@ func (SLP095) Description() string {
 	return "catch block returns silently without handling the error — use throw/reject or log then rethrow"
 }
 
-var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]|{}|""|''|undefined|none)\b`)
+var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]|{}|""|''|undefined|none)(?:\s|;|$|})`)
 var slp095CatchRE = regexp.MustCompile(`\bcatch\b`)
 var slp095ExceptRE = regexp.MustCompile(`\bexcept\b`)
 
@@ -51,11 +51,7 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 		if !isJSOrTSFile(f.Path) && !isPythonFile(f.Path) && !isJavaFile(f.Path) {
 			continue
 		}
-		if strings.Contains(strings.ToLower(f.Path), ".test.") ||
-			strings.Contains(strings.ToLower(f.Path), ".spec.") {
-			continue
-		}
-		if isJavaTestFile(f.Path) {
+		if isTestFile(f.Path) {
 			continue
 		}
 

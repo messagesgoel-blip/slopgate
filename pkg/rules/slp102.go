@@ -18,7 +18,7 @@ func (SLP102) Description() string {
 	return "async function has no await — likely an incomplete stub"
 }
 
-var slp102AsyncFunc = regexp.MustCompile(`(?i)(?:async\s+(?:function\s+)?|async\s*\(\s*\)\s*=>|async\s+\w+\s*=>|async\s*\w+\s*\([^)]*\)\s*\{)`)
+var slp102AsyncFunc = regexp.MustCompile(`(?i)(?:async\s+(?:function\s+)?|async\s*\(\s*\)\s*=>|async\s+\w+\s*=>|async\s+\w+\s*\([^)]*\)\s*\{)`)
 
 var slp102AwaitRe = regexp.MustCompile(`\bawait\b`)
 
@@ -31,8 +31,7 @@ func (r SLP102) Check(d *diff.Diff) []Finding {
 		if !isJSOrTSFile(f.Path) {
 			continue
 		}
-		if strings.Contains(strings.ToLower(f.Path), ".test.") ||
-			strings.Contains(strings.ToLower(f.Path), ".spec.") {
+		if isTestFile(f.Path) {
 			continue
 		}
 
@@ -52,16 +51,28 @@ func (r SLP102) Check(d *diff.Diff) []Finding {
 				if !inAsync && slp102AsyncFunc.MatchString(content) {
 					// brace-less arrow expression: handle single-line
 					if !strings.Contains(content, "{") {
-						if !slp102AwaitRe.MatchString(content) {
-							out = append(out, Finding{
-								RuleID:   r.ID(),
-								Severity: r.DefaultSeverity(),
-								File:     f.Path,
-								Line:     ln.NewLineNo,
-								Message:  "async function contains no await — remove async or add the async work",
-								Snippet:  content,
-							})
+						// Only emit if it's a complete arrow expression on one line
+						// e.g. const x = async () => 1
+						// Avoid false positives on multiline like:
+						// const x = async () =>
+						//    1
+						idx := strings.Index(content, "=>")
+						if idx != -1 {
+							rhs := strings.TrimSpace(content[idx+2:])
+							if rhs != "" && !slp102AwaitRe.MatchString(content) {
+								out = append(out, Finding{
+									RuleID:   r.ID(),
+									Severity: r.DefaultSeverity(),
+									File:     f.Path,
+									Line:     ln.NewLineNo,
+									Message:  "async function contains no await — remove async or add the async work",
+									Snippet:  content,
+								})
+							}
 						}
+						// If it's a multiline async arrow (no { but trailing =>), we might miss it
+						// because we don't have a good way to track the end of a brace-less arrow func.
+						// But the instructions specifically mentioned not emitting if it's not complete.
 						continue
 					}
 					inAsync = true
