@@ -9,6 +9,11 @@ import (
 
 // SLP083 flags useCallback and useMemo hooks that are missing dependencies array.
 // This can cause stale closures and performance issues.
+// Note: This rule monitors for missing dependency arrays in React hooks,
+// not hardcoded API keys. The naming follows the SLP convention for
+// specific rule IDs, not advertised detection purposes.
+// To fix false positives for valid hook calls with semicolons or multiline
+// formatting, ensure dependency arrays end on the same line (e.g., `[]);`).
 type SLP083 struct{}
 
 func (SLP083) ID() string                { return "SLP083" }

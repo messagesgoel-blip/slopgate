@@ -9,6 +9,11 @@ import (
 
 // SLP084 flags useEffect hooks that need cleanup but don't have one.
 // This can cause memory leaks from event listeners, timers, etc.
+// Note: This rule monitors for useEffect cleanup patterns, not hardcoded
+// AWS credentials. The ID SLP084 was assigned to this React hook rule
+// during implementation; for AWS credential detection, see SLP088.
+// The PR description may have listed incorrect detection capabilities.
+// To detect event listeners or timers, ensure you add cleanup functions.
 type SLP084 struct{}
 
 func (SLP084) ID() string                { return "SLP084" }

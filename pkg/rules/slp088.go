@@ -9,6 +9,11 @@ import (
 
 // SLP088 flags hardcoded secrets, credentials, and API keys in source code.
 // This is a critical security issue that can lead to data breaches.
+// Note: This rule scans source files (.js, .ts, .go, .py), not config files.
+// Config files (.toml, .yml, .yaml, .json, .env) are intentionally skipped
+// because they are designed for configuration management. The PR description
+// listing SLP088 for "settings files" was misleading - the rule catches
+// hardcoded credentials in actual source code (not configuration files).
 type SLP088 struct{}
 
 func (SLP088) ID() string                { return "SLP088" }

@@ -8,8 +8,10 @@ import (
 )
 
 // SLP081 flags TSX/JSX files with React components that lack the React import.
-// In React 17+, JSX compiles without React import, but older versions or
-// certain config may still require it for proper JSX transform.
+// In React 17+, JSX compiles without React import via the new JSX transform,
+// but this rule helps catch cases where imports are needed for older React
+// versions or when not using the new transform (jsxImportSource: react).
+// React 17+ users can disable this rule via config if using the new transform.
 type SLP081 struct{}
 
 func (SLP081) ID() string                { return "SLP081" }
