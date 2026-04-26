@@ -68,14 +68,14 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || isDocFile(f.Path) {
 			continue
 		}
-		if !isGoFile(f.Path) && !isJSOrTSFile(f.Path) && !isPythonFile(f.Path) && !isJavaFile(f.Path) {
+		if !isGoFile(f.Path) && !isJSOrTSFile(f.Path) && !isJavaFile(f.Path) {
 			continue
 		}
 
 		type funcBody struct {
-			sigLine  int
-			sig      string
-			body     []string
+			sigLine int
+			sig     string
+			body    []string
 		}
 		var funcs []funcBody
 

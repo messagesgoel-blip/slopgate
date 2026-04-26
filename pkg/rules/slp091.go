@@ -37,10 +37,14 @@ var testFileSuffixes = []string{
 }
 
 func isTestFile(path string) bool {
+	lower := strings.ToLower(path)
 	for _, s := range testFileSuffixes {
-		if strings.HasSuffix(path, s) || strings.Contains(path, s) {
+		if strings.HasSuffix(lower, s) || strings.Contains(lower, s) {
 			return true
 		}
+	}
+	if strings.Contains(lower, "_test.") || strings.Contains(lower, ".test.") || strings.Contains(lower, ".spec.") {
+		return true
 	}
 	return false
 }
@@ -61,6 +65,7 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 			content := ln.Content
 			if strings.HasPrefix(strings.TrimSpace(content), "//") ||
 				strings.HasPrefix(strings.TrimSpace(content), "#") ||
+				strings.HasPrefix(strings.TrimSpace(content), "--") ||
 				strings.HasPrefix(strings.TrimSpace(content), "/*") ||
 				strings.HasPrefix(strings.TrimSpace(content), "*") {
 				continue

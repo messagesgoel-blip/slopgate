@@ -19,22 +19,21 @@ func (SLP112) Description() string {
 
 var slp112GeneratedSuffixes = []string{
 	".pb.go", ".pb.gw.go", "_generated.go", "_generated.ts", "_generated.js",
-	".min.js", ".min.css", ".gen.go", ".grpc.go",
+	".min.js", ".min.css", ".grpc.go",
 	".pb.d.ts", ".pb.js",
 }
 
 var slp112KnownSourceMappings = map[string]string{
-	".pb.go":            ".proto",
-	".pb.gw.go":         ".proto",
-	".grpc.go":          ".proto",
-	"_generated.go":     ".proto",
-	"_generated.ts":     ".proto",
-	"_generated.js":     ".proto",
-	".gen.go":           ".go",
-	".min.js":           ".js",
-	".min.css":          ".css",
-	".pb.d.ts":          ".proto",
-	".pb.js":            ".proto",
+	".pb.go":        ".proto",
+	".pb.gw.go":     ".proto",
+	".grpc.go":      ".proto",
+	"_generated.go": ".proto",
+	"_generated.ts": ".proto",
+	"_generated.js": ".proto",
+	".min.js":       ".js",
+	".min.css":      ".css",
+	".pb.d.ts":      ".proto",
+	".pb.js":        ".proto",
 }
 
 func (r SLP112) Check(d *diff.Diff) []Finding {

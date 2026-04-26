@@ -54,6 +54,19 @@ func TestSLP104_IgnoresZeroLengthMake(t *testing.T) {
 	}
 }
 
+func TestSLP104_FiresOnMakeThreeArg(t *testing.T) {
+	d := parseDiff(t, `diff --git a/parser.go b/parser.go
+--- a/parser.go
++++ b/parser.go
+@@ -1,1 +1,3 @@
++  buf := make([]byte, 4096, 8192)
+`)
+	got := SLP104{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for make([]byte, 4096, 8192)")
+	}
+}
+
 func TestSLP104_Description(t *testing.T) {
 	r := SLP104{}
 	if r.ID() != "SLP104" {

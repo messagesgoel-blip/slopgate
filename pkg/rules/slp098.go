@@ -38,7 +38,7 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		if isTestFile(f.Path) || strings.Contains(f.Path, "_test.") || strings.Contains(f.Path, ".test.") || strings.Contains(f.Path, ".spec.") {
+		if isTestFile(f.Path) {
 			hasTestChange = true
 			continue
 		}
@@ -50,14 +50,16 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 			content := strings.TrimSpace(ln.Content)
 			for _, pat := range slp098RoutePatterns {
 				if pat.MatchString(content) {
-					hasNewRoute = true
 					routeFiles[f.Path] = true
 					break
 				}
 			}
-			if hasNewRoute && len(routeFiles) > 0 {
+			if routeFiles[f.Path] {
 				break
 			}
+		}
+		if routeFiles[f.Path] {
+			hasNewRoute = true
 		}
 	}
 

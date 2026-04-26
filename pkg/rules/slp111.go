@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"path"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -43,8 +44,8 @@ func (r SLP111) Check(d *diff.Diff) []Finding {
 		}
 
 		ext := strings.ToLower(f.Path)
-		if dot := strings.LastIndex(ext, "."); dot >= 0 {
-			ext = ext[dot:]
+		if pe := path.Ext(f.Path); pe != "" {
+			ext = strings.ToLower(pe)
 		} else {
 			ext = ""
 		}
@@ -62,10 +63,7 @@ func (r SLP111) Check(d *diff.Diff) []Finding {
 		}
 
 		if f.IsNew && ext == "" {
-			base := f.Path
-			if i := strings.LastIndex(f.Path, "/"); i >= 0 {
-				base = f.Path[i+1:]
-			}
+			base := path.Base(f.Path)
 			if !knownExtensionless[base] {
 				out = append(out, Finding{
 					RuleID:   r.ID(),

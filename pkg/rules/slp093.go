@@ -32,6 +32,7 @@ var slp093AssertTerms = []string{
 	"assert.Equal", "assert.EqualValues", "assert.JSONEq",
 	"assert.NotNil", "assert.Nil", "assert.True", "assert.False",
 	"should(", ".must(",
+	"require.", "t.Fatalf", "t.Errorf", "t.Error", "t.Fatal", "t.Skip",
 }
 
 func (r SLP093) Check(d *diff.Diff) []Finding {

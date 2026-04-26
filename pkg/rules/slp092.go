@@ -24,7 +24,7 @@ func (SLP092) Description() string {
 
 var slp092DoubleUnwrap = regexp.MustCompile(`(?i)(?:\.data){2,}\b|res\.data\.data\b|response\.data\.data\b`)
 
-var slp092NoEnvelopeMock = regexp.MustCompile(`mock\w*Value\w*\s*\(\s*\{`)
+var slp092NoEnvelopeMock = regexp.MustCompile(`(?i)mock(?:Implementation|ReturnValue|ResolvedValue|RejectedValue)(?:Once)?\s*\(\s*(?:\(\s*\)\s*=>\s*)?\{?`)
 
 var slp092EnvelopeDestructure = regexp.MustCompile(`(?i)(?:const|let|var)\s*\{[^}]*\b(?:ok|status|success)\b[^}]*\}\s*=.*await`)
 

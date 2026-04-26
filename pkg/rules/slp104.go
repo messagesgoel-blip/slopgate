@@ -17,7 +17,7 @@ func (SLP104) Description() string {
 	return "hardcoded buffer/size limit — define a named constant instead"
 }
 
-var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*([0-9]+)\s*\)`)
+var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*([0-9]+)(?:\s*,\s*[0-9]+)?\s*\)`)
 var slp104BufioSize = regexp.MustCompile(`bufio\.NewReaderSize\s*\([^,]+,\s*\d+\s*\)`)
 var slp104BufferConfig = regexp.MustCompile(`(?i)(?:bufferSize|maxSize|bufSize|chunkSize|limit)\s*[:=]\s*\d+`)
 
@@ -37,16 +37,16 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 		}
 
 		for _, ln := range f.AddedLines() {
-			content := strings.TrimSpace(ln.Content)
+			trimmed := strings.TrimSpace(ln.Content)
 			var msg string
 			switch {
-			case slp104MakeByte.MatchString(content):
-				if m := slp104MakeByte.FindStringSubmatch(content); m != nil && m[1] != "0" {
+			case slp104MakeByte.MatchString(trimmed):
+				if m := slp104MakeByte.FindStringSubmatch(trimmed); m != nil && m[1] != "0" {
 					msg = "hardcoded buffer size in make — use a named constant"
 				}
-			case slp104BufioSize.MatchString(content):
+			case slp104BufioSize.MatchString(trimmed):
 				msg = "hardcoded buffer size in bufio — use a named constant"
-			case slp104BufferConfig.MatchString(content):
+			case slp104BufferConfig.MatchString(trimmed):
 				msg = "hardcoded buffer limit — use a named constant"
 			}
 			if msg != "" {
@@ -56,7 +56,7 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 					File:     f.Path,
 					Line:     ln.NewLineNo,
 					Message:  msg,
-					Snippet:  content,
+					Snippet:  ln.Content,
 				})
 			}
 		}

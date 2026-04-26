@@ -19,9 +19,9 @@ func (SLP097) Description() string {
 	return "response destructuring may not match API envelope — verify {ok, data} contract"
 }
 
-var slp097DestructureData = regexp.MustCompile(`(?i)(?:const|let|var)\s*\{[^}]*\bdata\b[^}]*\}\s*=\s*(?:await\s+)?\w+(?:\.\w+\(\))`)
+var slp097DestructureData = regexp.MustCompile(`(?i)(?:const|let|var)\s*\{[^}]*\bdata\b[^}]*\}\s*=\s*(?:await\s+)?\w+(?:\.\w+\([^)]*\))+`)
 
-var slp097NoOkCheck = regexp.MustCompile(`(?i)fetch\([^)]*\)\s*\.then\s*\(\s*\(?\s*(?:res|response)\s*\)?\s*=>\s*(?:res|response)\s*\.json\s*\(\s*\)`)
+var slp097NoOkCheck = regexp.MustCompile(`(?i)fetch\(.+?\)\s*\.then\s*\(\s*\(?\s*(?:res|response)(?:\s*:\s*\w+)?\s*\)?\s*=>\s*(?:res|response)\s*\.json\s*\(\s*\)`)
 
 func (r SLP097) Check(d *diff.Diff) []Finding {
 	var out []Finding

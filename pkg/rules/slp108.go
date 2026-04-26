@@ -22,7 +22,7 @@ func (SLP108) Description() string {
 	return "open/connect without defer close or timeout — resources will leak on panic"
 }
 
-var slp108Open = regexp.MustCompile(`(?i)(?:os\.Open|OpenFile|sql\.Open|net\.Dial|http\.Get|http\.Post|Connect|Listen|NewClient)\s*\(`)
+var slp108Open = regexp.MustCompile(`(?i)\b(?:os\.Open|OpenFile|sql\.Open|net\.Dial|http\.Get|http\.Post|Connect|Listen|NewClient)\s*\(`)
 var slp108Fetch = regexp.MustCompile(`(?i)fetch\s*\(\s*['"\x60]`)
 var slp108DeferClose = regexp.MustCompile(`(?i)defer\s+.*(?:Close|Cancel)\s*\(`)
 var slp108Timeout = regexp.MustCompile(`(?i)(?:context\.WithTimeout|context\.WithDeadline|setTimeout|time\.After|setRequestTimeout)`)

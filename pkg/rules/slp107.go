@@ -52,6 +52,25 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 						errorBraceDepth = 0
 						errorBraceDepth += strings.Count(content, "{")
 						errorBraceDepth -= strings.Count(content, "}")
+						if slp107Cleanup.MatchString(content) {
+							cleanupLines = append(cleanupLines, ln)
+						}
+						if errorBraceDepth <= 0 && strings.Contains(content, "}") {
+							if len(cleanupLines) > 0 {
+								for _, cl := range cleanupLines {
+									out = append(out, Finding{
+										RuleID:   r.ID(),
+										Severity: r.DefaultSeverity(),
+										File:     f.Path,
+										Line:     cl.NewLineNo,
+										Message:  "cleanup/destroy only found in error block — ensure resource is also released on success path",
+										Snippet:  strings.TrimSpace(cl.Content),
+									})
+								}
+							}
+							inErrorBlock = false
+							cleanupLines = nil
+						}
 					}
 					continue
 				}

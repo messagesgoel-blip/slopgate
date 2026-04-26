@@ -10,8 +10,14 @@ func TestSLP108_FiresOnOpenWithoutDefer(t *testing.T) {
 +  db, err := sql.Open("postgres", connStr)
 `)
 	got := SLP108{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for open without defer")
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP108" {
+		t.Errorf("RuleID = %q", got[0].RuleID)
+	}
+	if got[0].Severity != SeverityBlock {
+		t.Errorf("Severity = %v", got[0].Severity)
 	}
 }
 
@@ -23,8 +29,14 @@ func TestSLP108_FiresOnFetchWithoutTimeout(t *testing.T) {
 +  const res = fetch("https://api.example.com/data")
 `)
 	got := SLP108{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for fetch without timeout")
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP108" {
+		t.Errorf("RuleID = %q", got[0].RuleID)
+	}
+	if got[0].Severity != SeverityBlock {
+		t.Errorf("Severity = %v", got[0].Severity)
 	}
 }
 

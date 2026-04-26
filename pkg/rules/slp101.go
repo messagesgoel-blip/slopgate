@@ -55,7 +55,7 @@ func (r SLP101) Check(d *diff.Diff) []Finding {
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
-					Message:  "empty else branch in feature-flagged code — remove the dead branch",
+					Message:  "empty else branch detected —aleb the dead branch or implement the alternate path",
 					Snippet:  content,
 				})
 			}

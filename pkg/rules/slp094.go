@@ -36,7 +36,7 @@ func (r SLP094) Check(d *diff.Diff) []Finding {
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
-					Message:  "|| true suppresses command failure — handle the error or explicitly comment why it's safe",
+					Message:  "|| true or || : suppresses command failure — handle the error or explicitly comment why it's safe",
 					Snippet:  strings.TrimSpace(ln.Content),
 				})
 			}
@@ -50,11 +50,17 @@ func isShellLikeFile(path string) bool {
 	if strings.HasSuffix(lower, ".sh") || strings.HasSuffix(lower, ".bash") {
 		return true
 	}
-	if strings.Contains(lower, "makefile") || strings.HasSuffix(lower, ".mk") {
+	base := lower
+	if i := strings.LastIndex(lower, "/"); i >= 0 {
+		base = lower[i+1:]
+	}
+	if base == "makefile" || strings.HasSuffix(base, ".mk") {
 		return true
 	}
 	if strings.HasSuffix(lower, ".yml") || strings.HasSuffix(lower, ".yaml") {
-		return strings.Contains(lower, "ci") || strings.Contains(lower, "workflow")
+		return strings.Contains(lower, ".github/workflows") ||
+			strings.Contains(base, "ci") ||
+			strings.HasPrefix(base, "workflow")
 	}
 	return false
 }

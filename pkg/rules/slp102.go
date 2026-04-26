@@ -50,6 +50,20 @@ func (r SLP102) Check(d *diff.Diff) []Finding {
 				content := strings.TrimSpace(ln.Content)
 
 				if !inAsync && slp102AsyncFunc.MatchString(content) {
+					// brace-less arrow expression: handle single-line
+					if !strings.Contains(content, "{") {
+						if !slp102AwaitRe.MatchString(content) {
+							out = append(out, Finding{
+								RuleID:   r.ID(),
+								Severity: r.DefaultSeverity(),
+								File:     f.Path,
+								Line:     ln.NewLineNo,
+								Message:  "async function contains no await — remove async or add the async work",
+								Snippet:  content,
+							})
+						}
+						continue
+					}
 					inAsync = true
 					asyncLine = ln.NewLineNo
 					asyncSnippet = content

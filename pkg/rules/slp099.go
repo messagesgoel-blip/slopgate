@@ -36,16 +36,15 @@ func hasResponseKeyword(name string) bool {
 
 func (r SLP099) Check(d *diff.Diff) []Finding {
 	var out []Finding
-	hasFieldChange := false
-	hasTestChange := false
 	changedFiles := make(map[string]bool)
+	changedTestFiles := make(map[string]bool)
 
 	for _, f := range d.Files {
 		if f.IsDelete || isDocFile(f.Path) {
 			continue
 		}
-		if isTestFile(f.Path) || strings.Contains(f.Path, "_test.") || strings.Contains(f.Path, ".test.") || strings.Contains(f.Path, ".spec.") {
-			hasTestChange = true
+		if isTestFile(f.Path) {
+			changedTestFiles[f.Path] = true
 			continue
 		}
 		if !isGoFile(f.Path) && !isJSOrTSFile(f.Path) {
@@ -56,32 +55,54 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 			content := strings.TrimSpace(ln.Content)
 			if slp099GoStructField.MatchString(content) || slp099TSInterfaceProp.MatchString(content) {
 				if hasResponseKeyword(f.Path) {
-					hasFieldChange = true
 					changedFiles[f.Path] = true
 				}
 			}
 		}
 	}
 
-	if hasFieldChange && !hasTestChange {
-		for _, f := range d.Files {
-			if !changedFiles[f.Path] {
-				continue
-			}
-			for _, ln := range f.AddedLines() {
-				content := strings.TrimSpace(ln.Content)
-				if slp099GoStructField.MatchString(content) || slp099TSInterfaceProp.MatchString(content) {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "response field added/changed without test update — verify tests still match",
-						Snippet:  content,
-					})
-				}
+	for _, f := range d.Files {
+		if !changedFiles[f.Path] {
+			continue
+		}
+		if testMatchesResponse(f.Path, changedTestFiles) {
+			continue
+		}
+		for _, ln := range f.AddedLines() {
+			content := strings.TrimSpace(ln.Content)
+			if slp099GoStructField.MatchString(content) || slp099TSInterfaceProp.MatchString(content) {
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
+					File:     f.Path,
+					Line:     ln.NewLineNo,
+					Message:  "response field added/changed without test update — verify tests still match",
+					Snippet:  content,
+				})
 			}
 		}
 	}
 	return out
+}
+
+func testMatchesResponse(respPath string, testFiles map[string]bool) bool {
+	if len(testFiles) == 0 {
+		return false
+	}
+	// derive basename and stem for the response file
+	base := respPath
+	if i := strings.LastIndex(respPath, "/"); i >= 0 {
+		base = respPath[i+1:]
+	}
+	stem := base
+	if i := strings.LastIndex(base, "."); i >= 0 {
+		stem = base[:i]
+	}
+	// check if any test file contains the same stem
+	for tf := range testFiles {
+		if strings.Contains(tf, stem) {
+			return true
+		}
+	}
+	return false
 }

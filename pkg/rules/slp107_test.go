@@ -19,6 +19,19 @@ func TestSLP107_FiresOnCleanupOnlyInErrorPath(t *testing.T) {
 	}
 }
 
+func TestSLP107_FiresOnSingleLineErrorBlock(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,1 +1,3 @@
++  if err != nil { conn.Close(); return err }
+`)
+	got := SLP107{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for single-line error block cleanup")
+	}
+}
+
 func TestSLP107_NoFireOnCleanupInNormalPath(t *testing.T) {
 	d := parseDiff(t, `diff --git a/handler.go b/handler.go
 --- a/handler.go

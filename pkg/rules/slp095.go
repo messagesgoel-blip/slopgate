@@ -19,6 +19,17 @@ func (SLP095) Description() string {
 }
 
 var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]|{}|""|''|undefined|none)\b`)
+var slp095CatchRE = regexp.MustCompile(`\bcatch\b`)
+var slp095ExceptRE = regexp.MustCompile(`\bexcept\b`)
+
+func indentationOf(line string) string {
+	for i, r := range line {
+		if r != ' ' && r != '\t' {
+			return line[:i]
+		}
+	}
+	return line
+}
 
 func hasErrorHandling(cLower string) bool {
 	return strings.Contains(cLower, "throw ") ||
@@ -53,6 +64,7 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 			catchBraceDepth := 0
 			handling := false
 			var silentLine *diff.Line
+			var exceptIndent string
 
 			for i := range h.Lines {
 				ln := &h.Lines[i]
@@ -63,11 +75,14 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 				cLower := strings.ToLower(content)
 
 				if !inCatch {
-					if strings.Contains(cLower, "catch") || strings.Contains(cLower, "except") {
+					if slp095CatchRE.MatchString(cLower) || slp095ExceptRE.MatchString(cLower) {
 						inCatch = true
 						catchBraceDepth = 0
 						handling = false
 						silentLine = nil
+						if isPythonFile(f.Path) {
+							exceptIndent = indentationOf(ln.Content)
+						}
 						catchBraceDepth += strings.Count(ln.Content, "{")
 						catchBraceDepth -= strings.Count(ln.Content, "}")
 						if hasErrorHandling(cLower) {
@@ -105,7 +120,7 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 
 				blockEnded := false
 				if isPythonFile(f.Path) {
-					if !strings.HasPrefix(ln.Content, " ") && !strings.HasPrefix(ln.Content, "\t") && content != "" {
+					if content != "" && indentationOf(ln.Content) <= exceptIndent {
 						blockEnded = true
 					}
 				} else {
