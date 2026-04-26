@@ -48,7 +48,17 @@ Exit codes:
 - `1` - blocking findings present
 - `2` - configuration or tool error
 
-## Rules (v0.0.10)
+### GitHub Actions CI
+
+slopgate runs automatically in CI on every push to main and on pull requests. The workflow:
+
+1. Fetches full git history (`fetch-depth: 0`) so base refs are available
+2. Builds and vets the code
+3. Runs `slopgate --no-color --base origin/main` to compare PR changes against the target branch
+
+For a complete CI setup example, see `.github/workflows/ci.yml`.
+
+## Rules (v0.0.11)
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
@@ -86,6 +96,11 @@ Exit codes:
 | SLP035 | Code quality or style issue detected (console/debugger, TODO without ticket, trailing whitespace, long lines) | warn | all |
 
 \* SLP020 escalates to **warn** when security-context keywords (password, token, secret, key, session, nonce, salt, credential, auth) appear nearby.
+
+### v0.0.11 Changes
+
+- **CI Integration**: slopgate now runs in GitHub Actions CI with `--base origin/main` to compare PR changes against the target branch
+- Full git history fetched (`fetch-depth: 0`) to ensure base refs are available for diff comparison
 
 ### v0.0.10 Changes
 
