@@ -4,5 +4,5 @@ description = "Ignore test files with fake private keys"
 file = '''pkg/rules/slp056_test.go'''
 
 [[rules]]
-description = "Ignore slopgate binary binary in CI"
+description = "Ignore slopgate binary in CI"
 file = '''slopgate'''

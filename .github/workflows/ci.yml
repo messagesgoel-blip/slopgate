@@ -36,7 +36,7 @@ jobs:
           go build -buildvcs=false -o ./slopgate ./cmd/slopgate
 
       - name: Run slopgate check
-        run: ./slopgate --staged --no-color || true
+        run: ./slopgate --no-color
 
       - name: Test
         run: go test -race ./...
