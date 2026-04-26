@@ -45,7 +45,7 @@ func isTestFile(path string) bool {
 
 	for _, segment := range strings.Split(lower, "/") {
 		switch segment {
-		case "test", "tests", "testdata":
+		case "test", "tests", "testdata", "fixtures", "__fixtures__", "fixture":
 			return true
 		}
 	}
@@ -68,6 +68,7 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 		for _, ln := range f.AddedLines() {
 			content := ln.Content
 			trimmed := strings.TrimSpace(content)
+			// If we're inside a block comment, skip until */ is found.
 			if inBlockComment {
 				if closeIdx := strings.Index(trimmed, "*/"); closeIdx >= 0 {
 					trimmed = strings.TrimSpace(trimmed[closeIdx+2:])
@@ -76,27 +77,31 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 					if trimmed == "" {
 						continue
 					}
-					// Fall through to process remainder
+					// Fall through to strip any further /* */ spans on this line.
 				} else {
 					continue
 				}
-			} else if openIdx := strings.Index(trimmed, "/*"); openIdx >= 0 {
-				if closeIdx := strings.Index(trimmed, "*/"); closeIdx > openIdx {
-					trimmed = strings.TrimSpace(trimmed[:openIdx] + trimmed[closeIdx+2:])
-					content = trimmed
-					if trimmed == "" {
-						continue
-					}
-					// Fall through to process remainder
-				} else {
+			}
+			// Repeatedly strip all /* */ comment spans from the line.
+			for {
+				openIdx := strings.Index(trimmed, "/*")
+				if openIdx < 0 {
+					break
+				}
+				closeOff := strings.Index(trimmed[openIdx+2:], "*/")
+				if closeOff < 0 {
+					// Unclosed /* — truncate at the comment open and set inBlockComment.
 					trimmed = strings.TrimSpace(trimmed[:openIdx])
 					content = trimmed
 					inBlockComment = true
-					if trimmed == "" {
-						continue
-					}
-					// Fall through to process non-comment portion before "/*"
+					break
 				}
+				absClose := openIdx + 2 + closeOff + 2
+				trimmed = strings.TrimSpace(trimmed[:openIdx] + trimmed[absClose:])
+				content = trimmed
+			}
+			if trimmed == "" {
+				continue
 			}
 			if strings.HasPrefix(trimmed, "//") ||
 				strings.HasPrefix(trimmed, "#") ||

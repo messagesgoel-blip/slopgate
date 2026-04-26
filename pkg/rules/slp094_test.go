@@ -5,6 +5,21 @@ import (
 	"testing"
 )
 
+func assertFindings(t *testing.T, got []Finding, wantCount int, wantRule string, wantSeverity Severity) {
+	t.Helper()
+	if len(got) != wantCount {
+		t.Fatalf("expected %d finding(s), got %d: %v", wantCount, len(got), got)
+	}
+	if wantCount > 0 {
+		if got[0].RuleID != wantRule {
+			t.Errorf("RuleID = %q, want %q", got[0].RuleID, wantRule)
+		}
+		if got[0].Severity != wantSeverity {
+			t.Errorf("Severity = %v, want %v", got[0].Severity, wantSeverity)
+		}
+	}
+}
+
 func TestSLP094_FiresOnOrTrue(t *testing.T) {
 	d := parseDiff(t, `diff --git a/build.sh b/build.sh
 --- a/build.sh
@@ -12,13 +27,7 @@ func TestSLP094_FiresOnOrTrue(t *testing.T) {
 @@ -1,1 +1,3 @@
 +  go build ./... || true
 `)
-	got := SLP094{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding for || true, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP094" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
+	assertFindings(t, SLP094{}.Check(d), 1, "SLP094", SeverityBlock)
 }
 
 func TestSLP094_FiresOnOrColon(t *testing.T) {
@@ -28,13 +37,7 @@ func TestSLP094_FiresOnOrColon(t *testing.T) {
 @@ -1,1 +1,3 @@
 +  run: npm test || :
 `)
-	got := SLP094{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding for || :, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP094" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
+	assertFindings(t, SLP094{}.Check(d), 1, "SLP094", SeverityBlock)
 }
 
 func TestSLP094_IgnoresNonShell(t *testing.T) {
@@ -98,13 +101,7 @@ func TestSLP094_FiresOnRunBlockScalarCommand(t *testing.T) {
    run: |
 +    npm test || true
 `)
-	got := SLP094{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding for run block scalar command, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP094" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
+	assertFindings(t, SLP094{}.Check(d), 1, "SLP094", SeverityBlock)
 }
 
 func TestSLP094_FiresOnRunListEntry(t *testing.T) {
@@ -114,13 +111,7 @@ func TestSLP094_FiresOnRunListEntry(t *testing.T) {
 @@ -1,1 +1,3 @@
 +  - run: npm test || true
 `)
-	got := SLP094{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding for YAML list-item run entry, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP094" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
+	assertFindings(t, SLP094{}.Check(d), 1, "SLP094", SeverityBlock)
 }
 
 func TestSLP094_FiresOnChainedSilentFail(t *testing.T) {
@@ -130,13 +121,7 @@ func TestSLP094_FiresOnChainedSilentFail(t *testing.T) {
 @@ -1,1 +1,3 @@
 +  go build || true&&echo done
 `)
-	got := SLP094{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding for chained || true&& pattern, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP094" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
+	assertFindings(t, SLP094{}.Check(d), 1, "SLP094", SeverityBlock)
 }
 
 func TestSLP094_BlockScalarSiblingKeyNotFlagged(t *testing.T) {

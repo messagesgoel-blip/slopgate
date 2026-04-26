@@ -151,7 +151,7 @@ func slp098TestMatches(testPath, sourceBase string) bool {
 		srcDir := path.Dir(sourceBase)
 		testDir := path.Dir(testBase)
 		for _, root := range []string{"tests", "test", "src/tests", "src/test"} {
-			if strings.HasPrefix(testDir, root) {
+			if testDir == root || strings.HasPrefix(testDir, root+"/") {
 				remainder := strings.TrimPrefix(testDir, root)
 				remainder = strings.TrimPrefix(remainder, "/")
 				if remainder == "" || strings.HasSuffix(srcDir, remainder) {
@@ -165,7 +165,7 @@ func slp098TestMatches(testPath, sourceBase string) bool {
 				continue
 			}
 			for _, testRoot := range []string{"tests", "test"} {
-				if testDir == testRoot+"/"+srcReplaced || testDir == testRoot {
+				if testDir == testRoot+"/"+srcReplaced {
 					return true
 				}
 			}
@@ -194,11 +194,23 @@ func slp098TestTarget(testPath string) string {
 		return strings.TrimSuffix(stem, ".test")
 	case strings.HasSuffix(stem, ".spec"):
 		return strings.TrimSuffix(stem, ".spec")
-	case strings.HasSuffix(strings.ToLower(stem), "tests"):
-		return stem[:len(stem)-len("tests")]
-	case strings.HasSuffix(strings.ToLower(stem), "test"):
-		return stem[:len(stem)-len("test")]
 	default:
+		// Strip "test"/"tests" only when they form the standalone basename
+		// or are preceded by a delimiter, to avoid truncating words like "latest".
+		base := path.Base(stem)
+		lowerBase := strings.ToLower(base)
+		dir := path.Dir(stem)
+		for _, sfx := range []string{"tests", "test"} {
+			if lowerBase == sfx {
+				return dir
+			}
+			for _, delim := range []string{".", "-"} {
+				if strings.HasSuffix(lowerBase, delim+sfx) {
+					newBase := base[:len(base)-len(delim+sfx)]
+					return path.Join(dir, newBase)
+				}
+			}
+		}
 		return stem
 	}
 }

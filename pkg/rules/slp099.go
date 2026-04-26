@@ -25,8 +25,8 @@ var slp099GoStructField = regexp.MustCompile(
 		`[A-Z]\w*\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?` + // Exported field (uppercase)
 		`|\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)\w+(?:\.\w+)?` + // Any field with pointer/slice type
 		`|[A-Z]\w*\s+\w+\.\w+` + // Exported field with package-qualified type
-	`)(?:\s+` + "`" + `[^` + "`" + `]*` + "`" + `)?\s*$` + // Optional struct tag
-	`|^\s*\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?\s+` + "`" + `[^` + "`" + `]*` + "`" + `\s*$`) // Lowercase field with struct tag
+		`)(?:\s+` + "`" + `[^` + "`" + `]*` + "`" + `)?\s*$` + // Optional struct tag
+		`|^\s*\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?\s+` + "`" + `[^` + "`" + `]*` + "`" + `\s*$`) // Lowercase field with struct tag
 
 var slp099TSInterfaceProp = regexp.MustCompile(`(?i)^(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?$`)
 
@@ -77,9 +77,18 @@ func matchesSlp099FieldLine(filePath, content string) bool {
 	return false
 }
 
+// slp099TrimKnownExt strips known multi-part extensions (e.g., .d.ts) before
+// falling back to path.Ext so that stems like "response.d.ts" → "response".
+func slp099TrimKnownExt(name string) string {
+	if strings.HasSuffix(name, ".d.ts") {
+		return strings.TrimSuffix(name, ".d.ts")
+	}
+	return strings.TrimSuffix(name, path.Ext(name))
+}
+
 func slp099FilenameTokens(name string) []string {
 	base := path.Base(name)
-	stem := strings.TrimSuffix(base, path.Ext(base))
+	stem := slp099TrimKnownExt(base)
 	stem = slp099CamelBoundaryAcronym.ReplaceAllString(stem, `$1 $2`)
 	stem = slp099CamelBoundaryLowerToUpper.ReplaceAllString(stem, `$1 $2`)
 	stem = slp099NonAlnum.ReplaceAllString(stem, " ")
@@ -157,7 +166,7 @@ func testMatchesResponse(respPath string, testFiles map[string]bool) bool {
 
 func slp099FileStem(filePath string) string {
 	base := path.Base(filePath)
-	stem := strings.TrimSuffix(base, path.Ext(base))
+	stem := slp099TrimKnownExt(base)
 	switch {
 	case strings.HasSuffix(stem, "_test"):
 		return strings.TrimSuffix(stem, "_test")

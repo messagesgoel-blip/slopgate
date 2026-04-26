@@ -18,7 +18,7 @@ func (SLP100) Description() string {
 	return "function returns zero value with no side effects — likely an unfinished stub"
 }
 
-var slp100FuncStart = regexp.MustCompile(`(?i)(?:func\s+|function\s+|def\s+|public\s+(?:static\s+)?(?:void\s+)?|private\s+(?:static\s+)?|fn\s+)\w+\s*\(`)
+var slp100FuncStart = regexp.MustCompile(`(?i)(?:func\s+(?:\([^)]*\)\s+)?|function\s+|def\s+|(?:public|private|protected)\s+(?:static\s+)?(?:final\s+)?(?:\w+\s+)?|fn\s+)\w+\s*\(`)
 
 var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None)\s*[;]?\s*$`)
 
@@ -58,7 +58,7 @@ func (r SLP100) Check(d *diff.Diff) []Finding {
 				}
 				content := strings.TrimSpace(ln.Content)
 
-				if !inFunc && slp100FuncStart.MatchString(content) {
+				if !inFunc && slp100FuncStart.MatchString(stripCommentAndStrings(content)) {
 					inFunc = true
 					braceDepth = 0
 					hasWork = false

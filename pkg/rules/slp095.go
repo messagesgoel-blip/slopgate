@@ -129,12 +129,8 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 				closesBeforeOpen := strings.Count(ln.Content, "}")
 				if firstOpen := strings.Index(ln.Content, "{"); firstOpen >= 0 {
 					closesBeforeOpen = strings.Count(ln.Content[:firstOpen], "}")
-					catchBraceDepth -= closesBeforeOpen
-					catchBraceDepth += strings.Count(ln.Content[firstOpen:], "{")
-					catchBraceDepth -= strings.Count(ln.Content[firstOpen:], "}")
-				} else {
-					catchBraceDepth -= closesBeforeOpen
 				}
+				catchBraceDepth -= closesBeforeOpen
 
 				blockEnded := false
 				if isPython {
@@ -144,6 +140,14 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 				} else {
 					if catchBraceDepth <= 0 && closesBeforeOpen > 0 {
 						blockEnded = true
+					}
+				}
+
+				// Only adjust for braces after the first open if the block hasn't ended.
+				if !blockEnded {
+					if firstOpen := strings.Index(ln.Content, "{"); firstOpen >= 0 {
+						catchBraceDepth += strings.Count(ln.Content[firstOpen:], "{")
+						catchBraceDepth -= strings.Count(ln.Content[firstOpen:], "}")
 					}
 				}
 
@@ -174,8 +178,6 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 						}
 						catchBraceDepth += strings.Count(catchSub2, "{")
 						catchBraceDepth -= strings.Count(catchSub2, "}")
-					} else {
-						continue
 					}
 				}
 

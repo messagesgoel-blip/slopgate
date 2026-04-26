@@ -168,6 +168,12 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 								if inner != "" {
 									cur.body = append(cur.body, inner)
 								}
+							} else if braceOff+1 < len(lineContent) {
+								// No closing brace on same line — capture content after the opening brace.
+								inner := strings.TrimSpace(lineContent[braceOff+1:])
+								if inner != "" {
+									cur.body = append(cur.body, inner)
+								}
 							}
 						}
 					}
@@ -189,8 +195,19 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 
 				braceDepth += strings.Count(content, "{")
 				braceDepth -= strings.Count(content, "}")
-				if ln.Kind == diff.LineAdd && ln.NewLineNo != cur.sigLine && ln.NewLineNo != cur.bodyStartLine && content != "{" && content != "}" {
-					cur.body = append(cur.body, content)
+				if ln.Kind == diff.LineAdd && ln.NewLineNo != cur.sigLine {
+					if ln.NewLineNo == cur.bodyStartLine {
+						// For multi-line signatures: capture content after the opening '{' on the body-start line.
+						if bracePos := strings.Index(content, "{"); bracePos >= 0 && bracePos+1 < len(content) {
+							inner := strings.TrimSpace(content[bracePos+1:])
+							inner = strings.TrimRight(inner, "} 	")
+							if inner != "" {
+								cur.body = append(cur.body, inner)
+							}
+						}
+					} else if content != "{" && content != "}" {
+						cur.body = append(cur.body, content)
+					}
 				}
 				if braceDepth <= 0 && strings.Contains(content, "}") {
 					if len(cur.body) > 0 {

@@ -19,8 +19,9 @@ func (SLP104) Description() string {
 }
 
 var slp104NumLit = `(?:0[xX][0-9A-Fa-f][0-9A-Fa-f_]*|0[bB][01][01_]*|0[oO][0-7][0-7_]*|[0-9][0-9_]*(?:\.[0-9_]+)?(?:[eE][+\-]?[0-9_]+)?)`
-var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*(` + slp104NumLit + `)(?:\s*,\s*(` + slp104NumLit + `))?\s*\)`)
-var slp104BufioSize = regexp.MustCompile(`bufio\.NewReaderSize\s*\((?:[^(),]+|\([^()]*\))+,\s*` + slp104NumLit + `\s*\)`)
+var slp104IntLit = `(?:0[xX][0-9A-Fa-f][0-9A-Fa-f_]*|0[bB][01][01_]*|0[oO][0-7][0-7_]*|[0-9][0-9_]*)`
+var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*(` + slp104IntLit + `)(?:\s*,\s*(` + slp104IntLit + `))?\s*\)`)
+var slp104BufioSize = regexp.MustCompile(`bufio\.NewReaderSize\s*\((?:[^(),]+|\([^()]*\))+,\s*` + slp104IntLit + `\s*\)`)
 var slp104BufferConfig = regexp.MustCompile(`(?i)\b(?:bufferSize|maxSize|bufSize|chunkSize)\b\s*(?:[:=]|:=)\s*` + slp104NumLit)
 
 func (r SLP104) Check(d *diff.Diff) []Finding {
@@ -36,6 +37,17 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
+		newFinding := func(ln diff.Line, msg string) Finding {
+			return Finding{
+				RuleID:   r.ID(),
+				Severity: r.DefaultSeverity(),
+				File:     f.Path,
+				Line:     ln.NewLineNo,
+				Message:  msg,
+				Snippet:  ln.Content,
+			}
+		}
+
 		for _, ln := range f.AddedLines() {
 			trimmed := strings.TrimSpace(ln.Content)
 			if isGoFile(f.Path) {
@@ -48,38 +60,17 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 							isZero = parsed == 0
 						}
 						if !isZero || capVal != "" {
-							out = append(out, Finding{
-								RuleID:   r.ID(),
-								Severity: r.DefaultSeverity(),
-								File:     f.Path,
-								Line:     ln.NewLineNo,
-								Message:  "hardcoded buffer size in make — use a named constant",
-								Snippet:  ln.Content,
-							})
+							out = append(out, newFinding(ln, "hardcoded buffer size in make — use a named constant"))
 							break
 						}
 					}
 				}
 				if slp104BufioSize.MatchString(trimmed) {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "hardcoded buffer size in bufio — use a named constant",
-						Snippet:  ln.Content,
-					})
+					out = append(out, newFinding(ln, "hardcoded buffer size in bufio — use a named constant"))
 				}
 			}
 			if slp104BufferConfig.MatchString(trimmed) {
-				out = append(out, Finding{
-					RuleID:   r.ID(),
-					Severity: r.DefaultSeverity(),
-					File:     f.Path,
-					Line:     ln.NewLineNo,
-					Message:  "hardcoded buffer limit — use a named constant",
-					Snippet:  ln.Content,
-				})
+				out = append(out, newFinding(ln, "hardcoded buffer limit — use a named constant"))
 			}
 		}
 	}

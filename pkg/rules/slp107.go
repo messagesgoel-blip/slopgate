@@ -52,9 +52,10 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				content := strings.TrimSpace(ln.Content)
+				cleanContent := stripCommentAndStrings(content)
 
 				if !inErrorBlock {
-					if slp107IfErrPattern.MatchString(content) || slp107ErrorBlockStart.MatchString(content) {
+					if slp107IfErrPattern.MatchString(cleanContent) || slp107ErrorBlockStart.MatchString(cleanContent) {
 						inErrorBlock = true
 						errorBlockStart = k
 						if isPython {
@@ -104,7 +105,7 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 						errorBlockStart = -1
 						cleanupLines = nil
 						// Re-check if this line starts a new error block
-						if slp107IfErrPattern.MatchString(content) || slp107ErrorBlockStart.MatchString(content) {
+						if slp107IfErrPattern.MatchString(cleanContent) || slp107ErrorBlockStart.MatchString(cleanContent) {
 							inErrorBlock = true
 							errorBlockStart = k
 							errorIndentLevel = len(ln.Content) - len(strings.TrimLeft(ln.Content, " \t"))

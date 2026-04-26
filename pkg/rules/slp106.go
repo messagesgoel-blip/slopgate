@@ -9,7 +9,7 @@ import (
 
 // SLP106 flags resource acquisition functions (Open, Connect, Acquire, Listen,
 // Dial) without a corresponding release/close/defer in the same hunk.
-//alenAI slop pattern: agents open connections but forget cleanup.
+// alenAI slop pattern: agents open connections but forget cleanup.
 type SLP106 struct{}
 
 func (SLP106) ID() string                { return "SLP106" }
@@ -33,7 +33,6 @@ func (r SLP106) Check(d *diff.Diff) []Finding {
 
 		for _, h := range f.Hunks {
 			var acquireLines []diff.Line
-			releaseCount := 0
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
 					continue
@@ -42,15 +41,13 @@ func (r SLP106) Check(d *diff.Diff) []Finding {
 				if slp106Acquire.MatchString(clean) {
 					acquireLines = append(acquireLines, ln)
 				}
-				if slp106Release.MatchString(clean) {
-					releaseCount++
+				// Pop the most recently unmatched acquire when a release is seen.
+				if slp106Release.MatchString(clean) && len(acquireLines) > 0 {
+					acquireLines = acquireLines[:len(acquireLines)-1]
 				}
 			}
-			// Each release covers one acquisition; emit findings for unmatched acquires.
-			for i, ln := range acquireLines {
-				if i < releaseCount {
-					continue
-				}
+			// Emit findings for any remaining unmatched acquires.
+			for _, ln := range acquireLines {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

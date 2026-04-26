@@ -19,7 +19,7 @@ func TestSLP108_FiresOnOpenWithoutDefer(t *testing.T) {
 	d := parseDiff(t, `diff --git a/db.go b/db.go
 --- a/db.go
 +++ b/db.go
-@@ -1,1 +1,3 @@
+@@ -1,1 +1,1 @@
 +  db, err := sql.Open("postgres", connStr)
 `)
 	got := SLP108{}.Check(d)
@@ -33,7 +33,7 @@ func TestSLP108_FiresOnFetchWithoutTimeout(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api.ts b/api.ts
 --- a/api.ts
 +++ b/api.ts
-@@ -1,1 +1,3 @@
+@@ -1,1 +1,1 @@
 +  const res = fetch("https://api.example.com/data")
 `)
 	got := SLP108{}.Check(d)
@@ -47,7 +47,7 @@ func TestSLP108_NoFireOnOpenWithDefer(t *testing.T) {
 	d := parseDiff(t, `diff --git a/db.go b/db.go
 --- a/db.go
 +++ b/db.go
-@@ -1,1 +1,5 @@
+@@ -1,1 +1,2 @@
 +  db, err := sql.Open("postgres", connStr)
 +  defer db.Close()
 `)
@@ -61,7 +61,7 @@ func TestSLP108_NoFireOnFetchWithTimeout(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api.ts b/api.ts
 --- a/api.ts
 +++ b/api.ts
-@@ -1,1 +1,5 @@
+@@ -1,1 +1,1 @@
 +  const res = fetch("url", { signal: AbortSignal.timeout(5000) });
 `)
 	got := SLP108{}.Check(d)
@@ -74,7 +74,7 @@ func TestSLP108_FiresOnOpenWithTimeoutNoDefer(t *testing.T) {
 	d := parseDiff(t, `diff --git a/db.go b/db.go
 --- a/db.go
 +++ b/db.go
-@@ -1,1 +1,5 @@
+@@ -1,1 +1,2 @@
 +  ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 +  db, err := sql.Open("postgres", connStr)
 `)
@@ -85,7 +85,7 @@ func TestSLP108_FiresOnOpenWithDeferCancelOnly(t *testing.T) {
 	d := parseDiff(t, `diff --git a/db.go b/db.go
 --- a/db.go
 +++ b/db.go
-@@ -1,1 +1,6 @@
+@@ -1,1 +1,3 @@
 +  ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 +  db, err := sql.Open("postgres", connStr)
 +  defer cancel()
@@ -97,7 +97,7 @@ func TestSLP108_IgnoresGenericNewClient(t *testing.T) {
 	d := parseDiff(t, `diff --git a/client.go b/client.go
 --- a/client.go
 +++ b/client.go
-@@ -1,1 +1,3 @@
+@@ -1,1 +1,1 @@
 +  client := NewClient(cfg)
 `)
 	got := SLP108{}.Check(d)
