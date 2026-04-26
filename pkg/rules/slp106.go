@@ -32,32 +32,32 @@ func (r SLP106) Check(d *diff.Diff) []Finding {
 		}
 
 		for _, h := range f.Hunks {
-			hasAcquire := false
-			hasRelease := false
+			var acquireLines []diff.Line
+			releaseCount := 0
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
 				if slp106Acquire.MatchString(ln.Content) {
-					hasAcquire = true
+					acquireLines = append(acquireLines, ln)
 				}
 				if slp106Release.MatchString(ln.Content) {
-					hasRelease = true
+					releaseCount++
 				}
 			}
-			if hasAcquire && !hasRelease {
-				for _, ln := range h.Lines {
-					if ln.Kind == diff.LineAdd && slp106Acquire.MatchString(ln.Content) {
-						out = append(out, Finding{
-							RuleID:   r.ID(),
-							Severity: r.DefaultSeverity(),
-							File:     f.Path,
-							Line:     ln.NewLineNo,
-							Message:  "resource acquired without visible release/close in this hunk — add deferred cleanup",
-							Snippet:  strings.TrimSpace(ln.Content),
-						})
-					}
+			// Each release covers one acquisition; emit findings for unmatched acquires.
+			for i, ln := range acquireLines {
+				if i < releaseCount {
+					continue
 				}
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
+					File:     f.Path,
+					Line:     ln.NewLineNo,
+					Message:  "resource acquired without visible release/close in this hunk — add deferred cleanup",
+					Snippet:  strings.TrimSpace(ln.Content),
+				})
 			}
 		}
 	}

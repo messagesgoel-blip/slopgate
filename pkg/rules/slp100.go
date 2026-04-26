@@ -65,6 +65,14 @@ func (r SLP100) Check(d *diff.Diff) []Finding {
 					firstLine = true
 					funcLineNo = ln.NewLineNo
 					funcSnippet = content
+					// Check the body fragment on the same line (text after the opening '{').
+					if idx := strings.Index(content, "{"); idx >= 0 {
+						bodyFragment := strings.TrimSpace(content[idx+1:])
+						bodyFragment = strings.TrimRight(bodyFragment, "} \t")
+						if hasSideEffect(bodyFragment) {
+							hasWork = true
+						}
+					}
 				}
 
 				if inFunc {
