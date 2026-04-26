@@ -20,7 +20,7 @@ func TestSLP101_FiresOnEmptyElseBranch(t *testing.T) {
 --- a/feature.ts
 +++ b/feature.ts
 @@ -1,1 +1,3 @@
-+  } else {
++  } else {}
 `)
 	got := SLP101{}.Check(d)
 	if len(got) == 0 {

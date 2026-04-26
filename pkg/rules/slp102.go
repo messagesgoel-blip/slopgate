@@ -20,6 +20,8 @@ func (SLP102) Description() string {
 
 var slp102AsyncFunc = regexp.MustCompile(`(?i)(?:async\s+(?:function\s+)?|async\s*\(\s*\)\s*=>|async\s+\w+\s*=>|async\s*\w+\s*\([^)]*\)\s*\{)`)
 
+var slp102AwaitRe = regexp.MustCompile(`\bawait\b`)
+
 func (r SLP102) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -59,7 +61,7 @@ func (r SLP102) Check(d *diff.Diff) []Finding {
 					braceDepth += strings.Count(content, "{")
 					braceDepth -= strings.Count(content, "}")
 
-					if strings.Contains(content, "await ") {
+					if slp102AwaitRe.MatchString(content) {
 						hasAwait = true
 					}
 

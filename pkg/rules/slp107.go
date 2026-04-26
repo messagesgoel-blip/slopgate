@@ -10,6 +10,10 @@ import (
 // SLP107 flags cleanup/destroy/close operations that appear only inside
 // an error block (catch/except/if err) but are missing from the success
 // path. Resources must be cleaned up on ALL code paths.
+//
+// Known limitation: uses brace-depth heuristics; Python except blocks and
+// resource-identifier correlation are not yet supported. A forward scan
+// for success-path cleanup after block close would reduce false positives.
 type SLP107 struct{}
 
 func (SLP107) ID() string                { return "SLP107" }
@@ -18,7 +22,7 @@ func (SLP107) Description() string {
 	return "cleanup/destroy only in error path — ensure cleanup runs on success too"
 }
 
-var slp107Cleanup = regexp.MustCompile(`(?i)(?:Close|Destroy|Cleanup|Release|Remove|Delete|Cancel|rollback)\s*\(`)
+var slp107Cleanup = regexp.MustCompile(`(?i)(?:Close|Destroy|Cleanup|Release|Remove|Delete|Cancel)\s*\(`)
 
 func (r SLP107) Check(d *diff.Diff) []Finding {
 	var out []Finding

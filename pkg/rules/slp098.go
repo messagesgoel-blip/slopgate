@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -33,7 +32,7 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	hasNewRoute := false
 	hasTestChange := false
-	var routeFile string
+	routeFiles := make(map[string]bool)
 
 	for _, f := range d.Files {
 		if f.IsDelete {
@@ -52,11 +51,11 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 			for _, pat := range slp098RoutePatterns {
 				if pat.MatchString(content) {
 					hasNewRoute = true
-					routeFile = f.Path
+					routeFiles[f.Path] = true
 					break
 				}
 			}
-			if hasNewRoute {
+			if hasNewRoute && len(routeFiles) > 0 {
 				break
 			}
 		}
@@ -64,7 +63,7 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 
 	if hasNewRoute && !hasTestChange {
 		for _, f := range d.Files {
-			if f.Path != routeFile {
+			if !routeFiles[f.Path] {
 				continue
 			}
 			for _, ln := range f.AddedLines() {
@@ -86,6 +85,5 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 		}
 	}
 
-	_ = filepath.Ext
 	return out
 }

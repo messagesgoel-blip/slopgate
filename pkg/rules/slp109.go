@@ -7,7 +7,7 @@ import (
 )
 
 // SLP109 flags two or more functions added in the same file with highly
-// similar bodies (>80% identical). This is a common AI slop pattern:
+// similar bodies (>60% identical). This is a common AI slop pattern:
 // copy-pasting entire functions with minor changes instead of extracting
 // shared logic.
 type SLP109 struct{}
@@ -32,27 +32,34 @@ func slp109Normalize(line string) string {
 }
 
 func slp109BodySimilarity(a, b []string) float64 {
-	if len(a) == 0 || len(b) == 0 {
-		return 0
-	}
-	matches := 0
+	setA := make(map[string]bool)
 	for _, la := range a {
 		na := slp109Normalize(la)
-		if len(na) < 3 {
-			continue
-		}
-		for _, lb := range b {
-			if slp109Normalize(lb) == na {
-				matches++
-				break
-			}
+		if len(na) >= 3 {
+			setA[na] = true
 		}
 	}
-	maxLen := len(a)
-	if len(b) > maxLen {
-		maxLen = len(b)
+	setB := make(map[string]bool)
+	for _, lb := range b {
+		nb := slp109Normalize(lb)
+		if len(nb) >= 3 {
+			setB[nb] = true
+		}
 	}
-	return float64(matches) / float64(maxLen)
+	if len(setA) == 0 || len(setB) == 0 {
+		return 0
+	}
+	intersection := 0
+	for k := range setA {
+		if setB[k] {
+			intersection++
+		}
+	}
+	maxLen := len(setA)
+	if len(setB) > maxLen {
+		maxLen = len(setB)
+	}
+	return float64(intersection) / float64(maxLen)
 }
 
 func (r SLP109) Check(d *diff.Diff) []Finding {
@@ -88,7 +95,7 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 						strings.Contains(strings.ToLower(content), "function ") ||
 						strings.Contains(strings.ToLower(content), "def ") ||
 						strings.Contains(strings.ToLower(content), "fn ")
-					if hasFuncKW || strings.Contains(content, "(") {
+					if hasFuncKW {
 						inFunc = true
 						braceDepth = 0
 						cur = funcBody{sigLine: ln.NewLineNo, sig: content}

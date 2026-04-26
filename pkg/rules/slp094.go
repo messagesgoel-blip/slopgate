@@ -46,15 +46,15 @@ func (r SLP094) Check(d *diff.Diff) []Finding {
 }
 
 func isShellLikeFile(path string) bool {
-	ext := strings.ToLower(path)
-	if strings.HasSuffix(ext, ".sh") || strings.HasSuffix(ext, ".bash") {
+	lower := strings.ToLower(path)
+	if strings.HasSuffix(lower, ".sh") || strings.HasSuffix(lower, ".bash") {
 		return true
 	}
-	if strings.Contains(ext, "Makefile") || strings.HasSuffix(ext, ".mk") {
+	if strings.Contains(lower, "makefile") || strings.HasSuffix(lower, ".mk") {
 		return true
 	}
-	if strings.HasSuffix(ext, ".yml") || strings.HasSuffix(ext, ".yaml") {
-		return strings.Contains(strings.ToLower(path), "ci") || strings.Contains(strings.ToLower(path), "workflow")
+	if strings.HasSuffix(lower, ".yml") || strings.HasSuffix(lower, ".yaml") {
+		return strings.Contains(lower, "ci") || strings.Contains(lower, "workflow")
 	}
 	return false
 }

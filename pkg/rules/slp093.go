@@ -12,7 +12,7 @@ import (
 // assertions that verify behavior.
 //
 // Heuristic: count mock/stub terms vs assertion terms per hunk. Flag when
-// mock count exceeds assertion count by 2 or more.
+// mocks are added but no corresponding assertions are present.
 type SLP093 struct{}
 
 func (SLP093) ID() string                { return "SLP093" }

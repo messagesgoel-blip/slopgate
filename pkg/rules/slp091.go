@@ -22,7 +22,7 @@ func (SLP091) Description() string {
 	return "hardcoded date in test fixture — will expire and break CI"
 }
 
-var slp091ISODate = regexp.MustCompile(`\b(20[12]\d)[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b`)
+var slp091ISODate = regexp.MustCompile(`\b(20[1-3]\d)[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b`)
 
 var slp091JSDate = regexp.MustCompile(`new\s+Date\s*\(\s*["'\x60]`)
 

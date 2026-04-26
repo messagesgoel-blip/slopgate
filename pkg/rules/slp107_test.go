@@ -7,6 +7,7 @@ func TestSLP107_FiresOnCleanupOnlyInErrorPath(t *testing.T) {
 --- a/handler.go
 +++ b/handler.go
 @@ -1,1 +1,5 @@
++  conn, err := net.Dial("tcp", addr)
 +  if err != nil {
 +      conn.Close()
 +      return err

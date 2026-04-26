@@ -8,7 +8,7 @@ import (
 )
 
 // SLP103 flags hardcoded timeout/duration values that should be named constants.
-// dátummal: AI agents frequently write time.Second * 30 or setTimeout(fn, 5000)
+// AI agents frequently write time.Second * 30 or setTimeout(fn, 5000)
 // instead of referencing a configuration constant or named value.
 type SLP103 struct{}
 

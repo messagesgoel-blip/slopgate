@@ -21,7 +21,7 @@ func (SLP097) Description() string {
 
 var slp097DestructureData = regexp.MustCompile(`(?i)(?:const|let|var)\s*\{[^}]*\bdata\b[^}]*\}\s*=\s*(?:await\s+)?\w+(?:\.\w+\(\))`)
 
-var slp097NoOkCheck = regexp.MustCompile(`(?i)fetch\([^)]*\)\s*\.then\s*\(\s*(?:res|response)\s*=>\s*(?:res|response)\s*\.json\s*\(\s*\)`)
+var slp097NoOkCheck = regexp.MustCompile(`(?i)fetch\([^)]*\)\s*\.then\s*\(\s*\(?\s*(?:res|response)\s*\)?\s*=>\s*(?:res|response)\s*\.json\s*\(\s*\)`)
 
 func (r SLP097) Check(d *diff.Diff) []Finding {
 	var out []Finding

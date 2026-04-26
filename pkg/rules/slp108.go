@@ -10,6 +10,10 @@ import (
 // SLP108 flags Open/Connect calls without a preceding or following defer
 // close or timeout/deadline setup. Connection management without guaranteed
 // cleanup is a common AI slop pattern.
+//
+// Known limitation: uses hunk-level correlation — any defer/timeout in the
+// same hunk suppresses findings for ALL open/fetch calls in that hunk.
+// Future improvement: match on variable names for per-resource tracking.
 type SLP108 struct{}
 
 func (SLP108) ID() string                { return "SLP108" }

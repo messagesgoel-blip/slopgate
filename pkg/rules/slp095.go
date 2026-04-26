@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -17,17 +18,7 @@ func (SLP095) Description() string {
 	return "catch block returns silently without handling the error — use throw/reject or log then rethrow"
 }
 
-func slp095SilentReturn(cLower string) bool {
-	return strings.Contains(cLower, "return null") ||
-		strings.Contains(cLower, "return 0") ||
-		strings.Contains(cLower, "return false") ||
-		strings.Contains(cLower, "return []") ||
-		strings.Contains(cLower, "return {}") ||
-		strings.Contains(cLower, "return \"\"") ||
-		strings.Contains(cLower, "return ''") ||
-		strings.Contains(cLower, "return undefined") ||
-		strings.Contains(cLower, "return none")
-}
+var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]|{}|""|''|undefined|none)\b`)
 
 func hasErrorHandling(cLower string) bool {
 	return strings.Contains(cLower, "throw ") ||
@@ -82,8 +73,21 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 						if hasErrorHandling(cLower) {
 							handling = true
 						}
-						if slp095SilentReturn(cLower) {
+						if slp095SilentReturn.MatchString(content) {
 							silentLine = ln
+						}
+						if catchBraceDepth <= 0 && strings.Contains(ln.Content, "}") {
+							if !handling && silentLine != nil {
+								out = append(out, Finding{
+									RuleID:   r.ID(),
+									Severity: r.DefaultSeverity(),
+									File:     f.Path,
+									Line:     silentLine.NewLineNo,
+									Message:  "catch/except block returns silently — rethrow or handle with explicit logging",
+									Snippet:  strings.TrimSpace(silentLine.Content),
+								})
+							}
+							inCatch = false
 						}
 					}
 					continue
@@ -95,7 +99,7 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 				if hasErrorHandling(cLower) {
 					handling = true
 				}
-				if slp095SilentReturn(cLower) {
+				if slp095SilentReturn.MatchString(content) {
 					silentLine = ln
 				}
 

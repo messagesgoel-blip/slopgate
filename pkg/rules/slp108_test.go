@@ -42,6 +42,20 @@ func TestSLP108_NoFireOnOpenWithDefer(t *testing.T) {
 	}
 }
 
+func TestSLP108_NoFireOnOpenWithTimeout(t *testing.T) {
+	d := parseDiff(t, `diff --git a/db.go b/db.go
+--- a/db.go
++++ b/db.go
+@@ -1,1 +1,5 @@
++  ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++  db, err := sql.Open("postgres", connStr)
+`)
+	got := SLP108{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for open with timeout, got %d", len(got))
+	}
+}
+
 func TestSLP108_Description(t *testing.T) {
 	r := SLP108{}
 	if r.ID() != "SLP108" {

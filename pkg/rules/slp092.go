@@ -22,8 +22,6 @@ func (SLP092) Description() string {
 	return "mock return shape may not match API envelope — verify against actual contract"
 }
 
-var slp092MockReturn = regexp.MustCompile(`(?i)mock(?:Resolved|Return|Implementation|Resolved)Value(?:Once)?\s*\(\s*(\{[^}]*\}|[^)]+)\)`)
-
 var slp092DoubleUnwrap = regexp.MustCompile(`(?i)(?:\.data){2,}\b|res\.data\.data\b|response\.data\.data\b`)
 
 var slp092NoEnvelopeMock = regexp.MustCompile(`mock\w*Value\w*\s*\(\s*\{`)

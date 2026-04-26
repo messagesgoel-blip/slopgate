@@ -58,7 +58,7 @@ slopgate runs automatically in CI on every push to main and on pull requests. Th
 
 For a complete CI setup example, see `.github/workflows/ci.yml`.
 
-## Rules (v0.0.11)
+## Rules (v0.0.12)
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
@@ -164,7 +164,7 @@ Total: 108 rules
   - SLP089: Exported function/class/module missing docstring
   - SLP090: API route without error handling
 
-Total: 77 rules
+Total: 87 rules
 
 ### v0.0.9 Changes
 

@@ -45,7 +45,7 @@ func TestSLP099_IgnoresNonResponseFiles(t *testing.T) {
 --- a/utils.go
 +++ b/utils.go
 @@ -1,1 +1,3 @@
-+    Helper string
++    Helper string ` + "`json:\"helper\"`" + `
 `)
 	got := SLP099{}.Check(d)
 	if len(got) != 0 {

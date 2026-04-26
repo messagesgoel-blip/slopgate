@@ -27,15 +27,11 @@ var slp111BinaryExtensions = map[string]bool{
 	".7z": true, ".rar": true, ".pdb": true, ".ds_store": true,
 }
 
-var slp111SourceExtensions = map[string]bool{
-	".go": true, ".py": true, ".js": true, ".ts": true,
-	".jsx": true, ".tsx": true, ".java": true, ".kt": true,
-	".rs": true, ".c": true, ".cpp": true, ".cc": true,
-	".cxx": true, ".h": true, ".hpp": true, ".rb": true,
-	".php": true, ".swift": true, ".scala": true, ".cs": true,
-	".fs": true, ".fsx": true, ".elm": true, ".hs": true,
-	".clj": true, ".cljs": true, ".ex": true, ".exs": true,
-	".erl": true,
+var knownExtensionless = map[string]bool{
+	"Makefile": true, "Dockerfile": true, "LICENSE": true, "README": true,
+	"CHANGELOG": true, "CONTRIBUTORS": true, "NOTICE": true, "AUTHORS": true,
+	"Vagrantfile": true, "Procfile": true, "Rakefile": true, "Gemfile": true,
+	"Jenkinsfile": true, "VERSION": true, "go.mod": false, "go.sum": false,
 }
 
 func (r SLP111) Check(d *diff.Diff) []Finding {
@@ -66,13 +62,11 @@ func (r SLP111) Check(d *diff.Diff) []Finding {
 		}
 
 		if f.IsNew && ext == "" {
-			knownNonSource := map[string]bool{
-				".md": true, ".txt": true, ".json": true, ".yaml": true, ".yml": true,
-				".toml": true, ".xml": true, ".csv": true, ".svg": true, ".html": true,
-				".css": true, ".scss": true, ".less": true, ".graphql": true, ".proto": true,
-				".sql": true, ".sh": true, ".bash": true, ".Makefile": true,
+			base := f.Path
+			if i := strings.LastIndex(f.Path, "/"); i >= 0 {
+				base = f.Path[i+1:]
 			}
-			if !knownNonSource[ext] && !strings.Contains(f.Path, ".") {
+			if !knownExtensionless[base] {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

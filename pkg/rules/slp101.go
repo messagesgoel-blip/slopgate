@@ -19,7 +19,7 @@ func (SLP101) Description() string {
 
 var slp101FlagCheck = regexp.MustCompile(`(?i)(?:if|when)\s*\(?\s*(?:!\s*)?(?:featureFlag|isEnabled|useFeature|feature\(|toggle\(|ldClient|growthbook|unleash\.|flags\[)\w*`)
 
-var slp101EmptyBranch = regexp.MustCompile(`(?i)^\s*\}?\s*else\s*\{?\s*\}?\s*$`)
+var slp101EmptyBranch = regexp.MustCompile(`(?i)else\s*\{\s*\}`)
 
 func (r SLP101) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -44,7 +44,7 @@ func (r SLP101) Check(d *diff.Diff) []Finding {
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
-					Message:  "feature flag check detected — verify both branches are different and not dead code",
+					Message:  "feature-flag conditional detected — review for intended divergence or dead code",
 					Snippet:  content,
 				})
 			}

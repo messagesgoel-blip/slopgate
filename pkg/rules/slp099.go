@@ -19,7 +19,7 @@ func (SLP099) Description() string {
 	return "response field changed without test update — tests may be stale"
 }
 
-var slp099GoStructField = regexp.MustCompile(`^\s*\w+\s+(?:\[\])?\*?\w+(?:\.\w+)?\s+\x60[^)]*\x60`)
+var slp099GoStructField = regexp.MustCompile(`^\s*\w+\s+(?:\[\])?\*?\w+(?:\.\w+)?\s+\x60[^\x60]*\x60`)
 
 var slp099TSInterfaceProp = regexp.MustCompile(`(?i)^\s+(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?$`)
 
@@ -38,7 +38,7 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	hasFieldChange := false
 	hasTestChange := false
-	var changedFile string
+	changedFiles := make(map[string]bool)
 
 	for _, f := range d.Files {
 		if f.IsDelete || isDocFile(f.Path) {
@@ -57,7 +57,7 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 			if slp099GoStructField.MatchString(content) || slp099TSInterfaceProp.MatchString(content) {
 				if hasResponseKeyword(f.Path) {
 					hasFieldChange = true
-					changedFile = f.Path
+					changedFiles[f.Path] = true
 				}
 			}
 		}
@@ -65,7 +65,7 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 
 	if hasFieldChange && !hasTestChange {
 		for _, f := range d.Files {
-			if f.Path != changedFile {
+			if !changedFiles[f.Path] {
 				continue
 			}
 			for _, ln := range f.AddedLines() {

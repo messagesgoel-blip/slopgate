@@ -24,11 +24,11 @@ var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return\s+(nil|null|0|false|""
 
 func hasSideEffect(line string) bool {
 	stripped := stripCommentAndStrings(line)
-	if strings.HasPrefix(strings.TrimSpace(stripped), "return") {
-		return false
+	trimmed := strings.TrimSpace(stripped)
+	if strings.HasPrefix(trimmed, "return") {
+		return !slp100ZeroReturn.MatchString(trimmed)
 	}
-	stripped = strings.TrimSpace(stripped)
-	if stripped == "" || stripped == "{" || stripped == "}" {
+	if trimmed == "" || trimmed == "{" || trimmed == "}" {
 		return false
 	}
 	return true
@@ -40,7 +40,7 @@ func (r SLP100) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || isDocFile(f.Path) {
 			continue
 		}
-		if !isGoFile(f.Path) && !isJSOrTSFile(f.Path) && !isPythonFile(f.Path) && !isJavaFile(f.Path) && !isRustFile(f.Path) {
+		if !isGoFile(f.Path) && !isJSOrTSFile(f.Path) && !isJavaFile(f.Path) && !isRustFile(f.Path) {
 			continue
 		}
 
@@ -49,6 +49,8 @@ func (r SLP100) Check(d *diff.Diff) []Finding {
 			braceDepth := 0
 			hasWork := false
 			firstLine := true
+			var funcLineNo int
+			var funcSnippet string
 
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
@@ -61,32 +63,29 @@ func (r SLP100) Check(d *diff.Diff) []Finding {
 					braceDepth = 0
 					hasWork = false
 					firstLine = true
+					funcLineNo = ln.NewLineNo
+					funcSnippet = content
 				}
 
 				if inFunc {
 					braceDepth += strings.Count(content, "{")
 					braceDepth -= strings.Count(content, "}")
 
-					if !firstLine && hasSideEffect(content) && !slp100ZeroReturn.MatchString(content) {
+					if !firstLine && hasSideEffect(content) {
 						hasWork = true
 					}
 					firstLine = false
 
 					if braceDepth <= 0 && strings.Contains(content, "}") {
 						if !hasWork {
-							for _, pln := range h.Lines {
-								if pln.Kind == diff.LineAdd && slp100FuncStart.MatchString(strings.TrimSpace(pln.Content)) {
-									out = append(out, Finding{
-										RuleID:   r.ID(),
-										Severity: r.DefaultSeverity(),
-										File:     f.Path,
-										Line:     pln.NewLineNo,
-										Message:  "function appears to be a no-op stub — implement the body or add a TODO if intentional",
-										Snippet:  strings.TrimSpace(pln.Content),
-									})
-									break
-								}
-							}
+							out = append(out, Finding{
+								RuleID:   r.ID(),
+								Severity: r.DefaultSeverity(),
+								File:     f.Path,
+								Line:     funcLineNo,
+								Message:  "function appears to be a no-op stub — implement the body or add a TODO if intentional",
+								Snippet:  funcSnippet,
+							})
 						}
 						inFunc = false
 					}

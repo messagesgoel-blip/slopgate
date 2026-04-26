@@ -41,6 +41,33 @@ func TestSLP103_IgnoresTestFiles(t *testing.T) {
 	}
 }
 
+func TestSLP103_FiresOnConfigTimeout(t *testing.T) {
+	d := parseDiff(t, `diff --git a/settings.py b/settings.py
+--- a/settings.py
++++ b/settings.py
+@@ -1,1 +1,3 @@
++  timeout = 30
++  ttl = 3600
+`)
+	got := SLP103{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for config timeout values")
+	}
+}
+
+func TestSLP103_IgnoresConfigInTestFile(t *testing.T) {
+	d := parseDiff(t, `diff --git a/settings_test.py b/settings_test.py
+--- a/settings_test.py
++++ b/settings_test.py
+@@ -1,1 +1,3 @@
++  timeout = 30
+`)
+	got := SLP103{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for test file, got %d", len(got))
+	}
+}
+
 func TestSLP103_Description(t *testing.T) {
 	r := SLP103{}
 	if r.ID() != "SLP103" {
