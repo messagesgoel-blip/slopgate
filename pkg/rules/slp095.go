@@ -22,18 +22,25 @@ var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]
 var slp095CatchRE = regexp.MustCompile(`\bcatch\b`)
 var slp095ExceptRE = regexp.MustCompile(`\bexcept\b`)
 
-func indentationOf(line string) string {
-	for i, r := range line {
-		if r != ' ' && r != '\t' {
-			return line[:i]
+var slp095RaiseRE = regexp.MustCompile(`\braise\b`)
+
+func indentationOf(line string) int {
+	width := 0
+	for _, r := range line {
+		if r == '\t' {
+			width += 4
+		} else if r == ' ' {
+			width++
+		} else {
+			break
 		}
 	}
-	return line
+	return width
 }
 
 func hasErrorHandling(cLower string) bool {
 	return strings.Contains(cLower, "throw ") ||
-		strings.Contains(cLower, "raise ") ||
+		slp095RaiseRE.MatchString(cLower) ||
 		strings.Contains(cLower, "reject(") ||
 		strings.Contains(cLower, "console.error") ||
 		strings.Contains(cLower, "console.warn") ||
@@ -61,7 +68,7 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 			catchBraceDepth := 0
 			handling := false
 			var silentLine *diff.Line
-			var exceptIndent string
+			var exceptIndent int
 
 			for i := range h.Lines {
 				ln := &h.Lines[i]

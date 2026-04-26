@@ -111,14 +111,11 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 // slp098TestMatches returns true if testPath is considered related to sourceBase
 // (sourceBase is the route file path without extension).
 func slp098TestMatches(testPath, sourceBase string) bool {
-	direct := slp098TestTarget(testPath)
-	if direct == sourceBase {
+	testBase := slp098TestTarget(testPath)
+	if testBase == sourceBase {
 		return true
 	}
 
-	// Generate candidate source bases by replacing test/tests/ prefixes with common source roots.
-	// E.g. "tests/routes/users.test.ts" → check if base matches "routes/users" or "src/routes/users" etc.
-	testBase := slp098TestTarget(testPath)
 	if testBase == "" {
 		return false
 	}
@@ -176,6 +173,10 @@ func slp098TestTarget(testPath string) string {
 		return strings.TrimSuffix(stem, ".test")
 	case strings.HasSuffix(stem, ".spec"):
 		return strings.TrimSuffix(stem, ".spec")
+	case strings.HasSuffix(strings.ToLower(stem), "tests"):
+		return stem[:len(stem)-len("tests")]
+	case strings.HasSuffix(strings.ToLower(stem), "test"):
+		return stem[:len(stem)-len("test")]
 	default:
 		return ""
 	}

@@ -191,6 +191,47 @@ func TestSLP107_IdentifierlessCleanupFires(t *testing.T) {
 	}
 }
 
+func TestSLP107_JSTypesCatch(t *testing.T) {
+	d := parseDiff(t, `diff --git a/db.ts b/db.ts
+--- a/db.ts
++++ b/db.ts
+@@ -1,1 +1,8 @@
++async function connect() {
++    const conn = createConnection();
++    try {
++        doWork();
++    } catch (err) {
++        conn.close();
++    }
++}
+`)
+	got := SLP107{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for JS/TS cleanup only in catch block")
+	}
+}
+
+func TestSLP107_JSTypesCatchNoFireWithSuccessCleanup(t *testing.T) {
+	d := parseDiff(t, `diff --git a/db.ts b/db.ts
+--- a/db.ts
++++ b/db.ts
+@@ -1,1 +1,10 @@
++async function connect() {
++    const conn = createConnection();
++    try {
++        doWork();
++    } catch (err) {
++        conn.close();
++    }
++    conn.close();
++}
+`)
+	got := SLP107{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when success-path cleanup exists, got %d", len(got))
+	}
+}
+
 func TestSLP107_Description(t *testing.T) {
 	r := SLP107{}
 	if r.ID() != "SLP107" {

@@ -19,8 +19,9 @@ func (SLP107) Description() string {
 }
 
 var slp107Cleanup = regexp.MustCompile(`(?i)\b(?:Close|Destroy|Cleanup|Release|Remove|Delete|Cancel|Free)\b\s*(?:\(|$)`)
-var slp107IdentifierPattern = regexp.MustCompile(`(?i)\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*(?:close|destroy|cleanup|release|remove|delete|cancel|free)\b\s*(?:\(|$)`)
+var slp107IdentifierPattern = regexp.MustCompile(`(?i)\b([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*\.\s*(?:close|destroy|cleanup|release|remove|delete|cancel|free)\b\s*(?:\(|$)`)
 var slp107ErrorBlockStart = regexp.MustCompile(`(?i)(?:\bif\s+err\b|\bcatch\b|\bexcept\b)`)
+var slp107IfErrPattern = regexp.MustCompile(`(?i)\bif\s+err\b`)
 
 func (r SLP107) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -49,18 +50,26 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				content := strings.TrimSpace(ln.Content)
-				cLower := strings.ToLower(content)
 
 				if !inErrorBlock {
-					if strings.Contains(cLower, "if err") || slp107ErrorBlockStart.MatchString(content) {
+					if slp107IfErrPattern.MatchString(content) || slp107ErrorBlockStart.MatchString(content) {
 						inErrorBlock = true
 						errorBlockStart = k
 						if isPython {
 							errorIndentLevel = len(ln.Content) - len(strings.TrimLeft(ln.Content, " \t"))
 						} else {
 							errorBraceDepth = 0
-							errorBraceDepth += strings.Count(content, "{")
-							errorBraceDepth -= strings.Count(content, "}")
+							// Only count braces from the error keyword onwards so that a
+							// leading "}" (e.g. "} catch (err) {") is not counted against
+							// the catch block's own brace depth.
+							headerSuffix := content
+							if loc := slp107ErrorBlockStart.FindStringIndex(content); loc != nil {
+								headerSuffix = content[loc[0]:]
+							} else if loc := slp107IfErrPattern.FindStringIndex(content); loc != nil {
+								headerSuffix = content[loc[0]:]
+							}
+							errorBraceDepth += strings.Count(headerSuffix, "{")
+							errorBraceDepth -= strings.Count(headerSuffix, "}")
 						}
 
 						// Handle cases where the cleanup might be on the same line as the if err (e.g. Go one-liners)
@@ -93,7 +102,7 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 						errorBlockStart = -1
 						cleanupLines = nil
 						// Re-check if this line starts a new error block
-						if strings.Contains(cLower, "if err") || slp107ErrorBlockStart.MatchString(content) {
+						if slp107IfErrPattern.MatchString(content) || slp107ErrorBlockStart.MatchString(content) {
 							inErrorBlock = true
 							errorBlockStart = k
 							errorIndentLevel = len(ln.Content) - len(strings.TrimLeft(ln.Content, " \t"))

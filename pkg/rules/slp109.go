@@ -81,6 +81,9 @@ func slp109CollectSignature(lines []diff.Line, start int) (string, int, bool) {
 		if lines[i].Kind == diff.LineDelete {
 			continue
 		}
+		if lines[i].Kind != diff.LineAdd {
+			return "", 0, false
+		}
 		content := strings.TrimSpace(lines[i].Content)
 		if content == "" {
 			continue
@@ -138,11 +141,29 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 					inFunc = true
 					braceDepth = 0
 					cur = funcBody{sigLine: ln.NewLineNo, sig: sig}
+					if bodyStart == idx {
+						lineContent := h.Lines[bodyStart].Content
+						if strings.Contains(lineContent, "{") && strings.Contains(lineContent, "}") {
+							open := strings.Index(lineContent, "{")
+							close := strings.LastIndex(lineContent, "}")
+							if close > open+1 {
+								inner := strings.TrimSpace(lineContent[open+1 : close])
+								if inner != "" {
+									cur.body = append(cur.body, inner)
+								}
+							}
+						}
+					}
 					idx = bodyStart - 1
 					continue
 				}
 
 				if ln.Kind == diff.LineDelete {
+					continue
+				}
+				if ln.Kind != diff.LineAdd {
+					inFunc = false
+					cur = funcBody{}
 					continue
 				}
 				content := strings.TrimSpace(ln.Content)

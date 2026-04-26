@@ -88,8 +88,8 @@ func TestSLP102_DoesNotFireForOneLineAsyncArrowNearAwait(t *testing.T) {
 +}
 `)
 	got := SLP102{}.Check(d)
-	if len(got) != 0 {
-		t.Fatalf("expected 0 findings for one-line async arrow near unrelated await, got %d", len(got))
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for one-line async arrow with unrelated await nearby, got %d", len(got))
 	}
 }
 

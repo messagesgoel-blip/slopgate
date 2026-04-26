@@ -98,7 +98,11 @@ func slp094CommandCandidates(f diff.File) []slp094CommandCandidate {
 			}
 			if strings.HasPrefix(value, "|") || strings.HasPrefix(value, ">") {
 				inRunBlock = true
-				runIndent = indent
+				if strings.HasPrefix(trim, "-") {
+					runIndent = indent + 2
+				} else {
+					runIndent = indent
+				}
 				continue
 			}
 			if ln.Kind == diff.LineAdd {

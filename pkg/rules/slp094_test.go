@@ -123,6 +123,21 @@ func TestSLP094_FiresOnChainedSilentFail(t *testing.T) {
 	}
 }
 
+func TestSLP094_BlockScalarSiblingKeyNotFlagged(t *testing.T) {
+	d := parseDiff(t, `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -1,3 +1,5 @@
++  - run: |
++      npm test || true
++    if: always() || true
+`)
+	got := SLP094{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for run block command, got %d: %v", len(got), got)
+	}
+}
+
 func TestSLP094_Description(t *testing.T) {
 	r := SLP094{}
 	if r.ID() != "SLP094" {

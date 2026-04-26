@@ -2,6 +2,7 @@ package rules
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -43,8 +44,12 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 				if m := slp104MakeByte.FindStringSubmatch(trimmed); m != nil {
 					lenVal := m[1]
 					capVal := m[2]
-					// Flag if len > 0 or if cap is explicitly provided (even if len is 0)
-					if lenVal != "0" || capVal != "" {
+					// Parse the length value numerically to handle 0x0, 0b0, underscore separators, etc.
+					isZero := false
+					if parsed, err := strconv.ParseInt(strings.ReplaceAll(lenVal, "_", ""), 0, 64); err == nil {
+						isZero = parsed == 0
+					}
+					if !isZero || capVal != "" {
 						msg = "hardcoded buffer size in make — use a named constant"
 					}
 				}

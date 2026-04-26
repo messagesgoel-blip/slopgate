@@ -76,8 +76,11 @@ func TestSLP108_FiresOnOpenWithTimeoutNoDefer(t *testing.T) {
 +  db, err := sql.Open("postgres", connStr)
 `)
 	got := SLP108{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected finding for open with timeout but no defer")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for open with timeout but no defer, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP108" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
 	}
 }
 

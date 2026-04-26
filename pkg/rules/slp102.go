@@ -30,6 +30,10 @@ func slp102HasOpeningBraceLookahead(lines []diff.Line, start int) bool {
 			continue
 		}
 		seenNonEmpty++
+		// Stop if a new async function declaration is found — its { belongs to a different function.
+		if slp102AsyncFunc.MatchString(content) {
+			return false
+		}
 		if strings.Contains(content, "{") {
 			return true
 		}

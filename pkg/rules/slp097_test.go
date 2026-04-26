@@ -13,6 +13,9 @@ func TestSLP097_FiresOnDataDestructureWithoutOkCheck(t *testing.T) {
 	if len(got) == 0 {
 		t.Fatal("expected findings for data destructure")
 	}
+	if got[0].RuleID != "SLP097" || got[0].Severity != SeverityWarn {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
+	}
 }
 
 func TestSLP097_FiresOnFetchWithoutOkCheck(t *testing.T) {
@@ -25,6 +28,9 @@ func TestSLP097_FiresOnFetchWithoutOkCheck(t *testing.T) {
 	got := SLP097{}.Check(d)
 	if len(got) == 0 {
 		t.Fatal("expected findings for fetch without ok check")
+	}
+	if got[0].RuleID != "SLP097" || got[0].Severity != SeverityWarn {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
 	}
 }
 
@@ -91,6 +97,9 @@ func TestSLP097_FiresOnFetchWithTypedParam(t *testing.T) {
 	if len(got) == 0 {
 		t.Fatal("expected findings for fetch with typed parameter without ok check")
 	}
+	if got[0].RuleID != "SLP097" || got[0].Severity != SeverityWarn {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
+	}
 }
 
 func TestSLP097_FiresOnNestedFetch(t *testing.T) {
@@ -103,6 +112,9 @@ func TestSLP097_FiresOnNestedFetch(t *testing.T) {
 	got := SLP097{}.Check(d)
 	if len(got) == 0 {
 		t.Fatal("expected findings for nested fetch without ok check")
+	}
+	if got[0].RuleID != "SLP097" || got[0].Severity != SeverityWarn {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
 	}
 }
 

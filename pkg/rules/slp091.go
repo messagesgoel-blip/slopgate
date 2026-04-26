@@ -32,7 +32,7 @@ var slp091Timestamp = regexp.MustCompile(`(?i)"(?:expires?_?(?:at|in)|ttl|deadli
 var testFileSuffixes = []string{
 	"_test.go", ".test.go", "_test.py", ".test.js", ".test.ts", ".test.tsx", ".test.jsx",
 	".spec.js", ".spec.ts", ".spec.tsx", ".spec.jsx",
-	"test.java", "tests.java", "_test.rs",
+	"_test.java", ".test.java", "_tests.java", ".tests.java", "_test.rs",
 }
 
 func isTestFile(path string) bool {
@@ -115,5 +115,3 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 	}
 	return out
 }
-
-

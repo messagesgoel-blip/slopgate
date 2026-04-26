@@ -11,8 +11,14 @@ new file mode 100755
 Binary files differ
 `)
 	got := SLP111{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for binary file")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for binary file, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP111" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
+	}
+	if got[0].File != "build/app.exe" {
+		t.Errorf("expected File=build/app.exe, got %q", got[0].File)
 	}
 }
 
@@ -25,8 +31,14 @@ new file mode 100644
 Binary files differ
 `)
 	got := SLP111{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for .class file")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for .class file, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP111" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
+	}
+	if got[0].File != "Foo.class" {
+		t.Errorf("expected File=Foo.class, got %q", got[0].File)
 	}
 }
 
@@ -43,8 +55,14 @@ new file mode 100755
 Binary files differ
 `)
 	got := SLP111{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings even with gitignore — binary may already be tracked")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding even with gitignore, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP111" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
+	}
+	if got[0].File != "app.exe" {
+		t.Errorf("expected File=app.exe, got %q", got[0].File)
 	}
 }
 
@@ -56,8 +74,29 @@ new file mode 100755
 Binary files differ
 `)
 	got := SLP111{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected finding for new extensionless binary file build/app")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for new extensionless binary file, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP111" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
+	}
+	if got[0].File != "build/app" {
+		t.Errorf("expected File=build/app, got %q", got[0].File)
+	}
+}
+
+func TestSLP111_AllowsWhitelistedExtensionlessNewFile(t *testing.T) {
+	d := parseDiff(t, `diff --git a/Makefile b/Makefile
+new file mode 100644
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,3 @@
++all:
++	go build ./...
+`)
+	got := SLP111{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for whitelisted extensionless file Makefile, got %d", len(got))
 	}
 }
 

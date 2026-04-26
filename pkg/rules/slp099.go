@@ -41,17 +41,28 @@ var slp099IgnoredTrailingTokens = map[string]struct{}{
 var slp099CamelBoundaryLowerToUpper = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 var slp099CamelBoundaryAcronym = regexp.MustCompile(`([A-Z]+)([A-Z][a-z])`)
 var slp099NonAlnum = regexp.MustCompile(`[^A-Za-z0-9]+`)
+var slp099VersionToken = regexp.MustCompile(`^v?\d+$`)
 
 func hasResponseKeyword(name string) bool {
 	tokens := slp099FilenameTokens(name)
 	for i := len(tokens) - 1; i >= 0; i-- {
-		if _, ok := slp099IgnoredTrailingTokens[tokens[i]]; ok {
+		tok := tokens[i]
+		if _, ok := slp099IgnoredTrailingTokens[tok]; ok {
 			continue
 		}
-		_, ok := slp099ResponseKeywords[tokens[i]]
-		return ok
+		if slp099VersionToken.MatchString(tok) {
+			continue
+		}
+		if _, ok := slp099ResponseKeywords[tok]; ok {
+			return true
+		}
+		return false
 	}
 	return false
+}
+
+func matchesSlp099FieldLine(content string) bool {
+	return slp099GoStructField.MatchString(content) || slp099TSInterfaceProp.MatchString(content)
 }
 
 func slp099FilenameTokens(name string) []string {
@@ -82,7 +93,7 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 
 		for _, ln := range f.AddedLines() {
 			content := strings.TrimSpace(ln.Content)
-			if slp099GoStructField.MatchString(content) || slp099TSInterfaceProp.MatchString(content) {
+			if matchesSlp099FieldLine(content) {
 				if hasResponseKeyword(f.Path) {
 					changedFiles[f.Path] = true
 				}
@@ -99,7 +110,7 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 		}
 		for _, ln := range f.AddedLines() {
 			content := strings.TrimSpace(ln.Content)
-			if slp099GoStructField.MatchString(content) || slp099TSInterfaceProp.MatchString(content) {
+			if matchesSlp099FieldLine(content) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
@@ -151,8 +162,5 @@ func slp099RelatedDir(respDir, testDir string) bool {
 	if respDir == testDir {
 		return true
 	}
-	if path.Dir(testDir) == respDir || path.Dir(respDir) == testDir {
-		return true
-	}
-	return path.Dir(respDir) == path.Dir(testDir)
+	return path.Dir(testDir) == respDir || path.Dir(respDir) == testDir
 }
