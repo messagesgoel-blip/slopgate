@@ -122,7 +122,7 @@ func slp098TestMatches(testPath, sourceBase string) bool {
 
 	// Also check if the test path lives under a parallel test/tests directory.
 	// Strip common test root prefixes and compare the remainder.
-	for _, root := range []string{"tests/", "test/"} {
+	for _, root := range []string{"tests/", "test/", "src/tests/", "src/test/"} {
 		if strings.HasPrefix(testBase, root) {
 			remainder := testBase[len(root):]
 			// Match directly or under common source roots
@@ -139,7 +139,7 @@ func slp098TestMatches(testPath, sourceBase string) bool {
 		// Same filename stem — check if directories are parallel (e.g., src/foo vs tests/foo)
 		srcDir := path.Dir(sourceBase)
 		testDir := path.Dir(testBase)
-		for _, root := range []string{"tests", "test"} {
+		for _, root := range []string{"tests", "test", "src/tests", "src/test"} {
 			if strings.HasPrefix(testDir, root) {
 				remainder := strings.TrimPrefix(testDir, root)
 				remainder = strings.TrimPrefix(remainder, "/")
@@ -155,6 +155,16 @@ func slp098TestMatches(testPath, sourceBase string) bool {
 			}
 			for _, testRoot := range []string{"tests", "test"} {
 				if testDir == testRoot+"/"+srcReplaced || testDir == testRoot {
+					return true
+				}
+			}
+			// Handle src/<module>/test[s] pattern (e.g., src/routes/test vs src/routes)
+			for _, testSuffix := range []string{"/test", "/tests"} {
+				if testDir == srcRoot+"/"+srcReplaced+testSuffix {
+					return true
+				}
+				// Also handle when testDir has the srcRoot prefix and a test suffix
+				if strings.TrimSuffix(testDir, testSuffix) == srcRoot+"/"+srcReplaced {
 					return true
 				}
 			}

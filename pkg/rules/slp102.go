@@ -79,9 +79,9 @@ func (r SLP102) Check(d *diff.Diff) []Finding {
 							// Avoid false positives on multiline like:
 							// const x = async () =>
 							//    1
-							idx := strings.Index(content, "=>")
-							if idx != -1 {
-								rhs := strings.TrimSpace(content[idx+2:])
+							arrowIdx := strings.Index(content, "=>")
+							if arrowIdx != -1 {
+								rhs := strings.TrimSpace(content[arrowIdx+2:])
 								if rhs != "" && !slp102AwaitRe.MatchString(content) {
 									out = append(out, Finding{
 										RuleID:   r.ID(),

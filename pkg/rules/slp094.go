@@ -34,7 +34,14 @@ func (r SLP094) Check(d *diff.Diff) []Finding {
 			if slp094IsCommentOnlyLine(candidate.command) {
 				continue
 			}
-			if slp094SilentFail.MatchString(candidate.command) {
+			cmd := candidate.command
+			if hashIdx := strings.Index(cmd, "#"); hashIdx >= 0 {
+				cmd = strings.TrimSpace(cmd[:hashIdx])
+			}
+			if cmd == "" {
+				continue
+			}
+			if slp094SilentFail.MatchString(cmd) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
@@ -56,8 +63,13 @@ type slp094CommandCandidate struct {
 
 func slp094CommandCandidates(f diff.File) []slp094CommandCandidate {
 	if !slp094IsYAMLFile(f.Path) {
+		isMakefile := slp094IsMakefile(f.Path)
 		out := make([]slp094CommandCandidate, 0, len(f.AddedLines()))
 		for _, ln := range f.AddedLines() {
+			// For Makefiles, only recipe lines (tab-indented) are shell commands.
+			if isMakefile && !strings.HasPrefix(ln.Content, "\t") {
+				continue
+			}
 			out = append(out, slp094CommandCandidate{line: ln, command: ln.Content})
 		}
 		return out
@@ -120,6 +132,15 @@ func slp094IsCommentOnlyLine(content string) bool {
 		strings.HasPrefix(trim, "//") ||
 		strings.HasPrefix(trim, "/*") ||
 		strings.HasPrefix(trim, "*/")
+}
+
+func slp094IsMakefile(filePath string) bool {
+	lower := strings.ToLower(filePath)
+	base := lower
+	if i := strings.LastIndex(lower, "/"); i >= 0 {
+		base = lower[i+1:]
+	}
+	return base == "makefile" || strings.HasSuffix(base, ".mk")
 }
 
 func slp094IsYAMLFile(path string) bool {

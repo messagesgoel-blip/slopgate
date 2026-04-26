@@ -20,7 +20,13 @@ func (SLP099) Description() string {
 	return "response field changed without test update — tests may be stale"
 }
 
-var slp099GoStructField = regexp.MustCompile(`^\s*\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?(?:\s+` + "`" + `[^` + "`" + `]*` + "`" + `)?\s*$`)
+var slp099GoStructField = regexp.MustCompile(
+	`^\s*(?:` +
+		`[A-Z]\w*\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?` + // Exported field (uppercase)
+		`|\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)\w+(?:\.\w+)?` + // Any field with pointer/slice type
+		`|\w+\s+\w+\.\w+` + // Any field with package-qualified type
+	`)(?:\s+` + "`" + `[^` + "`" + `]*` + "`" + `)?\s*$` + // Optional struct tag
+	`|^\s*\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?\s+` + "`" + `[^` + "`" + `]*` + "`" + `\s*$`) // Lowercase field with struct tag
 
 var slp099TSInterfaceProp = regexp.MustCompile(`(?i)^(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?$`)
 

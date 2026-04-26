@@ -2,14 +2,8 @@ package rules
 
 import "testing"
 
-func TestSLP108_FiresOnOpenWithoutDefer(t *testing.T) {
-	d := parseDiff(t, `diff --git a/db.go b/db.go
---- a/db.go
-+++ b/db.go
-@@ -1,1 +1,3 @@
-+  db, err := sql.Open("postgres", connStr)
-`)
-	got := SLP108{}.Check(d)
+func assertSLP108Fires(t *testing.T, got []Finding) {
+	t.Helper()
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding, got %d", len(got))
 	}
@@ -21,6 +15,16 @@ func TestSLP108_FiresOnOpenWithoutDefer(t *testing.T) {
 	}
 }
 
+func TestSLP108_FiresOnOpenWithoutDefer(t *testing.T) {
+	d := parseDiff(t, `diff --git a/db.go b/db.go
+--- a/db.go
++++ b/db.go
+@@ -1,1 +1,3 @@
++  db, err := sql.Open("postgres", connStr)
+`)
+	assertSLP108Fires(t, SLP108{}.Check(d))
+}
+
 func TestSLP108_FiresOnFetchWithoutTimeout(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api.ts b/api.ts
 --- a/api.ts
@@ -28,16 +32,7 @@ func TestSLP108_FiresOnFetchWithoutTimeout(t *testing.T) {
 @@ -1,1 +1,3 @@
 +  const res = fetch("https://api.example.com/data")
 `)
-	got := SLP108{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP108" {
-		t.Errorf("RuleID = %q", got[0].RuleID)
-	}
-	if got[0].Severity != SeverityBlock {
-		t.Errorf("Severity = %v", got[0].Severity)
-	}
+	assertSLP108Fires(t, SLP108{}.Check(d))
 }
 
 func TestSLP108_NoFireOnOpenWithDefer(t *testing.T) {
@@ -75,13 +70,7 @@ func TestSLP108_FiresOnOpenWithTimeoutNoDefer(t *testing.T) {
 +  ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 +  db, err := sql.Open("postgres", connStr)
 `)
-	got := SLP108{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding for open with timeout but no defer, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP108" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
+	assertSLP108Fires(t, SLP108{}.Check(d))
 }
 
 func TestSLP108_FiresOnOpenWithDeferCancelOnly(t *testing.T) {
@@ -93,13 +82,7 @@ func TestSLP108_FiresOnOpenWithDeferCancelOnly(t *testing.T) {
 +  db, err := sql.Open("postgres", connStr)
 +  defer cancel()
 `)
-	got := SLP108{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding for open with defer cancel but no db.Close, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP108" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
+	assertSLP108Fires(t, SLP108{}.Check(d))
 }
 
 func TestSLP108_IgnoresGenericNewClient(t *testing.T) {

@@ -153,6 +153,32 @@ func TestSLP094_BlockScalarSiblingKeyNotFlagged(t *testing.T) {
 	}
 }
 
+func TestSLP094_IgnoresMakefileMetadata(t *testing.T) {
+	d := parseDiff(t, `diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -1,1 +1,3 @@
++VERSION := 1 || true
+`)
+	got := SLP094{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for Makefile metadata line, got %d: %v", len(got), got)
+	}
+}
+
+func TestSLP094_IgnoresInlineCommentedSilentFail(t *testing.T) {
+	d := parseDiff(t, `diff --git a/build.sh b/build.sh
+--- a/build.sh
++++ b/build.sh
+@@ -1,1 +1,3 @@
++go build ./... # || true
+`)
+	got := SLP094{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for inline comment containing || true, got %d: %v", len(got), got)
+	}
+}
+
 func TestSLP094_Description(t *testing.T) {
 	r := SLP094{}
 	if r.ID() != "SLP094" {

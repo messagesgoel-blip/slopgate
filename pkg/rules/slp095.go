@@ -18,7 +18,7 @@ func (SLP095) Description() string {
 	return "catch block returns silently without handling the error — use throw/reject or log then rethrow"
 }
 
-var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]|\{\}|""|''|undefined|none)(?:\s*(?:;|\}|//)|\s*$)`)
+var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]|\{\}|""|''|undefined|none)(?:\s*(?:;|\}|//|#)|\s*$)`)
 var slp095CatchRE = regexp.MustCompile(`\bcatch\b`)
 var slp095ExceptRE = regexp.MustCompile(`\bexcept\b`)
 
@@ -90,8 +90,14 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 						if isPython {
 							exceptIndent = indentationOf(ln.Content)
 						}
-						catchBraceDepth += strings.Count(ln.Content, "{")
-						catchBraceDepth -= strings.Count(ln.Content, "}")
+						catchSub := ln.Content
+						if isCatchLang {
+							if ci := strings.Index(strings.ToLower(ln.Content), "catch"); ci >= 0 {
+								catchSub = ln.Content[ci:]
+							}
+						}
+						catchBraceDepth += strings.Count(catchSub, "{")
+						catchBraceDepth -= strings.Count(catchSub, "}")
 						if hasErrorHandling(cLower) {
 							handling = true
 						}
@@ -141,7 +147,24 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 						})
 					}
 					inCatch = false
-					continue
+					handling = false
+					silentLine = nil
+					// Re-check if the current line also starts a new (chained) catch.
+					if (isCatchLang && slp095CatchRE.MatchString(cLower)) ||
+						(isPython && slp095ExceptRE.MatchString(cLower)) {
+						inCatch = true
+						catchBraceDepth = 0
+						catchSub2 := ln.Content
+						if isCatchLang {
+							if ci2 := strings.Index(strings.ToLower(ln.Content), "catch"); ci2 >= 0 {
+								catchSub2 = ln.Content[ci2:]
+							}
+						}
+						catchBraceDepth += strings.Count(catchSub2, "{")
+						catchBraceDepth -= strings.Count(catchSub2, "}")
+					} else {
+						continue
+					}
 				}
 
 				if hasErrorHandling(cLower) {

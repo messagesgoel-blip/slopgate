@@ -75,25 +75,45 @@ func slp109HasFuncKeyword(content string) bool {
 		strings.Contains(cLower, "static ")
 }
 
-func slp109CollectSignature(lines []diff.Line, start int) (string, int, bool) {
+func slp109CollectSignature(lines []diff.Line, start int) (string, int, int, bool) {
 	var parts []string
+	parenDepth := 0
 	for i := start; i < len(lines); i++ {
 		if lines[i].Kind != diff.LineAdd {
-			return "", 0, false
+			return "", 0, 0, false
 		}
-		content := strings.TrimSpace(lines[i].Content)
+		raw := lines[i].Content
+		content := strings.TrimSpace(raw)
 		if content == "" {
 			continue
 		}
 		parts = append(parts, content)
-		if strings.Contains(content, "{") {
-			return strings.Join(parts, " "), i, true
+		// Scan raw line to track paren nesting and find the true body-opening '{'.
+		bodyBraceOff := -1
+		depth := parenDepth
+		for off, ch := range raw {
+			switch ch {
+			case '(':
+				depth++
+			case ')':
+				if depth > 0 {
+					depth--
+				}
+			case '{':
+				if depth == 0 && bodyBraceOff < 0 {
+					bodyBraceOff = off
+				}
+			}
+		}
+		parenDepth = depth
+		if bodyBraceOff >= 0 {
+			return strings.Join(parts, " "), i, bodyBraceOff, true
 		}
 		if strings.Contains(content, ";") {
-			return "", 0, false
+			return "", 0, 0, false
 		}
 	}
-	return "", 0, false
+	return "", 0, 0, false
 }
 
 func (r SLP109) Check(d *diff.Diff) []Finding {
@@ -131,7 +151,7 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 					if !slp109HasCallableShape(content) {
 						continue
 					}
-					sig, bodyStart, ok := slp109CollectSignature(h.Lines, idx)
+					sig, bodyStart, braceOff, ok := slp109CollectSignature(h.Lines, idx)
 					if !ok {
 						continue
 					}
@@ -140,11 +160,10 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 					cur = funcBody{sigLine: ln.NewLineNo, sig: sig}
 					if bodyStart == idx {
 						lineContent := h.Lines[bodyStart].Content
-						if strings.Contains(lineContent, "{") && strings.Contains(lineContent, "}") {
-							open := strings.Index(lineContent, "{")
+						if braceOff >= 0 && braceOff < len(lineContent) {
 							closeIdx := strings.LastIndex(lineContent, "}")
-							if closeIdx > open+1 {
-								inner := strings.TrimSpace(lineContent[open+1 : closeIdx])
+							if closeIdx > braceOff+1 {
+								inner := strings.TrimSpace(lineContent[braceOff+1 : closeIdx])
 								if inner != "" {
 									cur.body = append(cur.body, inner)
 								}

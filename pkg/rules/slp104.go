@@ -38,9 +38,7 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 
 		for _, ln := range f.AddedLines() {
 			trimmed := strings.TrimSpace(ln.Content)
-			var msg string
-			switch {
-			case slp104MakeByte.MatchString(trimmed):
+			if slp104MakeByte.MatchString(trimmed) {
 				for _, m := range slp104MakeByte.FindAllStringSubmatch(trimmed, -1) {
 					lenVal := m[1]
 					capVal := m[2]
@@ -49,22 +47,35 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 						isZero = parsed == 0
 					}
 					if !isZero || capVal != "" {
-						msg = "hardcoded buffer size in make — use a named constant"
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  "hardcoded buffer size in make — use a named constant",
+							Snippet:  ln.Content,
+						})
 						break
 					}
 				}
-			case slp104BufioSize.MatchString(trimmed):
-				msg = "hardcoded buffer size in bufio — use a named constant"
-			case slp104BufferConfig.MatchString(trimmed):
-				msg = "hardcoded buffer limit — use a named constant"
 			}
-			if msg != "" {
+			if slp104BufioSize.MatchString(trimmed) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
-					Message:  msg,
+					Message:  "hardcoded buffer size in bufio — use a named constant",
+					Snippet:  ln.Content,
+				})
+			}
+			if slp104BufferConfig.MatchString(trimmed) {
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
+					File:     f.Path,
+					Line:     ln.NewLineNo,
+					Message:  "hardcoded buffer limit — use a named constant",
 					Snippet:  ln.Content,
 				})
 			}

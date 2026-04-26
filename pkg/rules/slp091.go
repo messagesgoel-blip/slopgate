@@ -68,14 +68,30 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 		for _, ln := range f.AddedLines() {
 			content := ln.Content
 			trimmed := strings.TrimSpace(content)
-			if strings.HasPrefix(trimmed, "/*") {
-				inBlockComment = true
-			}
 			if inBlockComment {
-				if strings.Contains(trimmed, "*/") {
+				if closeIdx := strings.Index(trimmed, "*/"); closeIdx >= 0 {
+					trimmed = strings.TrimSpace(trimmed[closeIdx+2:])
+					content = trimmed
 					inBlockComment = false
+					if trimmed == "" {
+						continue
+					}
+					// Fall through to process remainder
+				} else {
+					continue
 				}
-				continue
+			} else if strings.HasPrefix(trimmed, "/*") {
+				if closeIdx := strings.Index(trimmed, "*/"); closeIdx >= 0 {
+					trimmed = strings.TrimSpace(trimmed[closeIdx+2:])
+					content = trimmed
+					if trimmed == "" {
+						continue
+					}
+					// Fall through to process remainder
+				} else {
+					inBlockComment = true
+					continue
+				}
 			}
 			if strings.HasPrefix(trimmed, "//") ||
 				strings.HasPrefix(trimmed, "#") ||
