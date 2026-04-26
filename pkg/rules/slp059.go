@@ -17,14 +17,14 @@ func (SLP059) Description() string {
 }
 
 var (
-	goIdentPattern            = regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\b`)
-	execCommandRe             = regexp.MustCompile(`\bexec\.Command\s*\(`)
-	slp059ConstStringDeclRe   = regexp.MustCompile("^\\s*const\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+[A-Za-z_][A-Za-z0-9_]*)?\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
-	slp059VarStringDeclRe     = regexp.MustCompile("^\\s*var\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+[A-Za-z_][A-Za-z0-9_]*)?\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
-	slp059ShortStringDeclRe   = regexp.MustCompile("^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*:=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
-	slp059ConstBlockStartRe   = regexp.MustCompile(`^\s*const\s*\(`)
-	slp059ConstBlockAssignRe  = regexp.MustCompile("^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)")
-	slp059FunctionStartLine   = regexp.MustCompile(`^\s*func\b`)
+	goIdentPattern           = regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\b`)
+	execCommandRe            = regexp.MustCompile(`\bexec\.Command\s*\(`)
+	slp059ConstStringDeclRe  = regexp.MustCompile("^\\s*const\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+[A-Za-z_][A-Za-z0-9_]*)?\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
+	slp059VarStringDeclRe    = regexp.MustCompile("^\\s*var\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+[A-Za-z_][A-Za-z0-9_]*)?\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
+	slp059ShortStringDeclRe  = regexp.MustCompile("^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*:=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)\\s*$")
+	slp059ConstBlockStartRe  = regexp.MustCompile(`^\s*const\s*\(`)
+	slp059ConstBlockAssignRe = regexp.MustCompile("^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|`[^`]*`)")
+	slp059FunctionStartLine  = regexp.MustCompile(`^\s*func\b`)
 )
 
 func slp059FileLines(f diff.File) []diff.Line {

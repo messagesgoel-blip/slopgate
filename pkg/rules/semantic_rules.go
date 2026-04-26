@@ -45,8 +45,8 @@ func (r SLP071) Check(a *diff.AnalysisResult) []Finding {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),
-				File:    fa.Path,
-				Message: "type assertion — use v, ok := x.(Type) for safe handling",
+				File:     fa.Path,
+				Message:  "type assertion — use v, ok := x.(Type) for safe handling",
 			})
 		}
 	}
@@ -96,8 +96,8 @@ func (r SLP072) Check(a *diff.AnalysisResult) []Finding {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),
-				File:    fa.Path,
-				Message: "method call on potentially nil result — check for nil before calling methods",
+				File:     fa.Path,
+				Message:  "method call on potentially nil result — check for nil before calling methods",
 			})
 		}
 	}
@@ -115,10 +115,10 @@ func (SLP073) Description() string {
 }
 
 var resourceTypes = map[string]bool{
-	"os.File":      true,
-	"*os.File":     true,
-	"sql.Rows":     true,
-	"*sql.Rows":    true,
+	"os.File":       true,
+	"*os.File":      true,
+	"sql.Rows":      true,
+	"*sql.Rows":     true,
 	"io.ReadCloser": true,
 	"http.Response": true,
 }
@@ -172,8 +172,8 @@ func (r SLP073) Check(a *diff.AnalysisResult) []Finding {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),
-				File:    fa.Path,
-				Message: "resource acquired without defer close — add defer close for safety",
+				File:     fa.Path,
+				Message:  "resource acquired without defer close — add defer close for safety",
 			})
 		}
 	}
@@ -221,8 +221,8 @@ func (r SLP074) Check(a *diff.AnalysisResult) []Finding {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),
-				File:    fa.Path,
-				Message: "loop variable captured by goroutine — copy to local var first",
+				File:     fa.Path,
+				Message:  "loop variable captured by goroutine — copy to local var first",
 			})
 		}
 	}
@@ -274,8 +274,8 @@ func (r SLP075) Check(a *diff.AnalysisResult) []Finding {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),
-				File:    fa.Path,
-				Message: "weak crypto — use crypto/aes, crypto/chacha20, or crypto/ed25519",
+				File:     fa.Path,
+				Message:  "weak crypto — use crypto/aes, crypto/chacha20, or crypto/ed25519",
 			})
 		}
 	}
@@ -323,8 +323,8 @@ func (r SLP076) Check(a *diff.AnalysisResult) []Finding {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),
-				File:    fa.Path,
-				Message: "SQL query built via concatenation — use $1, $2 parameters instead",
+				File:     fa.Path,
+				Message:  "SQL query built via concatenation — use $1, $2 parameters instead",
 			})
 		}
 	}
@@ -377,8 +377,8 @@ func (r SLP077) Check(a *diff.AnalysisResult) []Finding {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),
-				File:    fa.Path,
-				Message: "hardcoded credential detected — use env vars or secret manager",
+				File:     fa.Path,
+				Message:  "hardcoded credential detected — use env vars or secret manager",
 			})
 		}
 	}
@@ -418,8 +418,8 @@ func (r SLP078) Check(a *diff.AnalysisResult) []Finding {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),
-				File:    fa.Path,
-				Message: "select on channel without checking if closed first",
+				File:     fa.Path,
+				Message:  "select on channel without checking if closed first",
 			})
 		}
 	}
@@ -436,13 +436,13 @@ func (SLP079) Description() string {
 }
 
 var dangerousFuncs = map[string]bool{
-	"json.Unmarshal":   true,
-	"xml.Unmarshal":    true,
-	"io.Copy":          true,
-	"fmt.Scanf":       true,
-	"fmt.Fscanf":      true,
-	"json.Decode":     true,
-	"base64.Decode":   true,
+	"json.Unmarshal": true,
+	"xml.Unmarshal":  true,
+	"io.Copy":        true,
+	"fmt.Scanf":      true,
+	"fmt.Fscanf":     true,
+	"json.Decode":    true,
+	"base64.Decode":  true,
 }
 
 func ignoredErrors(n ast.Node) bool {
@@ -478,8 +478,8 @@ func (r SLP079) Check(a *diff.AnalysisResult) []Finding {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),
-				File:    fa.Path,
-				Message: "error return ignored — check err != nil before proceeding",
+				File:     fa.Path,
+				Message:  "error return ignored — check err != nil before proceeding",
 			})
 		}
 	}
@@ -524,8 +524,8 @@ func (r SLP080) Check(a *diff.AnalysisResult) []Finding {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),
-				File:    fa.Path,
-				Message: "small interface with single impl — consider concrete type instead",
+				File:     fa.Path,
+				Message:  "small interface with single impl — consider concrete type instead",
 			})
 		}
 	}

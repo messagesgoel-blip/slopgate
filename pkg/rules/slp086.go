@@ -10,6 +10,10 @@ import (
 
 // SLP086 flags potential missing authorization checks on sensitive endpoints.
 // This can lead to privilege escalation and unauthorized access.
+// Note: Auth checking is route-scoped - only lines within a specific route's
+// body are considered when determining if a route has authorization.
+// Note: The auth patterns have been tightened to only match auth-relevant
+// negations (e.g., !user.isAdmin) to avoid false positives from generic checks.
 type SLP086 struct{}
 
 func (SLP086) ID() string                { return "SLP086" }
@@ -54,6 +58,8 @@ func init() {
 }
 
 // Check scans for sensitive API routes without authorization checks.
+// Auth checking is route-scoped: only lines within a specific route's body
+// are considered when determining if that route has authorization.
 func (r SLP086) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {

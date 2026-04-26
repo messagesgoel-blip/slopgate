@@ -9,10 +9,10 @@ import (
 
 // SLP087 flags webhook handlers that don't have timeout configurations.
 // This can cause hanging requests and resource exhaustion.
-// Note: Timeout checking is file-scoped for simplicity. For route-specific
-// timeout checking, the Check method would need to parse route boundaries
-// (like SLP086 does). If a file contains multiple webhook handlers and
-// only one has a timeout, this rule will still report all handlers.
+// Note: Timeout checking is file-scoped for simplicity. This means if any
+// line in the file matches a timeout pattern, all webhook code in that file
+// is considered to have timeout coverage. For per-handler timeout checking,
+// the Check method would need route boundary parsing (like SLP086 does).
 type SLP087 struct{}
 
 func (SLP087) ID() string                { return "SLP087" }

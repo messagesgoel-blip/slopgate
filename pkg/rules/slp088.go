@@ -7,13 +7,12 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
-// SLP088 flags hardcoded secrets, credentials, and API keys in source code.
+// SLP088 flags hardcoded secrets, credentials, and API keys in settings files.
 // This is a critical security issue that can lead to data breaches.
-// Note: This rule scans source files (.js, .ts, .go, .py), not config files.
-// Config files (.toml, .yml, .yaml, .json, .env) are intentionally skipped
-// because they are designed for configuration management. The PR description
-// listing SLP088 for "settings files" was misleading - the rule catches
-// hardcoded credentials in actual source code (not configuration files).
+// Note: This rule scans config/settings files (.toml, .yml, .yaml, .json, .env)
+// for hardcoded credentials. Source code files are intentionally skipped
+// to avoid overlap with other rules like SLP081-SLP085 that handle different
+// credential detection scenarios.
 type SLP088 struct{}
 
 func (SLP088) ID() string                { return "SLP088" }
@@ -25,29 +24,29 @@ func (SLP088) Description() string {
 var (
 	// Common credential patterns
 	slp088CredentialPatterns = []*regexp.Regexp{
-		// API keys
-		regexp.MustCompile(`(?i)(?:api[_-]?key|apikey|api-key)\s*[=:]\s*["'][A-Za-z0-9_\-]{20,}["']`),
-		regexp.MustCompile(`(?i)["'][A-Za-z0-9_\-]{20,}["'].*(?:api[_-]?key|apikey|api-key)`),
+		// API keys (matches both code format "apiKey": "value" and JSON format)
+		regexp.MustCompile(`(?i)"?api[_-]?key"?\s*[=:]\s*["'][A-Za-z0-9_\-]{20,}["']`),
+		regexp.MustCompile(`(?i)"?[A-Za-z0-9_\-]{20,}"?\s*[:=]\s*api[_-]?key`),
 
-		// Secret keys
-		regexp.MustCompile(`(?i)(?:secret[_-]?key|secretkey|secret-key|app[_-]?secret)\s*[=:]\s*["'][A-Za-z0-9_\-]{16,}["']`),
+		// Secret keys (matches both code and JSON formats)
+		regexp.MustCompile(`(?i)"?(?:secret[_-]?key|secretkey|secret-key|app[_-]?secret)"?\s*[=:]\s*["'][A-Za-z0-9_\-]{16,}["']`),
 
-		// Passwords
-		regexp.MustCompile(`(?i)(?:password|passwd|pwd)\s*[=:]\s*["'][^"']{4,}["']`),
+		// Passwords (matches both code and JSON formats)
+		regexp.MustCompile(`(?i)"?(?:password|passwd|pwd)"?\s*[=:]\s*["'][^"']{4,}["']`),
 		regexp.MustCompile(`(?i)["'][^"']{4,}["']\s*[:=]\s*(?:password|passwd|pwd)`),
 
-		// Tokens
-		regexp.MustCompile(`(?i)(?:token|auth[_-]?token)\s*[=:]\s*["'][A-Za-z0-9_\-\.]{16,}["']`),
+		// Tokens (matches both code and JSON formats)
+		regexp.MustCompile(`(?i)"?(?:token|auth[_-]?token)"?\s*[=:]\s*["'][A-Za-z0-9_\-\.]{16,}["']`),
 		regexp.MustCompile(`(?i)(?:bearer|Bearer)\s+[A-Za-z0-9_\-\.]{20,}`),
 
-		// AWS credentials
-		regexp.MustCompile(`(?i)(?:aws[_-]?access[_-]?key|aws_access_key)\s*[=:]\s*["'][A-Z0-9]{20}["']`),
-		regexp.MustCompile(`(?i)(?:aws[_-]?secret[_-]?key|aws_secret_key)\s*[=:]\s*["'][A-Za-z0-9/+=]{40}["']`),
+		// AWS credentials (matches code and JSON formats)
+		regexp.MustCompile(`(?i)"?(?:aws[_-]?access[_-]?key|aws_access_key)"?\s*[=:]\s*["'][A-Z0-9]{20}["']`),
+		regexp.MustCompile(`(?i)"?(?:aws[_-]?secret[_-]?key|aws_secret_key)"?\s*[=:]\s*["'][A-Za-z0-9/+=]{40}["']`),
 
 		// Private keys
 		regexp.MustCompile(`(?i)(?:-----BEGIN\s+(?:RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----|-----BEGIN\s+PRIVATE\s+KEY-----)`),
 
-		// Generic high-entropy strings (long random-looking)
+		// Generic high-entropy strings (long random-looking) in code format
 		regexp.MustCompile(`(?i)(?:key|secret|credential|password|token)\s*[=:]\s*["'][A-Za-z0-9/+=]{32,}["']`),
 	}
 
@@ -58,7 +57,7 @@ var (
 	}
 )
 
-// Check scans source files for hardcoded credentials and secrets.
+// Check scans config files for hardcoded credentials and secrets.
 func (r SLP088) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -68,13 +67,17 @@ func (r SLP088) Check(d *diff.Diff) []Finding {
 
 		fileLower := strings.ToLower(f.Path)
 
-		// Skip config files (.toml, .yml, .yaml, .json, .env)
-		// These files are for configuration, not hardcoded secrets
+		// Only scan config files (.toml, .yml, .yaml, .json, .env)
+		// Source files are intentionally skipped to avoid overlap with other rules
+		isConfigFile := false
 		if strings.Contains(fileLower, ".env") && !strings.Contains(fileLower, "example") {
-			continue
+			isConfigFile = true
 		}
 		if strings.Contains(fileLower, ".toml") || strings.Contains(fileLower, ".yml") ||
 			strings.Contains(fileLower, ".yaml") || strings.Contains(fileLower, ".json") {
+			isConfigFile = true
+		}
+		if !isConfigFile {
 			continue
 		}
 
@@ -86,7 +89,7 @@ func (r SLP088) Check(d *diff.Diff) []Finding {
 
 				content := strings.TrimSpace(ln.Content)
 
-				// Skip if it's using environment variable pattern
+				// Skip if it's using environment variable pattern (properly configured)
 				isEnvPattern := false
 				for _, pattern := range slp088ConfigPatterns {
 					if pattern.MatchString(content) {
@@ -106,7 +109,7 @@ func (r SLP088) Check(d *diff.Diff) []Finding {
 							Severity: r.DefaultSeverity(),
 							File:     f.Path,
 							Line:     ln.NewLineNo,
-							Message:  "hardcoded credential detected - use environment variable (process.env.XXX) or secret manager instead",
+							Message:  "hardcoded credential detected in settings file - use environment variable (process.env.XXX) or secret manager instead",
 							Snippet:  content,
 						})
 						break

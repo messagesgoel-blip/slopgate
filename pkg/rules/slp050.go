@@ -141,7 +141,7 @@ func slp050CollectFuncHeader(lines []diff.Line, start, openParen int) (string, i
 		if i == start {
 			scanStart = openParen + 1
 		}
-			for j := scanStart; j < len(content); j++ {
+		for j := scanStart; j < len(content); j++ {
 			switch content[j] {
 			case '(':
 				depth++

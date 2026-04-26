@@ -52,7 +52,7 @@ func (r SLP043) Check(d *diff.Diff) []Finding {
 				// This looks like an embedded type field without json tag
 				out = append(out, Finding{
 					RuleID:   r.ID(),
-					Severity:  r.DefaultSeverity(),
+					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     line.NewLineNo,
 					Message:  r.Description(),

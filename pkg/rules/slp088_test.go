@@ -12,78 +12,73 @@ func TestSLP088(t *testing.T) {
 		expected int
 	}{
 		{
-			name: "hardcoded API key",
-			diff: strings.TrimSpace(`diff --git a/src/config.js b/src/config.js
+			name: "hardcoded API key in config",
+			diff: strings.TrimSpace(`diff --git a/config.json b/config.json
 index 123..456 100644
---- a/src/config.js
-+++ b/src/config.js
+--- a/config.json
++++ b/config.json
 @@ -1,5 +1,8 @@
--const config = {
--  apiKey: "sk-1234567890abcdef1234567890abcdef"
-+const config = {
-+  apiKey: "sk-1234567890abcdef1234567890abcdef"
+ {
+-  "apiKey": "sk-1234567890abcdef1234567890abcdef"
++  "apiKey": "sk-1234567890abcdef1234567890abcdef"
  }
 `),
 			expected: 1,
 		},
 		{
-			name: "hardcoded password",
-			diff: strings.TrimSpace(`diff --git a/src/db.js b/src/db.js
+			name: "hardcoded password in YAML",
+			diff: strings.TrimSpace(`diff --git a/config.yml b/config.yml
 index 123..456 100644
---- a/src/db.js
-+++ b/src/db.js
+--- a/config.yml
++++ b/config.yml
 @@ -1,5 +1,8 @@
--const dbConfig = {
+ database:
 -  password: "supersecret123"
-+const dbConfig = {
 +  password: "supersecret123"
- }
+   host: localhost
 `),
 			expected: 1,
 		},
 		{
-			name: "process.env is ok",
-			diff: strings.TrimSpace(`diff --git a/src/config.js b/src/config.js
+			name: "process.env is ok in config",
+			diff: strings.TrimSpace(`diff --git a/config.yaml b/config.yaml
 index 123..456 100644
---- a/src/config.js
-+++ b/src/config.js
+--- a/config.yaml
++++ b/config.yaml
 @@ -1,5 +1,8 @@
--const config = {
--  apiKey: process.env.API_KEY
-+const config = {
-+  apiKey: process.env.API_KEY
- }
+ database:
+-  password: process.env.DB_PASSWORD
++  password: process.env.DB_PASSWORD
+   host: localhost
 `),
 			expected: 0,
 		},
 		{
-			name: "AWS credentials",
-			diff: strings.TrimSpace(`diff --git a/src/aws.js b/src/aws.js
+			name: "AWS credentials in TOML",
+			diff: strings.TrimSpace(`diff --git a/settings.toml b/settings.toml
 index 123..456 100644
---- a/src/aws.js
-+++ b/src/aws.js
+--- a/settings.toml
++++ b/settings.toml
 @@ -1,5 +1,8 @@
--const AWS = require('aws-sdk')
--AWS.config.update({
--  accessKeyId: "AKIAIOSFODNN7EXAMPLE",
--  secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-+const AWS = require('aws-sdk')
-+AWS.config.update({
-+  accessKeyId: "AKIAIOSFODNN7EXAMPLE",
-+  secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
- })
+ [aws]
+-  access_key = "AKIAIOSFODNN7EXAMPLE"
+-  secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
++  access_key = "AKIAIOSFODNN7EXAMPLE"
++  secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 `),
 			expected: 1,
 		},
 		{
-			name: "private key in code",
-			diff: strings.TrimSpace(`diff --git a/src/jwt.js b/src/jwt.js
+			name: "private key in settings file",
+			diff: strings.TrimSpace(`diff --git a/config.json b/config.json
 index 123..456 100644
---- a/src/jwt.js
-+++ b/src/jwt.js
+--- a/config.json
++++ b/config.json
 @@ -1,5 +1,8 @@
--const privateKey = '-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA2Z3qX2BTLS4e0ek346h\n-----END RSA PRIVATE KEY-----'
-+const privateKey = '-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA2Z3qX2BTLS4e0ek346h\n-----END RSA PRIVATE KEY-----'
+ {
+-  "privateKey": "-----BEGIN RSA PRIVATE KEY-----\\nMIIEpAIBAAKCAQEA2Z3qX2BTLS4e0ek346h\\n-----END RSA PRIVATE KEY-----"
++  "privateKey": "-----BEGIN RSA PRIVATE KEY-----\\nMIIEpAIBAAKCAQEA2Z3qX2BTLS4e0ek346h\\n-----END RSA PRIVATE KEY-----"
+ }
 `),
 			expected: 1,
 		},
@@ -98,6 +93,21 @@ index 123..456 100644
 -API_KEY=sk-abcdef123456
 +SECRET_KEY=mysecretkey123
 +API_KEY=sk-abcdef123456
+`),
+			expected: 0,
+		},
+		{
+			name: "source .js file should be skipped",
+			diff: strings.TrimSpace(`diff --git a/src/config.js b/src/config.js
+index 123..456 100644
+--- a/src/config.js
++++ b/src/config.js
+@@ -1,5 +1,8 @@
+-const config = {
+-  apiKey: "sk-1234567890abcdef1234567890abcdef"
++const config = {
++  apiKey: "sk-1234567890abcdef1234567890abcdef"
+ }
 `),
 			expected: 0,
 		},

@@ -9,6 +9,8 @@ import (
 
 // SLP090 flags API endpoints that don't handle error responses properly.
 // This can lead to unhandled exceptions and poor user experience.
+// Note: Error handling detection includes explicit error patterns (try-catch,
+// error middleware) and error status codes (4xx/5xx) or error/fail payloads.
 type SLP090 struct{}
 
 func (SLP090) ID() string                { return "SLP090" }

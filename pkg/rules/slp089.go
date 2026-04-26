@@ -80,8 +80,10 @@ func isExportDeclaration(content string) bool {
 	return false
 }
 
-// isConstExportDeclaration checks if a line declares a const export (without export prefix)
+// isConstExportDeclaration checks if a line declares a const/function that is
+// either explicitly exported or re-exported via `export { name }` in the same hunk.
 func isConstExportDeclaration(content string) bool {
+	// Check if this is an explicit export (starts with "export")
 	for _, pattern := range slp089ConstExportPatterns {
 		if pattern.MatchString(content) {
 			return true
