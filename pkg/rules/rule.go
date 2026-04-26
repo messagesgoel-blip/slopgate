@@ -41,10 +41,10 @@ func (s Severity) String() string {
 type Finding struct {
 	RuleID   string
 	Severity Severity
-	File    string
-	Line    int    // 1-indexed line in the new file; 0 if not applicable
-	Message string // one-line explanation
-	Snippet string // the offending source line, unmodified
+	File     string
+	Line     int    // 1-indexed line in the new file; 0 if not applicable
+	Message  string // one-line explanation
+	Snippet  string // the offending source line, unmodified
 }
 
 // Rule is the interface every detection must implement.

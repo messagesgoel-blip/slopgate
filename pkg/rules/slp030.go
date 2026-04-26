@@ -9,9 +9,9 @@ import (
 // SLP030 flags ORM/query methods that select single records without
 // excluding sentinel values. AI-generated queries often do:
 //
-//   File.query().only()       // missing .where('hash', '!=', 'folder-marker')
-//   User.find().first()       // could return placeholder user
-//   Record.findOne().last()   // missing sentinel filter
+//	File.query().only()       // missing .where('hash', '!=', 'folder-marker')
+//	User.find().first()       // could return placeholder user
+//	Record.findOne().last()   // missing sentinel filter
 //
 // This is a semantic bug: the query returns the first/last/only record,
 // which might be a sentinel placeholder like 'folder-marker' or 'null-string'.

@@ -83,5 +83,16 @@ func Default() *Registry {
 	r.RegisterSemantic(SLP078{})
 	r.RegisterSemantic(SLP079{})
 	r.RegisterSemantic(SLP080{})
+	// Register diff-based rules SLP081-SLP090 for CodeRabbit parity.
+	r.Register(SLP081{})
+	r.Register(SLP082{})
+	r.Register(SLP083{})
+	r.Register(SLP084{})
+	r.Register(SLP085{})
+	r.Register(SLP086{})
+	r.Register(SLP087{})
+	r.Register(SLP088{})
+	r.Register(SLP089{})
+	r.Register(SLP090{})
 	return r
 }
