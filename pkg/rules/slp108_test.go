@@ -96,6 +96,19 @@ func TestSLP108_FiresOnOpenWithDeferCancelOnly(t *testing.T) {
 	}
 }
 
+func TestSLP108_IgnoresGenericNewClient(t *testing.T) {
+	d := parseDiff(t, `diff --git a/client.go b/client.go
+--- a/client.go
++++ b/client.go
+@@ -1,1 +1,3 @@
++  client := NewClient(cfg)
+`)
+	got := SLP108{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for generic NewClient, got %d", len(got))
+	}
+}
+
 func TestSLP108_Description(t *testing.T) {
 	r := SLP108{}
 	if r.ID() != "SLP108" {

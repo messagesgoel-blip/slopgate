@@ -24,15 +24,43 @@ var slp099GoStructField = regexp.MustCompile(`^\s*\w+\s+(?:\[\])?\*?\w+(?:\.\w+)
 
 var slp099TSInterfaceProp = regexp.MustCompile(`(?i)^(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?$`)
 
-var slp099ResponseKeywords = []string{"Response", "response", "Res", "res", "DTO", "dto", "Output", "output", "Result", "result", "Payload"}
+var slp099ResponseKeywords = map[string]struct{}{
+	"response": {},
+	"dto":      {},
+	"output":   {},
+	"result":   {},
+	"payload":  {},
+}
+
+var slp099IgnoredTrailingTokens = map[string]struct{}{
+	"model":  {},
+	"schema": {},
+	"type":   {},
+}
+
+var slp099CamelBoundaryLowerToUpper = regexp.MustCompile(`([a-z0-9])([A-Z])`)
+var slp099CamelBoundaryAcronym = regexp.MustCompile(`([A-Z]+)([A-Z][a-z])`)
+var slp099NonAlnum = regexp.MustCompile(`[^A-Za-z0-9]+`)
 
 func hasResponseKeyword(name string) bool {
-	for _, kw := range slp099ResponseKeywords {
-		if strings.Contains(name, kw) {
-			return true
+	tokens := slp099FilenameTokens(name)
+	for i := len(tokens) - 1; i >= 0; i-- {
+		if _, ok := slp099IgnoredTrailingTokens[tokens[i]]; ok {
+			continue
 		}
+		_, ok := slp099ResponseKeywords[tokens[i]]
+		return ok
 	}
 	return false
+}
+
+func slp099FilenameTokens(name string) []string {
+	base := path.Base(name)
+	stem := strings.TrimSuffix(base, path.Ext(base))
+	stem = slp099CamelBoundaryAcronym.ReplaceAllString(stem, `$1 $2`)
+	stem = slp099CamelBoundaryLowerToUpper.ReplaceAllString(stem, `$1 $2`)
+	stem = slp099NonAlnum.ReplaceAllString(stem, " ")
+	return strings.Fields(strings.ToLower(stem))
 }
 
 func (r SLP099) Check(d *diff.Diff) []Finding {

@@ -33,6 +33,7 @@ func indentationOf(line string) string {
 
 func hasErrorHandling(cLower string) bool {
 	return strings.Contains(cLower, "throw ") ||
+		strings.Contains(cLower, "raise ") ||
 		strings.Contains(cLower, "reject(") ||
 		strings.Contains(cLower, "console.error") ||
 		strings.Contains(cLower, "console.warn") ||
@@ -107,13 +108,6 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 				catchBraceDepth += strings.Count(ln.Content, "{")
 				catchBraceDepth -= strings.Count(ln.Content, "}")
 
-				if hasErrorHandling(cLower) {
-					handling = true
-				}
-				if slp095SilentReturn.MatchString(content) {
-					silentLine = ln
-				}
-
 				blockEnded := false
 				if isPythonFile(f.Path) {
 					if content != "" && indentationOf(ln.Content) <= exceptIndent {
@@ -137,6 +131,14 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 						})
 					}
 					inCatch = false
+					continue
+				}
+
+				if hasErrorHandling(cLower) {
+					handling = true
+				}
+				if slp095SilentReturn.MatchString(content) {
+					silentLine = ln
 				}
 			}
 

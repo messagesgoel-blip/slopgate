@@ -50,6 +50,23 @@ func TestSLP107_NoFireOnCleanupInNormalPath(t *testing.T) {
 	}
 }
 
+func TestSLP107_NoFireWhenEarlierDeferMatchesSameResource(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,7 +1,11 @@
++  defer conn.Close()
++  if err != nil {
++      conn.Close()
++      return err
++  }
+`)
+	got := SLP107{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when earlier defer matches same resource, got %d", len(got))
+	}
+}
+
 func TestSLP107_PythonExceptBlock(t *testing.T) {
 	d := parseDiff(t, `diff --git a/handler.py b/handler.py
 --- a/handler.py
@@ -103,6 +120,40 @@ func TestSLP107_FiresWhenDeletedSuccessCleanupIsReplacedForDifferentResource(t *
 	got := SLP107{}.Check(d)
 	if len(got) == 0 {
 		t.Fatal("expected findings when conn cleanup only remains in error path")
+	}
+}
+
+func TestSLP107_FiresOnLowercaseCleanupForDifferentResource(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.py b/handler.py
+--- a/handler.py
++++ b/handler.py
+@@ -1,1 +1,8 @@
++  try:
++      do_thing()
++  except Exception:
++      conn.close()
++  other.close()
+`)
+	got := SLP107{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings when lowercase cleanup targets a different resource")
+	}
+}
+
+func TestSLP107_IgnoresDeletedErrorBlockMarkers(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,4 +1,4 @@
+-  if err != nil {
++  if failure != nil {
++      conn.Close()
++      return failure
++  }
+`)
+	got := SLP107{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when only deleted line contains error marker, got %d", len(got))
 	}
 }
 

@@ -69,6 +69,34 @@ func TestSLP094_IgnoresWorkflowLikeYamlOutsideCILocations(t *testing.T) {
 	}
 }
 
+func TestSLP094_IgnoresNonRunYAMLMetadata(t *testing.T) {
+	d := parseDiff(t, `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -1,1 +1,4 @@
++  env:
++    BUILD_NOTE: "npm test || true"
+`)
+	got := SLP094{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for non-run yaml metadata, got %d", len(got))
+	}
+}
+
+func TestSLP094_FiresOnRunBlockScalarCommand(t *testing.T) {
+	d := parseDiff(t, `diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -1,3 +1,5 @@
+   run: |
++    npm test || true
+`)
+	got := SLP094{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for run block scalar command")
+	}
+}
+
 func TestSLP094_Description(t *testing.T) {
 	r := SLP094{}
 	if r.ID() != "SLP094" {

@@ -119,6 +119,19 @@ func TestSLP104_DoesNotFireOnIdentifierContainingLimit(t *testing.T) {
 	}
 }
 
+func TestSLP104_DoesNotFireOnBareLimitIdentifier(t *testing.T) {
+	d := parseDiff(t, `diff --git a/config.go b/config.go
+--- a/config.go
++++ b/config.go
+@@ -1,1 +1,3 @@
++  limit := 4096
+`)
+	got := SLP104{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for bare limit identifier, got %d", len(got))
+	}
+}
+
 func TestSLP104_Description(t *testing.T) {
 	r := SLP104{}
 	if r.ID() != "SLP104" {

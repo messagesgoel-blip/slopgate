@@ -19,6 +19,7 @@ func (SLP094) Description() string {
 }
 
 var slp094SilentFail = regexp.MustCompile(`\|\|\s*(?:true|:)\s*;?\s*(?:\s|$)`)
+var slp094YAMLRunLine = regexp.MustCompile(`^\s*run\s*:\s*(.*)$`)
 
 func (r SLP094) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -29,19 +30,79 @@ func (r SLP094) Check(d *diff.Diff) []Finding {
 		if !isShellLikeFile(f.Path) {
 			continue
 		}
-		for _, ln := range f.AddedLines() {
-			if slp094IsCommentOnlyLine(ln.Content) {
+		for _, candidate := range slp094CommandCandidates(f) {
+			if slp094IsCommentOnlyLine(candidate.command) {
 				continue
 			}
-			if slp094SilentFail.MatchString(ln.Content) {
+			if slp094SilentFail.MatchString(candidate.command) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
-					Line:     ln.NewLineNo,
+					Line:     candidate.line.NewLineNo,
 					Message:  "|| true or || : suppresses command failure — handle the error or explicitly comment why it's safe",
-					Snippet:  ln.Content,
+					Snippet:  candidate.line.Content,
 				})
+			}
+		}
+	}
+	return out
+}
+
+type slp094CommandCandidate struct {
+	line    diff.Line
+	command string
+}
+
+func slp094CommandCandidates(f diff.File) []slp094CommandCandidate {
+	if !slp094IsYAMLFile(f.Path) {
+		out := make([]slp094CommandCandidate, 0, len(f.AddedLines()))
+		for _, ln := range f.AddedLines() {
+			out = append(out, slp094CommandCandidate{line: ln, command: ln.Content})
+		}
+		return out
+	}
+
+	var out []slp094CommandCandidate
+	for _, h := range f.Hunks {
+		inRunBlock := false
+		runIndent := -1
+		for _, ln := range h.Lines {
+			if ln.Kind == diff.LineDelete {
+				continue
+			}
+
+			content := ln.Content
+			trim := strings.TrimSpace(content)
+			indent := slp094Indent(content)
+
+			if inRunBlock {
+				if trim != "" && indent <= runIndent {
+					inRunBlock = false
+				} else {
+					if ln.Kind == diff.LineAdd {
+						out = append(out, slp094CommandCandidate{line: ln, command: trim})
+					}
+					continue
+				}
+			}
+
+			match := slp094YAMLRunLine.FindStringSubmatch(content)
+			if len(match) == 0 {
+				continue
+			}
+
+			value := strings.TrimSpace(match[1])
+			if value == "" {
+				continue
+			}
+			if strings.HasPrefix(value, "|") || strings.HasPrefix(value, ">") {
+				inRunBlock = true
+				runIndent = indent
+				continue
+			}
+			if ln.Kind == diff.LineAdd {
+				out = append(out, slp094CommandCandidate{line: ln, command: value})
 			}
 		}
 	}
@@ -55,6 +116,15 @@ func slp094IsCommentOnlyLine(content string) bool {
 		strings.HasPrefix(trim, "//") ||
 		strings.HasPrefix(trim, "/*") ||
 		strings.HasPrefix(trim, "*/")
+}
+
+func slp094IsYAMLFile(path string) bool {
+	lower := strings.ToLower(path)
+	return strings.HasSuffix(lower, ".yml") || strings.HasSuffix(lower, ".yaml")
+}
+
+func slp094Indent(content string) int {
+	return len(content) - len(strings.TrimLeft(content, " \t"))
 }
 
 func isShellLikeFile(path string) bool {

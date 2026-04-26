@@ -43,6 +43,20 @@ func TestSLP092_IgnoresEnvelopeObjectMock(t *testing.T) {
 	}
 }
 
+func TestSLP092_FiresOnDataOnlyMockShape(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api.test.ts b/api.test.ts
+--- a/api.test.ts
++++ b/api.test.ts
+@@ -1,1 +1,5 @@
++  mockResolvedValue({ data: items });
++  const { ok, data } = await getItems();
+`)
+	got := SLP092{}.Check(d)
+	if len(got) == 0 {
+		t.Fatalf("expected findings for data-only mock shape, got %d", len(got))
+	}
+}
+
 func TestSLP092_IgnoresNonTestFiles(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api.ts b/api.ts
 --- a/api.ts

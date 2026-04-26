@@ -21,7 +21,7 @@ func (SLP097) Description() string {
 
 var slp097DestructureData = regexp.MustCompile(`(?i)(?:const|let|var)\s*\{[^}]*\bdata\b[^}]*\}\s*=\s*(?:await\s+)?\w+(?:\.\w+\([^)]*\))+`)
 
-var slp097NoOkCheck = regexp.MustCompile(`(?i)fetch\(.+?\)\s*\.then\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)(?:\s*:\s*[^)\r\n]+)?\s*\)?\s*=>\s*([A-Za-z_$][\w$]*)\s*\.json\s*\(\s*\)`)
+var slp097NoOkCheck = regexp.MustCompile(`(?i)\bfetch\b\(.+?\)\s*\.then\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)(?:\s*:\s*[^)\r\n]+)?\s*\)?\s*=>\s*([A-Za-z_$][\w$]*)\s*\.json\s*\(\s*\)`)
 
 func slp097MatchesNoOkCheck(content string) bool {
 	match := slp097NoOkCheck.FindStringSubmatch(content)

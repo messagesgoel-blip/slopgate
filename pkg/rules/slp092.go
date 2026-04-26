@@ -26,7 +26,7 @@ var slp092DoubleUnwrap = regexp.MustCompile(`(?i)(?:\.data){2,}\b|res\.data\.dat
 
 var slp092NoEnvelopeMock = regexp.MustCompile(`(?i)mock(?:Implementation|ReturnValue|ResolvedValue|RejectedValue)(?:Once)?\s*\(\s*(?:(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\(?\s*)?\{`)
 
-var slp092EnvelopeKey = regexp.MustCompile(`(?i)\b(?:ok|status|success|data)\b\s*(?::|,|\})`)
+var slp092EnvelopeKey = regexp.MustCompile(`(?i)\b(?:ok|status|success)\b\s*(?::|,|\})`)
 
 var slp092EnvelopeDestructure = regexp.MustCompile(`(?i)(?:const|let|var)\s*\{[^}]*\b(?:ok|status|success)\b[^}]*\}\s*=.*await`)
 

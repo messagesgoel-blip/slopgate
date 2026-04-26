@@ -81,6 +81,27 @@ func slp109NextNonEmptyLine(lines []diff.Line, start int) string {
 	return ""
 }
 
+func slp109CollectSignature(lines []diff.Line, start int) (string, int, bool) {
+	var parts []string
+	for i := start; i < len(lines); i++ {
+		if lines[i].Kind == diff.LineDelete {
+			continue
+		}
+		content := strings.TrimSpace(lines[i].Content)
+		if content == "" {
+			continue
+		}
+		parts = append(parts, content)
+		if strings.Contains(content, "{") {
+			return strings.Join(parts, " "), i, true
+		}
+		if strings.Contains(content, ";") {
+			return "", 0, false
+		}
+	}
+	return "", 0, false
+}
+
 func (r SLP109) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -103,40 +124,42 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 			braceDepth := 0
 			var cur funcBody
 
-			for idx, ln := range h.Lines {
-				content := strings.TrimSpace(ln.Content)
-
-				if !inFunc && ln.Kind != diff.LineAdd {
+			for idx := 0; idx < len(h.Lines); idx++ {
+				ln := h.Lines[idx]
+				if !inFunc {
+					if ln.Kind != diff.LineAdd {
+						continue
+					}
+					content := strings.TrimSpace(ln.Content)
+					if !slp109HasFuncKeyword(content) {
+						continue
+					}
+					sig, bodyStart, ok := slp109CollectSignature(h.Lines, idx)
+					if !ok {
+						continue
+					}
+					inFunc = true
+					braceDepth = 0
+					cur = funcBody{sigLine: ln.NewLineNo, sig: sig}
+					idx = bodyStart - 1
 					continue
 				}
 
-				if !inFunc && strings.Contains(content, "(") && strings.Contains(content, ")") {
-					if slp109HasFuncKeyword(content) {
-						inFunc = true
-						braceDepth = 0
-						cur = funcBody{sigLine: ln.NewLineNo, sig: content}
-						if !strings.Contains(content, "{") {
-							next := slp109NextNonEmptyLine(h.Lines, idx+1)
-							if !strings.Contains(next, "{") {
-								inFunc = false
-								continue
-							}
-						}
-					}
+				if ln.Kind == diff.LineDelete {
+					continue
 				}
+				content := strings.TrimSpace(ln.Content)
 
-				if inFunc {
-					braceDepth += strings.Count(content, "{")
-					braceDepth -= strings.Count(content, "}")
-					if ln.Kind == diff.LineAdd && ln.NewLineNo != cur.sigLine && content != "{" && content != "}" {
-						cur.body = append(cur.body, content)
+				braceDepth += strings.Count(content, "{")
+				braceDepth -= strings.Count(content, "}")
+				if ln.Kind == diff.LineAdd && ln.NewLineNo != cur.sigLine && content != "{" && content != "}" {
+					cur.body = append(cur.body, content)
+				}
+				if braceDepth <= 0 && strings.Contains(content, "}") {
+					if len(cur.body) > 0 {
+						funcs = append(funcs, cur)
 					}
-					if braceDepth <= 0 && strings.Contains(content, "}") {
-						if len(cur.body) > 0 {
-							funcs = append(funcs, cur)
-						}
-						inFunc = false
-					}
+					inFunc = false
 				}
 			}
 		}

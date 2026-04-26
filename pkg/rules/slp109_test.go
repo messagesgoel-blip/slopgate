@@ -78,6 +78,35 @@ func TestSLP109_FiresWhenBraceStartsOnNextLine(t *testing.T) {
 	}
 }
 
+func TestSLP109_FiresOnWrappedParameterList(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handlers.go b/handlers.go
+--- a/handlers.go
++++ b/handlers.go
+@@ -1,1 +1,24 @@
++func ProcessUser(
++    id string,
++    mode string,
++) error {
++    validate(id)
++    log.Printf("processing %s", id)
++    return db.Insert("users", id)
++}
++
++func ProcessItem(
++    id string,
++    mode string,
++) error {
++    validate(id)
++    log.Printf("processing %s", id)
++    return db.Insert("items", id)
++}
+`)
+	got := SLP109{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for wrapped parameter list")
+	}
+}
+
 func TestSLP109_EmitsAtMostOneFindingPerTargetFunction(t *testing.T) {
 	d := parseDiff(t, `diff --git a/handlers.go b/handlers.go
 --- a/handlers.go

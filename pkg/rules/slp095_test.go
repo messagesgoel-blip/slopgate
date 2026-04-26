@@ -44,6 +44,23 @@ func TestSLP095_FiresOnExceptReturnNone(t *testing.T) {
 	}
 }
 
+func TestSLP095_NoFireOnExceptWithRaiseAndOuterReturn(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.py b/handler.py
+--- a/handler.py
++++ b/handler.py
+@@ -1,1 +1,6 @@
++  try:
++      do_thing()
++  except Exception:
++      raise
++  return None
+`)
+	got := SLP095{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for except with raise and outer return, got %d", len(got))
+	}
+}
+
 func TestSLP095_IgnoresTestFiles(t *testing.T) {
 	d := parseDiff(t, `diff --git a/handler.test.js b/handler.test.js
 --- a/handler.test.js

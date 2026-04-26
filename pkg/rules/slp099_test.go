@@ -55,6 +55,41 @@ func TestSLP099_FiresOnUntaggedResponseFieldWithoutTestUpdate(t *testing.T) {
 	}
 }
 
+func TestSLP099_FiresOnTSInterfacePropWithoutTestUpdate(t *testing.T) {
+	d := parseDiff(t, `diff --git a/response.ts b/response.ts
+--- a/response.ts
++++ b/response.ts
+@@ -1,3 +1,4 @@
+ export interface ApiResponse {
++  slug: string;
+ }
+`)
+	got := SLP099{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for TS response field without test")
+	}
+}
+
+func TestSLP099_NoFireOnTSInterfacePropWithSpecUpdate(t *testing.T) {
+	d := parseDiff(t, `diff --git a/response.ts b/response.ts
+--- a/response.ts
++++ b/response.ts
+@@ -1,3 +1,4 @@
+ export interface ApiResponse {
++  slug: string;
+ }
+diff --git a/response.spec.ts b/response.spec.ts
+--- a/response.spec.ts
++++ b/response.spec.ts
+@@ -1,1 +1,3 @@
++  it("covers response field", () => {})
+`)
+	got := SLP099{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for TS response field with spec update, got %d", len(got))
+	}
+}
+
 func TestSLP099_DoesNotTreatContainsMatchAsRelatedTest(t *testing.T) {
 	d := parseDiff(t, `diff --git a/response.go b/response.go
 --- a/response.go
@@ -72,6 +107,21 @@ diff --git a/response_profile_test.go b/response_profile_test.go
 	got := SLP099{}.Check(d)
 	if len(got) == 0 {
 		t.Fatal("expected finding when only containing-stem test file changed")
+	}
+}
+
+func TestSLP099_IgnoresResultCacheFile(t *testing.T) {
+	d := parseDiff(t, `diff --git a/result_cache.ts b/result_cache.ts
+--- a/result_cache.ts
++++ b/result_cache.ts
+@@ -1,3 +1,4 @@
+ export interface ResultCacheEntry {
++  slug: string;
+ }
+`)
+	got := SLP099{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for result_cache.ts, got %d", len(got))
 	}
 }
 

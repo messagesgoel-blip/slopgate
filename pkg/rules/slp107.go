@@ -18,7 +18,8 @@ func (SLP107) Description() string {
 	return "cleanup/destroy only in error path — ensure cleanup runs on success too"
 }
 
-var slp107Cleanup = regexp.MustCompile(`(?i)(?:Close|Destroy|Cleanup|Release|Remove|Delete|Cancel)\s*\(`)
+var slp107Cleanup = regexp.MustCompile(`(?i)\b(?:Close|Destroy|Cleanup|Release|Remove|Delete|Cancel|Free)\b\s*(?:\(|$)`)
+var slp107IdentifierPattern = regexp.MustCompile(`(?i)\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*(?:close|destroy|cleanup|release|remove|delete|cancel|free)\b\s*(?:\(|$)`)
 
 func (r SLP107) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -38,16 +39,21 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 			inErrorBlock := false
 			errorBraceDepth := 0
 			errorIndentLevel := -1
+			errorBlockStart := -1
 			var cleanupLines []diff.Line
 
 			for k := range h.Lines {
 				ln := &h.Lines[k]
+				if ln.Kind == diff.LineDelete {
+					continue
+				}
 				content := strings.TrimSpace(ln.Content)
 				cLower := strings.ToLower(content)
 
 				if !inErrorBlock {
 					if strings.Contains(cLower, "if err") || strings.Contains(cLower, "catch") || strings.Contains(cLower, "except") {
 						inErrorBlock = true
+						errorBlockStart = k
 						if isPython {
 							errorIndentLevel = len(ln.Content) - len(strings.TrimLeft(ln.Content, " \t"))
 						} else {
@@ -63,11 +69,12 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 						}
 
 						// Check if the block closed immediately (one-liner)
-						if (!isPython && errorBraceDepth <= 0 && strings.Contains(content, "}")) || (isPython && k+1 < len(h.Lines) && getIndent(h.Lines[k+1].Content) <= errorIndentLevel) {
+						if (!isPython && errorBraceDepth <= 0 && strings.Contains(content, "}")) || (isPython && slp107NextNonDeletedIndent(h.Lines, k+1) <= errorIndentLevel) {
 							if len(cleanupLines) > 0 {
-								r.emitIfNoSuccessCleanup(&out, f.Path, cleanupLines, h, k+1)
+								r.emitIfNoSuccessCleanup(&out, f.Path, cleanupLines, h, errorBlockStart, k+1)
 							}
 							inErrorBlock = false
+							errorBlockStart = -1
 							cleanupLines = nil
 						}
 					}
@@ -79,13 +86,15 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 					// (Ignoring blank lines)
 					if content != "" && getIndent(ln.Content) <= errorIndentLevel {
 						if len(cleanupLines) > 0 {
-							r.emitIfNoSuccessCleanup(&out, f.Path, cleanupLines, h, k)
+							r.emitIfNoSuccessCleanup(&out, f.Path, cleanupLines, h, errorBlockStart, k)
 						}
 						inErrorBlock = false
+						errorBlockStart = -1
 						cleanupLines = nil
 						// Re-check if this line starts a new error block
 						if strings.Contains(cLower, "if err") || strings.Contains(cLower, "catch") || strings.Contains(cLower, "except") {
 							inErrorBlock = true
+							errorBlockStart = k
 							errorIndentLevel = len(ln.Content) - len(strings.TrimLeft(ln.Content, " \t"))
 							if ln.Kind == diff.LineAdd && slp107Cleanup.MatchString(content) {
 								cleanupLines = append(cleanupLines, *ln)
@@ -104,37 +113,47 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 
 				if !isPython && errorBraceDepth <= 0 && strings.Contains(content, "}") {
 					if len(cleanupLines) > 0 {
-						r.emitIfNoSuccessCleanup(&out, f.Path, cleanupLines, h, k+1)
+						r.emitIfNoSuccessCleanup(&out, f.Path, cleanupLines, h, errorBlockStart, k+1)
 					}
 					inErrorBlock = false
+					errorBlockStart = -1
 					cleanupLines = nil
 				}
 			}
 			// End of hunk also closes any open error block
 			if inErrorBlock && len(cleanupLines) > 0 {
-				r.emitIfNoSuccessCleanup(&out, f.Path, cleanupLines, h, len(h.Lines))
+				r.emitIfNoSuccessCleanup(&out, f.Path, cleanupLines, h, errorBlockStart, len(h.Lines))
 			}
 		}
 	}
 	return out
 }
 
-func (r SLP107) emitIfNoSuccessCleanup(out *[]Finding, filePath string, cleanupLines []diff.Line, hunk *diff.Hunk, startIndex int) {
+func (r SLP107) emitIfNoSuccessCleanup(out *[]Finding, filePath string, cleanupLines []diff.Line, hunk *diff.Hunk, blockStart, startIndex int) {
 	for _, cl := range cleanupLines {
 		identifier := extractIdentifier(cl.Content)
 		foundSuccess := false
+		for j := blockStart - 1; j >= 0; j-- {
+			ln := hunk.Lines[j]
+			if ln.Kind == diff.LineDelete {
+				continue
+			}
+			if slp107LineMatchesCleanup(ln.Content, identifier) {
+				foundSuccess = true
+				break
+			}
+		}
+		if foundSuccess {
+			continue
+		}
 		for j := startIndex; j < len(hunk.Lines); j++ {
 			ln := hunk.Lines[j]
 			if ln.Kind == diff.LineDelete {
 				continue
 			}
-			// Success path cleanup could be an existing line or a newly added line
-			content := ln.Content
-			if slp107Cleanup.MatchString(content) || strings.Contains(strings.ToLower(content), "defer ") {
-				if identifier == "" || strings.Contains(content, identifier) {
-					foundSuccess = true
-					break
-				}
+			if slp107LineMatchesCleanup(ln.Content, identifier) {
+				foundSuccess = true
+				break
 			}
 		}
 
@@ -151,6 +170,27 @@ func (r SLP107) emitIfNoSuccessCleanup(out *[]Finding, filePath string, cleanupL
 	}
 }
 
+func slp107LineMatchesCleanup(content string, identifier string) bool {
+	lower := strings.ToLower(content)
+	if !slp107Cleanup.MatchString(content) && !strings.Contains(lower, "defer ") {
+		return false
+	}
+	if identifier == "" {
+		return slp107Cleanup.MatchString(content) || strings.Contains(lower, "defer ")
+	}
+	return extractIdentifier(content) == identifier
+}
+
+func slp107NextNonDeletedIndent(lines []diff.Line, start int) int {
+	for i := start; i < len(lines); i++ {
+		if lines[i].Kind == diff.LineDelete {
+			continue
+		}
+		return getIndent(lines[i].Content)
+	}
+	return -1
+}
+
 func getIndent(s string) int {
 	trimmed := strings.TrimLeft(s, " \t")
 	if trimmed == "" {
@@ -161,19 +201,9 @@ func getIndent(s string) int {
 
 func extractIdentifier(content string) string {
 	content = strings.TrimSpace(content)
-	idx := strings.Index(content, ".Close")
-	if idx == -1 {
-		idx = strings.Index(content, ".Destroy")
-	}
-	if idx == -1 {
-		idx = strings.Index(content, ".Cleanup")
-	}
-	if idx > 0 {
-		start := idx - 1
-		for start >= 0 && isAlphaNumeric(content[start]) {
-			start--
-		}
-		return content[start+1 : idx]
+	match := slp107IdentifierPattern.FindStringSubmatch(content)
+	if len(match) == 2 {
+		return match[1]
 	}
 	return ""
 }

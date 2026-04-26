@@ -28,7 +28,7 @@ var slp091JSDate = regexp.MustCompile(`new\s+Date\s*\(\s*["'\x60]`)
 
 var slp091SQLDate = regexp.MustCompile(`(?i)(expires?_?at|valid_until|not_after|expiry_date)\s*[:=]\s*\d`)
 
-var slp091Timestamp = regexp.MustCompile(`(?i)"(?:expires?_?(?:at|in)|ttl|deadline)"\s*[:=]\s*\d{10,13}\b|(?i)(expires?_?(?:at|in)|ttl|deadline)\s*=\s*\d{10,13}\b`)
+var slp091Timestamp = regexp.MustCompile(`(?i)"(?:expires?_?(?:at|in)|ttl|deadline)"\s*[:=]\s*\d{10,13}\b|(?i)(expires?_?(?:at|in)|ttl|deadline)\s*[:=]\s*\d{10,13}\b`)
 
 var testFileSuffixes = []string{
 	"_test.go", ".test.go", "_test.py", ".test.js", ".test.ts", ".test.tsx", ".test.jsx",

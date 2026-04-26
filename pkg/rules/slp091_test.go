@@ -118,6 +118,19 @@ func TestSLP091_FiresOnHardcodedTimestampInTest(t *testing.T) {
 	}
 }
 
+func TestSLP091_FiresOnUnquotedTimestampWithColon(t *testing.T) {
+	d := parseDiff(t, `diff --git a/auth_test.go b/auth_test.go
+--- a/auth_test.go
++++ b/auth_test.go
+@@ -1,1 +1,3 @@
++  ttl: 1712345678,
+`)
+	got := SLP091{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for unquoted timestamp with colon")
+	}
+}
+
 func TestSLP091_Description(t *testing.T) {
 	r := SLP091{}
 	if r.ID() != "SLP091" {
