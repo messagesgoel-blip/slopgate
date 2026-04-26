@@ -17,23 +17,20 @@ func (SLP112) Description() string {
 	return "generated file committed without corresponding source — commit the source file too"
 }
 
-var slp112GeneratedSuffixes = []string{
-	".pb.go", ".pb.gw.go", "_generated.go", "_generated.ts", "_generated.js",
-	".min.js", ".min.css", ".grpc.go",
-	".pb.d.ts", ".pb.js",
-}
-
-var slp112KnownSourceMappings = map[string]string{
-	".pb.go":        ".proto",
-	".pb.gw.go":     ".proto",
-	".grpc.go":      ".proto",
-	"_generated.go": ".proto",
-	"_generated.ts": ".proto",
-	"_generated.js": ".proto",
-	".min.js":       ".js",
-	".min.css":      ".css",
-	".pb.d.ts":      ".proto",
-	".pb.js":        ".proto",
+var slp112SuffixMappings = []struct {
+	generated string
+	source    string
+}{
+	{generated: ".pb.go", source: ".proto"},
+	{generated: ".pb.gw.go", source: ".proto"},
+	{generated: "_generated.go", source: ".proto"},
+	{generated: "_generated.ts", source: ".proto"},
+	{generated: "_generated.js", source: ".proto"},
+	{generated: ".min.js", source: ".js"},
+	{generated: ".min.css", source: ".css"},
+	{generated: ".grpc.go", source: ".proto"},
+	{generated: ".pb.d.ts", source: ".proto"},
+	{generated: ".pb.js", source: ".proto"},
 }
 
 func (r SLP112) Check(d *diff.Diff) []Finding {
@@ -46,18 +43,14 @@ func (r SLP112) Check(d *diff.Diff) []Finding {
 	}
 
 	for _, f := range d.Files {
-		if f.IsDelete || isDocFile(f.Path) || !f.IsNew {
+		if f.IsDelete || isDocFile(f.Path) {
 			continue
 		}
 
-		for _, suffix := range slp112GeneratedSuffixes {
-			if strings.HasSuffix(f.Path, suffix) {
-				sourceExt, ok := slp112KnownSourceMappings[suffix]
-				if !ok {
-					continue
-				}
-				base := strings.TrimSuffix(f.Path, suffix)
-				sourceFile := base + sourceExt
+		for _, mapping := range slp112SuffixMappings {
+			if strings.HasSuffix(f.Path, mapping.generated) {
+				base := strings.TrimSuffix(f.Path, mapping.generated)
+				sourceFile := base + mapping.source
 				if !allFiles[sourceFile] {
 					out = append(out, Finding{
 						RuleID:   r.ID(),

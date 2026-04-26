@@ -29,6 +29,26 @@ func TestSLP093_NoFireOnMockWithAssertion(t *testing.T) {
 	}
 }
 
+func TestSLP093_NoFireOnPythonAssertStatement(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api_test.py b/api_test.py
+--- a/api_test.py
++++ b/api_test.py
+@@ -1,1 +1,4 @@
++  stub_client = mock()
++  assert result.ok
+`)
+	got := SLP093{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for Python assert statement, got %d", len(got))
+	}
+}
+
+func TestSLP093_CommentOnlyLineDoesNotTreatPointerCodeAsComment(t *testing.T) {
+	if isCommentOnlyLine("*ptr = value") {
+		t.Fatal("expected pointer dereference line to be treated as code")
+	}
+}
+
 func TestSLP093_Description(t *testing.T) {
 	r := SLP093{}
 	if r.ID() != "SLP093" {

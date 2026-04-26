@@ -40,6 +40,19 @@ new file mode 100644
 	}
 }
 
+func TestSLP112_FiresOnModifiedGeneratedFileWithoutSource(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/api.pb.go b/api/api.pb.go
+--- a/api/api.pb.go
++++ b/api/api.pb.go
+@@ -1,3 +1,4 @@
++// Updated generated code
+`)
+	got := SLP112{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for modified generated file without source")
+	}
+}
+
 func TestSLP112_IgnoresNonGeneratedFiles(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api/handler.go b/api/handler.go
 new file mode 100644

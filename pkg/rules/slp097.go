@@ -21,7 +21,12 @@ func (SLP097) Description() string {
 
 var slp097DestructureData = regexp.MustCompile(`(?i)(?:const|let|var)\s*\{[^}]*\bdata\b[^}]*\}\s*=\s*(?:await\s+)?\w+(?:\.\w+\([^)]*\))+`)
 
-var slp097NoOkCheck = regexp.MustCompile(`(?i)fetch\(.+?\)\s*\.then\s*\(\s*\(?\s*(?:res|response)(?:\s*:\s*[^)\r\n]+)?\s*\)?\s*=>\s*(?:res|response)\s*\.json\s*\(\s*\)`)
+var slp097NoOkCheck = regexp.MustCompile(`(?i)fetch\(.+?\)\s*\.then\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)(?:\s*:\s*[^)\r\n]+)?\s*\)?\s*=>\s*([A-Za-z_$][\w$]*)\s*\.json\s*\(\s*\)`)
+
+func slp097MatchesNoOkCheck(content string) bool {
+	match := slp097NoOkCheck.FindStringSubmatch(content)
+	return len(match) == 3 && match[1] == match[2]
+}
 
 func (r SLP097) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -50,7 +55,7 @@ func (r SLP097) Check(d *diff.Diff) []Finding {
 				})
 			}
 
-			if slp097NoOkCheck.MatchString(content) {
+			if slp097MatchesNoOkCheck(content) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

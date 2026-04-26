@@ -33,6 +33,37 @@ func TestSLP102_NoFireOnAsyncWithAwait(t *testing.T) {
 	}
 }
 
+func TestSLP102_FiresOnMultilineAsyncDeclarationWithoutAwait(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api.ts b/api.ts
+--- a/api.ts
++++ b/api.ts
+@@ -1,1 +1,6 @@
++const getItems = async () =>
++{
++    return [];
++}
+`)
+	got := SLP102{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for multiline async declaration without await")
+	}
+}
+
+func TestSLP102_FiresWhenClosingBraceIsContextLine(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api.ts b/api.ts
+--- a/api.ts
++++ b/api.ts
+@@ -1,3 +1,3 @@
++async function getItems() {
++    return [];
+ }
+`)
+	got := SLP102{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings when closing brace is a context line")
+	}
+}
+
 func TestSLP102_IgnoresNonJSTS(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api.go b/api.go
 --- a/api.go

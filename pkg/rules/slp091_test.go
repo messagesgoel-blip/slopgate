@@ -82,6 +82,27 @@ func TestSLP091_IgnoresOldHistoricalDates(t *testing.T) {
 	}
 }
 
+func TestSLP091_IgnoresHistoricalDateWhenLineAlsoMentionsFutureYear(t *testing.T) {
+	d := parseDiff(t, `diff --git a/app.test.ts b/app.test.ts
+--- a/app.test.ts
++++ b/app.test.ts
+@@ -1,1 +1,3 @@
+ describe("app", () => {
++  const createdAt = "2019-03-15T00:00:00Z"; const note = "ticket-2026";
+ })
+`)
+	got := SLP091{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for historical date with unrelated 2026 token, got %d", len(got))
+	}
+}
+
+func TestSLP091_IsTestFileDetectsCaseInsensitiveTestDirs(t *testing.T) {
+	if !isTestFile("pkg/TestData/fixture.json") {
+		t.Fatal("expected TestData directory to be treated as test content")
+	}
+}
+
 func TestSLP091_FiresOnHardcodedTimestampInTest(t *testing.T) {
 	d := parseDiff(t, `diff --git a/auth_test.go b/auth_test.go
 --- a/auth_test.go

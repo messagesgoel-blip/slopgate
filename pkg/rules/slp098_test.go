@@ -46,6 +46,42 @@ diff --git a/routes_test.go b/routes_test.go
 	}
 }
 
+func TestSLP098_FiresWhenRelatedTestHasNoAddedLines(t *testing.T) {
+	d := parseDiff(t, `diff --git a/routes.go b/routes.go
+--- a/routes.go
++++ b/routes.go
+@@ -1,1 +1,3 @@
++  mux.HandleFunc("/api/items", itemsHandler)
+diff --git a/routes_test.go b/routes_test.go
+--- a/routes_test.go
++++ b/routes_test.go
+@@ -1,1 +1,0 @@
+-  func TestOldItemsHandler(t *testing.T) {}
+`)
+	got := SLP098{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when related test has no added lines, got %d", len(got))
+	}
+}
+
+func TestSLP098_DoesNotTreatPrefixMatchAsRelatedTest(t *testing.T) {
+	d := parseDiff(t, `diff --git a/user.go b/user.go
+--- a/user.go
++++ b/user.go
+@@ -1,1 +1,3 @@
++  router.Handle("/users", usersHandler)
+diff --git a/user_profile_test.go b/user_profile_test.go
+--- a/user_profile_test.go
++++ b/user_profile_test.go
+@@ -1,1 +1,3 @@
++  func TestUserProfile(t *testing.T) {}
+`)
+	got := SLP098{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when only prefixed test file changed, got %d", len(got))
+	}
+}
+
 func TestSLP098_Description(t *testing.T) {
 	r := SLP098{}
 	if r.ID() != "SLP098" {

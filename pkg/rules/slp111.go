@@ -28,11 +28,11 @@ var slp111BinaryExtensions = map[string]bool{
 	".7z": true, ".rar": true, ".pdb": true, ".ds_store": true,
 }
 
-var knownExtensionless = map[string]bool{
-	"Makefile": true, "Dockerfile": true, "LICENSE": true, "README": true,
-	"CHANGELOG": true, "CONTRIBUTORS": true, "NOTICE": true, "AUTHORS": true,
-	"Vagrantfile": true, "Procfile": true, "Rakefile": true, "Gemfile": true,
-	"Jenkinsfile": true, "VERSION": true, "go.mod": false, "go.sum": false,
+var knownExtensionless = map[string]struct{}{
+	"Makefile": {}, "Dockerfile": {}, "LICENSE": {}, "README": {},
+	"CHANGELOG": {}, "CONTRIBUTORS": {}, "NOTICE": {}, "AUTHORS": {},
+	"Vagrantfile": {}, "Procfile": {}, "Rakefile": {}, "Gemfile": {},
+	"Jenkinsfile": {}, "VERSION": {},
 }
 
 func (r SLP111) Check(d *diff.Diff) []Finding {
@@ -62,7 +62,10 @@ func (r SLP111) Check(d *diff.Diff) []Finding {
 
 		if f.IsNew && ext == "" {
 			base := path.Base(f.Path)
-			if !knownExtensionless[base] {
+			if strings.HasPrefix(base, ".") {
+				continue
+			}
+			if _, ok := knownExtensionless[base]; !ok {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

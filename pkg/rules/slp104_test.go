@@ -28,6 +28,19 @@ func TestSLP104_FiresOnBufioReaderSize(t *testing.T) {
 	}
 }
 
+func TestSLP104_FiresOnNestedBufioReaderSize(t *testing.T) {
+	d := parseDiff(t, `diff --git a/reader.go b/reader.go
+--- a/reader.go
++++ b/reader.go
+@@ -1,1 +1,3 @@
++  r := bufio.NewReaderSize(io.LimitReader(f, 1234), 65536)
+`)
+	got := SLP104{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for nested NewReaderSize")
+	}
+}
+
 func TestSLP104_IgnoresTestFiles(t *testing.T) {
 	d := parseDiff(t, `diff --git a/parser.test.go b/parser.test.go
 --- a/parser.test.go
@@ -90,6 +103,19 @@ func TestSLP104_FiresOnLiteralBufferSize(t *testing.T) {
 	got := SLP104{}.Check(d)
 	if len(got) == 0 {
 		t.Fatal("expected findings for bufferSize := 4096")
+	}
+}
+
+func TestSLP104_DoesNotFireOnIdentifierContainingLimit(t *testing.T) {
+	d := parseDiff(t, `diff --git a/config.go b/config.go
+--- a/config.go
++++ b/config.go
+@@ -1,1 +1,3 @@
++  bufferLimitless := 4096
+`)
+	got := SLP104{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for bufferLimitless identifier, got %d", len(got))
 	}
 }
 

@@ -81,6 +81,21 @@ func TestSLP108_FiresOnOpenWithTimeoutNoDefer(t *testing.T) {
 	}
 }
 
+func TestSLP108_FiresOnOpenWithDeferCancelOnly(t *testing.T) {
+	d := parseDiff(t, `diff --git a/db.go b/db.go
+--- a/db.go
++++ b/db.go
+@@ -1,1 +1,6 @@
++  ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++  db, err := sql.Open("postgres", connStr)
++  defer cancel()
+`)
+	got := SLP108{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for open with defer cancel but no db.Close")
+	}
+}
+
 func TestSLP108_Description(t *testing.T) {
 	r := SLP108{}
 	if r.ID() != "SLP108" {

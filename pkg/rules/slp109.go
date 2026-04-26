@@ -62,6 +62,25 @@ func slp109BodySimilarity(a, b []string) float64 {
 	return float64(intersection) / float64(maxLen)
 }
 
+func slp109HasFuncKeyword(content string) bool {
+	cLower := strings.ToLower(content)
+	return strings.Contains(cLower, "func ") ||
+		strings.Contains(cLower, "function ") ||
+		strings.Contains(cLower, "public ") ||
+		strings.Contains(cLower, "private ") ||
+		strings.Contains(cLower, "static ")
+}
+
+func slp109NextNonEmptyLine(lines []diff.Line, start int) string {
+	for i := start; i < len(lines); i++ {
+		content := strings.TrimSpace(lines[i].Content)
+		if content != "" {
+			return content
+		}
+	}
+	return ""
+}
+
 func (r SLP109) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -84,38 +103,32 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 			braceDepth := 0
 			var cur funcBody
 
-			for _, ln := range h.Lines {
-				if ln.Kind != diff.LineAdd {
-					continue
-				}
+			for idx, ln := range h.Lines {
 				content := strings.TrimSpace(ln.Content)
 
-				if !inFunc && strings.Contains(content, "(") && strings.Contains(content, ")") && strings.Contains(content, "{") {
-					cLower := strings.ToLower(content)
-					hasFuncKW := strings.Contains(cLower, "func ") ||
-						strings.Contains(cLower, "function ") ||
-						strings.Contains(cLower, "public ") ||
-						strings.Contains(cLower, "private ") ||
-						strings.Contains(cLower, "static ")
+				if !inFunc && ln.Kind != diff.LineAdd {
+					continue
+				}
 
-					if hasFuncKW {
+				if !inFunc && strings.Contains(content, "(") && strings.Contains(content, ")") {
+					if slp109HasFuncKeyword(content) {
 						inFunc = true
 						braceDepth = 0
 						cur = funcBody{sigLine: ln.NewLineNo, sig: content}
-						braceDepth += strings.Count(content, "{")
-						braceDepth -= strings.Count(content, "}")
-						if braceDepth <= 0 {
-							inFunc = false
-							continue
+						if !strings.Contains(content, "{") {
+							next := slp109NextNonEmptyLine(h.Lines, idx+1)
+							if !strings.Contains(next, "{") {
+								inFunc = false
+								continue
+							}
 						}
-						continue
 					}
 				}
 
 				if inFunc {
 					braceDepth += strings.Count(content, "{")
 					braceDepth -= strings.Count(content, "}")
-					if content != "{" && content != "}" {
+					if ln.Kind == diff.LineAdd && ln.NewLineNo != cur.sigLine && content != "{" && content != "}" {
 						cur.body = append(cur.body, content)
 					}
 					if braceDepth <= 0 && strings.Contains(content, "}") {
@@ -128,8 +141,12 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 			}
 		}
 
+		seen := make(map[int]bool)
 		for i := 0; i < len(funcs); i++ {
 			for j := i + 1; j < len(funcs); j++ {
+				if seen[funcs[j].sigLine] {
+					continue
+				}
 				sim := slp109BodySimilarity(funcs[i].body, funcs[j].body)
 				if sim > 0.6 {
 					out = append(out, Finding{
@@ -140,6 +157,7 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 						Message:  "function body is highly similar to another added function — extract shared logic",
 						Snippet:  funcs[j].sig,
 					})
+					seen[funcs[j].sigLine] = true
 				}
 			}
 		}

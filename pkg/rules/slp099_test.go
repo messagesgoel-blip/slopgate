@@ -8,9 +8,9 @@ func TestSLP099_FiresOnResponseFieldWithoutTestUpdate(t *testing.T) {
 +++ b/response.go
 @@ -1,5 +1,7 @@
  type ItemResponse struct {
-     ID   int    ` + "`json:\"id\"`" + `
-     Name string ` + "`json:\"name\"`" + `
-+    Slug string ` + "`json:\"slug\"`" + `
+     ID   int    `+"`json:\"id\"`"+`
+     Name string `+"`json:\"name\"`"+`
++    Slug string `+"`json:\"slug\"`"+`
  }
 `)
 	got := SLP099{}.Check(d)
@@ -25,8 +25,8 @@ func TestSLP099_NoFireWhenTestAlsoModified(t *testing.T) {
 +++ b/response.go
 @@ -1,3 +1,4 @@
  type ItemResponse struct {
-     ID   int    ` + "`json:\"id\"`" + `
-+    Slug string ` + "`json:\"slug\"`" + `
+     ID   int    `+"`json:\"id\"`"+`
++    Slug string `+"`json:\"slug\"`"+`
  }
 diff --git a/response_test.go b/response_test.go
 --- a/response_test.go
@@ -40,12 +40,47 @@ diff --git a/response_test.go b/response_test.go
 	}
 }
 
+func TestSLP099_FiresOnUntaggedResponseFieldWithoutTestUpdate(t *testing.T) {
+	d := parseDiff(t, `diff --git a/response.go b/response.go
+--- a/response.go
++++ b/response.go
+@@ -1,3 +1,4 @@
+ type ItemResponse struct {
++    Slug string
+ }
+`)
+	got := SLP099{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for untagged response field without test")
+	}
+}
+
+func TestSLP099_DoesNotTreatContainsMatchAsRelatedTest(t *testing.T) {
+	d := parseDiff(t, `diff --git a/response.go b/response.go
+--- a/response.go
++++ b/response.go
+@@ -1,3 +1,4 @@
+ type ItemResponse struct {
++    Slug string `+"`json:\"slug\"`"+`
+ }
+diff --git a/response_profile_test.go b/response_profile_test.go
+--- a/response_profile_test.go
++++ b/response_profile_test.go
+@@ -1,1 +1,3 @@
++  func TestResponseProfile(t *testing.T) {}
+`)
+	got := SLP099{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding when only containing-stem test file changed")
+	}
+}
+
 func TestSLP099_IgnoresNonResponseFiles(t *testing.T) {
 	d := parseDiff(t, `diff --git a/utils.go b/utils.go
 --- a/utils.go
 +++ b/utils.go
 @@ -1,1 +1,3 @@
-+    Helper string ` + "`json:\"helper\"`" + `
++    Helper string `+"`json:\"helper\"`"+`
 `)
 	got := SLP099{}.Check(d)
 	if len(got) != 0 {

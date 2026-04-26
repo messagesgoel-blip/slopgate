@@ -49,6 +49,64 @@ func TestSLP109_NoFireOnDifferentFunctions(t *testing.T) {
 	}
 }
 
+func TestSLP109_FiresWhenBraceStartsOnNextLine(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handlers.go b/handlers.go
+--- a/handlers.go
++++ b/handlers.go
+@@ -1,1 +1,22 @@
++func ProcessUser(id string) error
++{
++    ctx := context.Background()
++    validate(id)
++    log.Printf("processing %s", id)
++    result := db.Insert("users", id)
++    return result
++}
++
++func ProcessItem(id string) error
++{
++    ctx := context.Background()
++    validate(id)
++    log.Printf("processing %s", id)
++    result := db.Insert("items", id)
++    return result
++}
+`)
+	got := SLP109{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for duplicate multiline function signatures")
+	}
+}
+
+func TestSLP109_EmitsAtMostOneFindingPerTargetFunction(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handlers.go b/handlers.go
+--- a/handlers.go
++++ b/handlers.go
+@@ -1,1 +1,26 @@
++func ProcessUser(id string) error {
++    validate(id)
++    log.Printf("processing %s", id)
++    return db.Insert("users", id)
++}
++
++func ProcessItem(id string) error {
++    validate(id)
++    log.Printf("processing %s", id)
++    return db.Insert("items", id)
++}
++
++func ProcessOrder(id string) error {
++    validate(id)
++    log.Printf("processing %s", id)
++    return db.Insert("orders", id)
++}
+`)
+	got := SLP109{}.Check(d)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 findings for 3 similar functions, got %d", len(got))
+	}
+}
+
 func TestSLP109_Description(t *testing.T) {
 	r := SLP109{}
 	if r.ID() != "SLP109" {

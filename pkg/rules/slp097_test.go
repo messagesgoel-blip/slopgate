@@ -28,6 +28,19 @@ func TestSLP097_FiresOnFetchWithoutOkCheck(t *testing.T) {
 	}
 }
 
+func TestSLP097_IgnoresMismatchedJsonReceiver(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api.ts b/api.ts
+--- a/api.ts
++++ b/api.ts
+@@ -1,1 +1,3 @@
++  fetch("/api/items").then(res => response.json())
+`)
+	got := SLP097{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for mismatched callback receiver, got %d", len(got))
+	}
+}
+
 func TestSLP097_IgnoresTestFiles(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api.test.ts b/api.test.ts
 --- a/api.test.ts

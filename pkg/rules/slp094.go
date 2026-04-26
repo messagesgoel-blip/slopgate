@@ -30,6 +30,9 @@ func (r SLP094) Check(d *diff.Diff) []Finding {
 			continue
 		}
 		for _, ln := range f.AddedLines() {
+			if slp094IsCommentOnlyLine(ln.Content) {
+				continue
+			}
 			if slp094SilentFail.MatchString(ln.Content) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
@@ -43,6 +46,15 @@ func (r SLP094) Check(d *diff.Diff) []Finding {
 		}
 	}
 	return out
+}
+
+func slp094IsCommentOnlyLine(content string) bool {
+	trim := strings.TrimSpace(content)
+	return trim == "" ||
+		strings.HasPrefix(trim, "#") ||
+		strings.HasPrefix(trim, "//") ||
+		strings.HasPrefix(trim, "/*") ||
+		strings.HasPrefix(trim, "*/")
 }
 
 func isShellLikeFile(path string) bool {
@@ -65,9 +77,12 @@ func isShellLikeFile(path string) bool {
 			strings.HasSuffix(base, ".ci.yml") || strings.HasSuffix(base, ".ci.yaml") ||
 			base == "ci"
 
-		return strings.Contains(lower, ".github/workflows") ||
-			isCI ||
-			strings.HasPrefix(base, "workflow")
+		inGitHubWorkflows := strings.HasPrefix(lower, ".github/workflows/") || strings.Contains(lower, "/.github/workflows/")
+		isWorkflow := base == "workflow" ||
+			strings.HasPrefix(base, "workflow.") ||
+			strings.HasPrefix(base, "workflow-")
+
+		return inGitHubWorkflows || isCI || isWorkflow
 	}
 	return false
 }

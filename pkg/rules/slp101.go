@@ -7,14 +7,15 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
-// SLP101 flags feature flag or toggle checks where both branches of the
-// conditional are identical, or one branch is empty. This is a dead flag.
+// SLP101 flags feature-flag conditionals and empty alternate branches.
+// This is a common AI slop pattern: scaffolding a gated branch without
+// clarifying whether the divergence is intentional.
 type SLP101 struct{}
 
 func (SLP101) ID() string                { return "SLP101" }
 func (SLP101) DefaultSeverity() Severity { return SeverityWarn }
 func (SLP101) Description() string {
-	return "dead feature flag — both branches are identical or one is empty"
+	return "feature-flag conditional or empty else branch — review for dead code or unintended scaffolding"
 }
 
 var slp101FlagCheck = regexp.MustCompile(`(?i)(?:if|when)\s*\(?\s*(?:!\s*)?(?:featureFlag|isEnabled|useFeature|feature\(|toggle\(|ldClient|growthbook|unleash\.|flags\[)\w*`)
@@ -36,6 +37,9 @@ func (r SLP101) Check(d *diff.Diff) []Finding {
 
 		for _, ln := range f.AddedLines() {
 			content := strings.TrimSpace(ln.Content)
+			if strings.HasPrefix(content, "//") || (strings.HasPrefix(content, "/*") && strings.HasSuffix(content, "*/")) {
+				continue
+			}
 
 			if slp101FlagCheck.MatchString(content) {
 				out = append(out, Finding{

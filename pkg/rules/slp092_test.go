@@ -15,17 +15,31 @@ func TestSLP092_FiresOnDoubleUnwrap(t *testing.T) {
 	}
 }
 
-func TestSLP092_FiresOnMockEnvelopeMismatch(t *testing.T) {
+func TestSLP092_FiresOnArrowObjectMockWithoutEnvelope(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api.test.ts b/api.test.ts
 --- a/api.test.ts
 +++ b/api.test.ts
 @@ -1,1 +1,5 @@
-+  mockResolvedValue({ data: items });
++  mockImplementation(() => ({ items }));
 +  const { ok, data } = await getItems();
 `)
 	got := SLP092{}.Check(d)
 	if len(got) == 0 {
 		t.Fatalf("expected findings for envelope mismatch, got %d", len(got))
+	}
+}
+
+func TestSLP092_IgnoresEnvelopeObjectMock(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api.test.ts b/api.test.ts
+--- a/api.test.ts
++++ b/api.test.ts
+@@ -1,1 +1,5 @@
++  mockResolvedValue({ ok: true, data: items });
++  const { ok, data } = await getItems();
+`)
+	got := SLP092{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for envelope-shaped mock, got %d", len(got))
 	}
 }
 

@@ -1,7 +1,9 @@
 package rules
 
 import (
+	"path"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -38,7 +40,9 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 			continue
 		}
 		if isTestFile(f.Path) {
-			testFiles[f.Path] = true
+			if len(f.AddedLines()) > 0 {
+				testFiles[f.Path] = true
+			}
 			continue
 		}
 		if isDocFile(f.Path) {
@@ -59,18 +63,21 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 		}
 	}
 
+	routePaths := make([]string, 0, len(routeFiles))
 	for rf := range routeFiles {
+		routePaths = append(routePaths, rf)
+	}
+	sort.Strings(routePaths)
+
+	for _, rf := range routePaths {
 		// Heuristic: check if there's a test file related to this route file.
 		// For example, if rf is "pkg/api/handler.go", look for "pkg/api/handler_test.go".
 		// Or if rf is "src/routes/users.ts", look for "src/routes/users.test.ts" or "src/routes/users.spec.ts".
-		base := rf
-		if i := strings.LastIndex(rf, "."); i >= 0 {
-			base = rf[:i]
-		}
+		base := strings.TrimSuffix(rf, path.Ext(rf))
 
 		foundTest := false
 		for tf := range testFiles {
-			if strings.HasPrefix(tf, base) {
+			if slp098TestTarget(tf) == base {
 				foundTest = true
 				break
 			}
@@ -103,4 +110,19 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 	}
 
 	return out
+}
+
+func slp098TestTarget(testPath string) string {
+	ext := path.Ext(testPath)
+	stem := strings.TrimSuffix(testPath, ext)
+	switch {
+	case strings.HasSuffix(stem, "_test"):
+		return strings.TrimSuffix(stem, "_test")
+	case strings.HasSuffix(stem, ".test"):
+		return strings.TrimSuffix(stem, ".test")
+	case strings.HasSuffix(stem, ".spec"):
+		return strings.TrimSuffix(stem, ".spec")
+	default:
+		return ""
+	}
 }

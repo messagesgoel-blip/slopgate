@@ -88,21 +88,21 @@ func TestSLP107_PythonNoFire(t *testing.T) {
 	}
 }
 
-func TestSLP107_NoFireIfSuccessPathHasCleanup(t *testing.T) {
+func TestSLP107_FiresWhenDeletedSuccessCleanupIsReplacedForDifferentResource(t *testing.T) {
 	d := parseDiff(t, `diff --git a/handler.go b/handler.go
 --- a/handler.go
 +++ b/handler.go
 @@ -1,7 +1,11 @@
-+  if err != nil {
+   if err != nil {
 +      conn.Close()
-+      return err
-+  }
-+  
-+  defer conn.Close()
- `)
+       return err
+   }
+-  defer conn.Close()
++  defer other.Close()
+`)
 	got := SLP107{}.Check(d)
-	if len(got) != 0 {
-		t.Fatalf("expected 0 findings because success path has cleanup, got %d", len(got))
+	if len(got) == 0 {
+		t.Fatal("expected findings when conn cleanup only remains in error path")
 	}
 }
 

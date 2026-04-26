@@ -18,7 +18,7 @@ func (SLP095) Description() string {
 	return "catch block returns silently without handling the error — use throw/reject or log then rethrow"
 }
 
-var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]|{}|""|''|undefined|none)(?:\s|;|$|})`)
+var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]|\{\}|""|''|undefined|none)(?:\s|;|$|})`)
 var slp095CatchRE = regexp.MustCompile(`\bcatch\b`)
 var slp095ExceptRE = regexp.MustCompile(`\bexcept\b`)
 

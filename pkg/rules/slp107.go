@@ -125,6 +125,9 @@ func (r SLP107) emitIfNoSuccessCleanup(out *[]Finding, filePath string, cleanupL
 		foundSuccess := false
 		for j := startIndex; j < len(hunk.Lines); j++ {
 			ln := hunk.Lines[j]
+			if ln.Kind == diff.LineDelete {
+				continue
+			}
 			// Success path cleanup could be an existing line or a newly added line
 			content := ln.Content
 			if slp107Cleanup.MatchString(content) || strings.Contains(strings.ToLower(content), "defer ") {

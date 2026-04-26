@@ -24,7 +24,9 @@ func (SLP092) Description() string {
 
 var slp092DoubleUnwrap = regexp.MustCompile(`(?i)(?:\.data){2,}\b|res\.data\.data\b|response\.data\.data\b`)
 
-var slp092NoEnvelopeMock = regexp.MustCompile(`(?i)mock(?:Implementation|ReturnValue|ResolvedValue|RejectedValue)(?:Once)?\s*\(\s*(?:\(\s*\)\s*=>\s*)?\{`)
+var slp092NoEnvelopeMock = regexp.MustCompile(`(?i)mock(?:Implementation|ReturnValue|ResolvedValue|RejectedValue)(?:Once)?\s*\(\s*(?:(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\(?\s*)?\{`)
+
+var slp092EnvelopeKey = regexp.MustCompile(`(?i)\b(?:ok|status|success|data)\b\s*(?::|,|\})`)
 
 var slp092EnvelopeDestructure = regexp.MustCompile(`(?i)(?:const|let|var)\s*\{[^}]*\b(?:ok|status|success)\b[^}]*\}\s*=.*await`)
 
@@ -42,7 +44,7 @@ func (r SLP092) Check(d *diff.Diff) []Finding {
 		hasEnvelopeDestructure := false
 
 		for _, ln := range f.AddedLines() {
-			if slp092NoEnvelopeMock.MatchString(ln.Content) {
+			if slp092NoEnvelopeMock.MatchString(ln.Content) && !slp092EnvelopeKey.MatchString(ln.Content) {
 				hasNoEnvelopeMock = true
 			}
 			if slp092EnvelopeDestructure.MatchString(ln.Content) {
@@ -62,7 +64,7 @@ func (r SLP092) Check(d *diff.Diff) []Finding {
 
 		if hasNoEnvelopeMock && hasEnvelopeDestructure {
 			for _, ln := range f.AddedLines() {
-				if slp092NoEnvelopeMock.MatchString(ln.Content) {
+				if slp092NoEnvelopeMock.MatchString(ln.Content) && !slp092EnvelopeKey.MatchString(ln.Content) {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),

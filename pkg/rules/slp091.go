@@ -31,7 +31,7 @@ var slp091SQLDate = regexp.MustCompile(`(?i)(expires?_?at|valid_until|not_after|
 var slp091Timestamp = regexp.MustCompile(`(?i)"(?:expires?_?(?:at|in)|ttl|deadline)"\s*[:=]\s*\d{10,13}\b|(?i)(expires?_?(?:at|in)|ttl|deadline)\s*=\s*\d{10,13}\b`)
 
 var testFileSuffixes = []string{
-	"_test.go", "_test.py", ".test.js", ".test.ts", ".test.tsx", ".test.jsx",
+	"_test.go", ".test.go", "_test.py", ".test.js", ".test.ts", ".test.tsx", ".test.jsx",
 	".spec.js", ".spec.ts", ".spec.tsx", ".spec.jsx",
 	"test.java", "tests.java", "_test.rs",
 }
@@ -39,13 +39,16 @@ var testFileSuffixes = []string{
 func isTestFile(path string) bool {
 	lower := strings.ToLower(path)
 	for _, s := range testFileSuffixes {
-		// Use lowercase comparison for both suffix and containment
-		if strings.HasSuffix(lower, s) || strings.Contains(lower, s) {
+		if strings.HasSuffix(lower, s) {
 			return true
 		}
 	}
-	if strings.Contains(lower, "_test.") || strings.Contains(lower, ".test.") || strings.Contains(lower, ".spec.") {
-		return true
+
+	for _, segment := range strings.Split(lower, "/") {
+		switch segment {
+		case "test", "tests", "testdata":
+			return true
+		}
 	}
 	return false
 }
@@ -56,12 +59,7 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
-		// Check for test file markers or inclusion in test directories (including root-level)
-		isTest := isTestFile(f.Path) ||
-			strings.HasPrefix(f.Path, "test/") || strings.HasPrefix(f.Path, "tests/") || strings.HasPrefix(f.Path, "testdata/") ||
-			strings.Contains(f.Path, "/test/") || strings.Contains(f.Path, "/tests/") || strings.Contains(f.Path, "/testdata/")
-
-		if !isTest {
+		if !isTestFile(f.Path) {
 			continue
 		}
 
@@ -87,8 +85,11 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 			case slp091Timestamp.MatchString(content):
 				msg = "hardcoded timestamp in test — use relative time or mock"
 			case slp091ISODate.MatchString(content):
-				if strings.Contains(content, "202") || strings.Contains(content, "203") {
-					msg = "hardcoded date literal in test — consider using a relative date expression"
+				if match := slp091ISODate.FindStringSubmatch(content); len(match) > 1 {
+					year := match[1]
+					if strings.HasPrefix(year, "202") || strings.HasPrefix(year, "203") {
+						msg = "hardcoded date literal in test — consider using a relative date expression"
+					}
 				}
 			}
 			if msg == "" {

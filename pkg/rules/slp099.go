@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"path"
 	"regexp"
 	"strings"
 
@@ -19,9 +20,9 @@ func (SLP099) Description() string {
 	return "response field changed without test update — tests may be stale"
 }
 
-var slp099GoStructField = regexp.MustCompile(`^\s*\w+\s+(?:\[\])?\*?\w+(?:\.\w+)?\s+\x60[^\x60]*\x60`)
+var slp099GoStructField = regexp.MustCompile(`^\s*\w+\s+(?:\[\])?\*?\w+(?:\.\w+)?(?:\s+\x60[^\x60]*\x60)?$`)
 
-var slp099TSInterfaceProp = regexp.MustCompile(`(?i)(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?$`)
+var slp099TSInterfaceProp = regexp.MustCompile(`(?i)^(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?$`)
 
 var slp099ResponseKeywords = []string{"Response", "response", "Res", "res", "DTO", "dto", "Output", "output", "Result", "result", "Payload"}
 
@@ -89,20 +90,41 @@ func testMatchesResponse(respPath string, testFiles map[string]bool) bool {
 	if len(testFiles) == 0 {
 		return false
 	}
-	// derive basename and stem for the response file
-	base := respPath
-	if i := strings.LastIndex(respPath, "/"); i >= 0 {
-		base = respPath[i+1:]
-	}
-	stem := base
-	if i := strings.LastIndex(base, "."); i >= 0 {
-		stem = base[:i]
-	}
-	// check if any test file contains the same stem
+	respStem := slp099FileStem(respPath)
+	respDir := path.Dir(respPath)
+
 	for tf := range testFiles {
-		if strings.Contains(tf, stem) {
+		if slp099FileStem(tf) != respStem {
+			continue
+		}
+		if slp099RelatedDir(respDir, path.Dir(tf)) {
 			return true
 		}
 	}
 	return false
+}
+
+func slp099FileStem(filePath string) string {
+	base := path.Base(filePath)
+	stem := strings.TrimSuffix(base, path.Ext(base))
+	switch {
+	case strings.HasSuffix(stem, "_test"):
+		return strings.TrimSuffix(stem, "_test")
+	case strings.HasSuffix(stem, ".test"):
+		return strings.TrimSuffix(stem, ".test")
+	case strings.HasSuffix(stem, ".spec"):
+		return strings.TrimSuffix(stem, ".spec")
+	default:
+		return stem
+	}
+}
+
+func slp099RelatedDir(respDir, testDir string) bool {
+	if respDir == testDir {
+		return true
+	}
+	if path.Dir(testDir) == respDir || path.Dir(respDir) == testDir {
+		return true
+	}
+	return path.Dir(respDir) == path.Dir(testDir)
 }

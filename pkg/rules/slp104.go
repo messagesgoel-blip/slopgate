@@ -18,8 +18,8 @@ func (SLP104) Description() string {
 }
 
 var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*([0-9]+)(?:\s*,\s*([0-9]+))?\s*\)`)
-var slp104BufioSize = regexp.MustCompile(`bufio\.NewReaderSize\s*\([^,]+,\s*\d+\s*\)`)
-var slp104BufferConfig = regexp.MustCompile(`(?i)(?:bufferSize|maxSize|bufSize|chunkSize|limit)\s*(?:[:=]|:=)\s*\d+`)
+var slp104BufioSize = regexp.MustCompile(`bufio\.NewReaderSize\s*\((?:[^(),]+|\([^()]*\))+,\s*\d+\s*\)`)
+var slp104BufferConfig = regexp.MustCompile(`(?i)\b(?:bufferSize|maxSize|bufSize|chunkSize|limit)\b\s*(?:[:=]|:=)\s*\d+`)
 
 func (r SLP104) Check(d *diff.Diff) []Finding {
 	var out []Finding

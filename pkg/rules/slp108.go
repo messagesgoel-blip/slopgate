@@ -23,7 +23,7 @@ func (SLP108) Description() string {
 
 var slp108Open = regexp.MustCompile(`(?i)\b(os\.Open|OpenFile|sql\.Open|net\.Dial|http\.Get|http\.Post|Connect|Listen|NewClient)\b\s*\(`)
 var slp108Fetch = regexp.MustCompile(`(?i)\bfetch\b\s*\(\s*['"\x60]`)
-var slp108DeferClose = regexp.MustCompile(`(?i)defer\s+.*(?:Close|Cancel)\s*\(`)
+var slp108DeferClose = regexp.MustCompile(`(?i)defer\s+.*Close\s*\(`)
 var slp108Timeout = regexp.MustCompile(`(?i)(?:context\.WithTimeout|context\.WithDeadline|setTimeout|time\.After|setRequestTimeout|\.timeout|AbortSignal|AbortController)`)
 
 func (r SLP108) Check(d *diff.Diff) []Finding {

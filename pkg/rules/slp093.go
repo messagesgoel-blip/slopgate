@@ -31,6 +31,7 @@ var slp093AssertTerms = []string{
 	"expect(", "assert.", "assert(", ".toEqual", ".toBe", ".toHaveBeenCalled",
 	"assert.Equal", "assert.EqualValues", "assert.JSONEq",
 	"assert.NotNil", "assert.Nil", "assert.True", "assert.False",
+	"assert ", "assert\t",
 	"should(", ".must(",
 	"require.", "t.Fatalf", "t.Errorf", "t.Error", "t.Fatal", "t.Skip",
 }
@@ -38,7 +39,7 @@ var slp093AssertTerms = []string{
 func isCommentOnlyLine(content string) bool {
 	trim := strings.TrimSpace(content)
 	if trim == "" || strings.HasPrefix(trim, "//") || strings.HasPrefix(trim, "#") ||
-		strings.HasPrefix(trim, "/*") || strings.HasPrefix(trim, "*") {
+		strings.HasPrefix(trim, "/*") || strings.HasPrefix(trim, "*/") {
 		return true
 	}
 	return false
