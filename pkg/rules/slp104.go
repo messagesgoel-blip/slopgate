@@ -18,7 +18,7 @@ func (SLP104) Description() string {
 	return "hardcoded buffer/size limit — define a named constant instead"
 }
 
-var slp104NumLit = `(?:0x[0-9A-Fa-f][0-9A-Fa-f_]*|0b[01][01_]*|0o[0-7][0-7_]*|[0-9][0-9_]*(?:\.[0-9_]+)?(?:[eE][+\-]?[0-9_]+)?)`
+var slp104NumLit = `(?:0[xX][0-9A-Fa-f][0-9A-Fa-f_]*|0[bB][01][01_]*|0[oO][0-7][0-7_]*|[0-9][0-9_]*(?:\.[0-9_]+)?(?:[eE][+\-]?[0-9_]+)?)`
 var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*(` + slp104NumLit + `)(?:\s*,\s*(` + slp104NumLit + `))?\s*\)`)
 var slp104BufioSize = regexp.MustCompile(`bufio\.NewReaderSize\s*\((?:[^(),]+|\([^()]*\))+,\s*` + slp104NumLit + `\s*\)`)
 var slp104BufferConfig = regexp.MustCompile(`(?i)\b(?:bufferSize|maxSize|bufSize|chunkSize)\b\s*(?:[:=]|:=)\s*` + slp104NumLit)
@@ -41,16 +41,16 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 			var msg string
 			switch {
 			case slp104MakeByte.MatchString(trimmed):
-				if m := slp104MakeByte.FindStringSubmatch(trimmed); m != nil {
+				for _, m := range slp104MakeByte.FindAllStringSubmatch(trimmed, -1) {
 					lenVal := m[1]
 					capVal := m[2]
-					// Parse the length value numerically to handle 0x0, 0b0, underscore separators, etc.
 					isZero := false
 					if parsed, err := strconv.ParseInt(strings.ReplaceAll(lenVal, "_", ""), 0, 64); err == nil {
 						isZero = parsed == 0
 					}
 					if !isZero || capVal != "" {
 						msg = "hardcoded buffer size in make — use a named constant"
+						break
 					}
 				}
 			case slp104BufioSize.MatchString(trimmed):

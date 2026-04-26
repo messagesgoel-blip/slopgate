@@ -12,8 +12,11 @@ func TestSLP094_FiresOnOrTrue(t *testing.T) {
 +  go build ./... || true
 `)
 	got := SLP094{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for || true")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for || true, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP094" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
 	}
 }
 
@@ -25,8 +28,11 @@ func TestSLP094_FiresOnOrColon(t *testing.T) {
 +  run: npm test || :
 `)
 	got := SLP094{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for || :")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for || :, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP094" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
 	}
 }
 
@@ -92,8 +98,11 @@ func TestSLP094_FiresOnRunBlockScalarCommand(t *testing.T) {
 +    npm test || true
 `)
 	got := SLP094{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for run block scalar command")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for run block scalar command, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP094" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
 	}
 }
 
@@ -105,8 +114,11 @@ func TestSLP094_FiresOnRunListEntry(t *testing.T) {
 +  - run: npm test || true
 `)
 	got := SLP094{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for YAML list-item run entry with || true")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for YAML list-item run entry, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP094" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
 	}
 }
 
@@ -118,8 +130,11 @@ func TestSLP094_FiresOnChainedSilentFail(t *testing.T) {
 +  go build || true&&echo done
 `)
 	got := SLP094{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for chained || true&& pattern")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for chained || true&& pattern, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP094" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
 	}
 }
 

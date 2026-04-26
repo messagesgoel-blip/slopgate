@@ -178,6 +178,6 @@ func slp098TestTarget(testPath string) string {
 	case strings.HasSuffix(strings.ToLower(stem), "test"):
 		return stem[:len(stem)-len("test")]
 	default:
-		return ""
+		return stem
 	}
 }

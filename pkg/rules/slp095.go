@@ -18,7 +18,7 @@ func (SLP095) Description() string {
 	return "catch block returns silently without handling the error — use throw/reject or log then rethrow"
 }
 
-var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]|\{\}|""|''|undefined|none)(?:\s|;|$|})`)
+var slp095SilentReturn = regexp.MustCompile(`(?i)\breturn\s+(?:null|0|false|\[\]|\{\}|""|''|undefined|none)(?:\s*(?:;|\}|//)|\s*$)`)
 var slp095CatchRE = regexp.MustCompile(`\bcatch\b`)
 var slp095ExceptRE = regexp.MustCompile(`\bexcept\b`)
 
@@ -62,6 +62,8 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 		if isTestFile(f.Path) {
 			continue
 		}
+		isPython := isPythonFile(f.Path)
+		isCatchLang := isJSOrTSFile(f.Path) || isJavaFile(f.Path)
 
 		for _, h := range f.Hunks {
 			inCatch := false
@@ -79,12 +81,13 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 				cLower := strings.ToLower(content)
 
 				if !inCatch {
-					if slp095CatchRE.MatchString(cLower) || slp095ExceptRE.MatchString(cLower) {
+					if (isCatchLang && slp095CatchRE.MatchString(cLower)) ||
+						(isPython && slp095ExceptRE.MatchString(cLower)) {
 						inCatch = true
 						catchBraceDepth = 0
 						handling = false
 						silentLine = nil
-						if isPythonFile(f.Path) {
+						if isPython {
 							exceptIndent = indentationOf(ln.Content)
 						}
 						catchBraceDepth += strings.Count(ln.Content, "{")
@@ -116,7 +119,7 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 				catchBraceDepth -= strings.Count(ln.Content, "}")
 
 				blockEnded := false
-				if isPythonFile(f.Path) {
+				if isPython {
 					if content != "" && indentationOf(ln.Content) <= exceptIndent {
 						blockEnded = true
 					}

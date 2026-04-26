@@ -10,8 +10,8 @@ func TestSLP097_FiresOnDataDestructureWithoutOkCheck(t *testing.T) {
 +  const { data } = await api.get();
 `)
 	got := SLP097{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for data destructure")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for data destructure")
 	}
 	if got[0].RuleID != "SLP097" || got[0].Severity != SeverityWarn {
 		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
@@ -26,8 +26,8 @@ func TestSLP097_FiresOnFetchWithoutOkCheck(t *testing.T) {
 +  fetch("/api/items").then(res => res.json())
 `)
 	got := SLP097{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for fetch without ok check")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for fetch without ok check")
 	}
 	if got[0].RuleID != "SLP097" || got[0].Severity != SeverityWarn {
 		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
@@ -94,8 +94,8 @@ func TestSLP097_FiresOnFetchWithTypedParam(t *testing.T) {
 +  fetch("/api/items").then((res: Response) => res.json())
 `)
 	got := SLP097{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for fetch with typed parameter without ok check")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for fetch with typed parameter without ok check")
 	}
 	if got[0].RuleID != "SLP097" || got[0].Severity != SeverityWarn {
 		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
@@ -110,8 +110,8 @@ func TestSLP097_FiresOnNestedFetch(t *testing.T) {
 +  fetch("/a").then(res => fetch("/b").then(r => r.json()))
 `)
 	got := SLP097{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected findings for nested fetch without ok check")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for nested fetch without ok check")
 	}
 	if got[0].RuleID != "SLP097" || got[0].Severity != SeverityWarn {
 		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)

@@ -49,6 +49,26 @@ func TestSLP102_FiresOnMultilineAsyncDeclarationWithoutAwait(t *testing.T) {
 	}
 }
 
+func TestSLP102_NoFireWhenAddedAsyncHasContextAwait(t *testing.T) {
+	// The "async" keyword is added to an existing function whose body already
+	// contains "await" in a context (unchanged) line.  The function has real
+	// async work, so SLP102 must not fire.
+	d := parseDiff(t, `diff --git a/api.ts b/api.ts
+--- a/api.ts
++++ b/api.ts
+@@ -1,4 +1,4 @@
+-function getItems() {
++async function getItems() {
+     const items = await cache.get("items");
+     return items;
+ }
+`)
+	got := SLP102{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when added async function body already contains await in context, got %d", len(got))
+	}
+}
+
 func TestSLP102_FiresWhenClosingBraceIsContextLine(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api.ts b/api.ts
 --- a/api.ts
@@ -77,7 +97,7 @@ func TestSLP102_IgnoresNonJSTS(t *testing.T) {
 	}
 }
 
-func TestSLP102_DoesNotFireForOneLineAsyncArrowNearAwait(t *testing.T) {
+func TestSLP102_FiresForOneLineAsyncArrowNearAwait(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api.ts b/api.ts
 --- a/api.ts
 +++ b/api.ts

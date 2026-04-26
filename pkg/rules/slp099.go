@@ -61,8 +61,14 @@ func hasResponseKeyword(name string) bool {
 	return false
 }
 
-func matchesSlp099FieldLine(content string) bool {
-	return slp099GoStructField.MatchString(content) || slp099TSInterfaceProp.MatchString(content)
+func matchesSlp099FieldLine(filePath, content string) bool {
+	if isGoFile(filePath) {
+		return slp099GoStructField.MatchString(content)
+	}
+	if isJSOrTSFile(filePath) {
+		return slp099TSInterfaceProp.MatchString(content)
+	}
+	return false
 }
 
 func slp099FilenameTokens(name string) []string {
@@ -93,7 +99,7 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 
 		for _, ln := range f.AddedLines() {
 			content := strings.TrimSpace(ln.Content)
-			if matchesSlp099FieldLine(content) {
+			if matchesSlp099FieldLine(f.Path, content) {
 				if hasResponseKeyword(f.Path) {
 					changedFiles[f.Path] = true
 				}
@@ -110,7 +116,7 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 		}
 		for _, ln := range f.AddedLines() {
 			content := strings.TrimSpace(ln.Content)
-			if matchesSlp099FieldLine(content) {
+			if matchesSlp099FieldLine(f.Path, content) {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

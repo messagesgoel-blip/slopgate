@@ -24,7 +24,7 @@ func (SLP092) Description() string {
 
 var slp092DoubleUnwrap = regexp.MustCompile(`(?i)(?:\.data){2,}\b|res\.data\.data\b|response\.data\.data\b`)
 
-var slp092NoEnvelopeMock = regexp.MustCompile(`(?i)mock(?:Implementation|ReturnValue|ResolvedValue|RejectedValue)(?:Once)?\s*\(\s*(?:(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\(?\s*)?\{`)
+var slp092NoEnvelopeMock = regexp.MustCompile(`(?i)mock(?:Implementation|ReturnValue|ResolvedValue)(?:Once)?\s*\(\s*(?:(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\(?\s*)?\{`)
 
 var slp092EnvelopeKey = regexp.MustCompile(`(?i)\b(?:ok|status|success)\b\s*(?::|,|\})`)
 
@@ -37,14 +37,14 @@ func slp092HasEnvelopeInBlock(lines []diff.Line, start int) bool {
 	if start >= len(lines) {
 		return false
 	}
-	envelopeFound := slp092EnvelopeKey.MatchString(lines[start].Content)
 	braceDepth := strings.Count(lines[start].Content, "{") - strings.Count(lines[start].Content, "}")
+	envelopeFound := slp092EnvelopeKey.MatchString(lines[start].Content)
 	for j := start + 1; j < len(lines) && !envelopeFound; j++ {
 		if braceDepth <= 0 {
 			break
 		}
 		braceDepth += strings.Count(lines[j].Content, "{") - strings.Count(lines[j].Content, "}")
-		if slp092EnvelopeKey.MatchString(lines[j].Content) {
+		if braceDepth == 1 && slp092EnvelopeKey.MatchString(lines[j].Content) {
 			envelopeFound = true
 		}
 	}

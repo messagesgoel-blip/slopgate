@@ -2,6 +2,19 @@ package rules
 
 import "testing"
 
+func assertSingleFinding(t *testing.T, got []Finding, expectedFile string) {
+	t.Helper()
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP111" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
+	}
+	if got[0].File != expectedFile {
+		t.Errorf("expected File=%q, got %q", expectedFile, got[0].File)
+	}
+}
+
 func TestSLP111_FiresOnBinaryCommitted(t *testing.T) {
 	d := parseDiff(t, `diff --git a/build/app.exe b/build/app.exe
 new file mode 100755
@@ -11,15 +24,7 @@ new file mode 100755
 Binary files differ
 `)
 	got := SLP111{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding for binary file, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP111" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
-	if got[0].File != "build/app.exe" {
-		t.Errorf("expected File=build/app.exe, got %q", got[0].File)
-	}
+	assertSingleFinding(t, got, "build/app.exe")
 }
 
 func TestSLP111_FiresOnClassFile(t *testing.T) {
@@ -31,15 +36,7 @@ new file mode 100644
 Binary files differ
 `)
 	got := SLP111{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding for .class file, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP111" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
-	if got[0].File != "Foo.class" {
-		t.Errorf("expected File=Foo.class, got %q", got[0].File)
-	}
+	assertSingleFinding(t, got, "Foo.class")
 }
 
 func TestSLP111_FiresWhenBinaryAlreadyTracked(t *testing.T) {
@@ -55,15 +52,7 @@ new file mode 100755
 Binary files differ
 `)
 	got := SLP111{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding even with gitignore, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP111" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
-	if got[0].File != "app.exe" {
-		t.Errorf("expected File=app.exe, got %q", got[0].File)
-	}
+	assertSingleFinding(t, got, "app.exe")
 }
 
 func TestSLP111_FiresOnExtensionlessNewFile(t *testing.T) {
@@ -74,15 +63,7 @@ new file mode 100755
 Binary files differ
 `)
 	got := SLP111{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 finding for new extensionless binary file, got %d", len(got))
-	}
-	if got[0].RuleID != "SLP111" || got[0].Severity != SeverityBlock {
-		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
-	}
-	if got[0].File != "build/app" {
-		t.Errorf("expected File=build/app, got %q", got[0].File)
-	}
+	assertSingleFinding(t, got, "build/app")
 }
 
 func TestSLP111_AllowsWhitelistedExtensionlessNewFile(t *testing.T) {

@@ -78,9 +78,6 @@ func slp109HasFuncKeyword(content string) bool {
 func slp109CollectSignature(lines []diff.Line, start int) (string, int, bool) {
 	var parts []string
 	for i := start; i < len(lines); i++ {
-		if lines[i].Kind == diff.LineDelete {
-			continue
-		}
 		if lines[i].Kind != diff.LineAdd {
 			return "", 0, false
 		}
@@ -145,9 +142,9 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 						lineContent := h.Lines[bodyStart].Content
 						if strings.Contains(lineContent, "{") && strings.Contains(lineContent, "}") {
 							open := strings.Index(lineContent, "{")
-							close := strings.LastIndex(lineContent, "}")
-							if close > open+1 {
-								inner := strings.TrimSpace(lineContent[open+1 : close])
+							closeIdx := strings.LastIndex(lineContent, "}")
+							if closeIdx > open+1 {
+								inner := strings.TrimSpace(lineContent[open+1 : closeIdx])
 								if inner != "" {
 									cur.body = append(cur.body, inner)
 								}
@@ -159,6 +156,8 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 				}
 
 				if ln.Kind == diff.LineDelete {
+					inFunc = false
+					cur = funcBody{}
 					continue
 				}
 				if ln.Kind != diff.LineAdd {

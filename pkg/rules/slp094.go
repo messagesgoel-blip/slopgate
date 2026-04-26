@@ -18,7 +18,7 @@ func (SLP094) Description() string {
 	return "shell command suppresses failure with || true or || : — handle the error instead"
 }
 
-var slp094SilentFail = regexp.MustCompile(`\|\|\s*(?:true|:)\s*(?:;|\s*$|&&|\s)`)
+var slp094SilentFail = regexp.MustCompile(`\|\|\s*(?:true|:)\s*(?:;|\s*$|&&|\)|\s)`)
 var slp094YAMLRunLine = regexp.MustCompile(`^\s*(?:-\s*)?run\s*:\s*(.*)$`)
 
 func (r SLP094) Check(d *diff.Diff) []Finding {
@@ -148,12 +148,10 @@ func isShellLikeFile(path string) bool {
 		isCI := base == "ci.yml" || base == "ci.yaml" ||
 			strings.HasPrefix(base, "ci.") || strings.HasPrefix(base, "ci-") ||
 			strings.HasSuffix(base, "-ci.yml") || strings.HasSuffix(base, "-ci.yaml") ||
-			strings.HasSuffix(base, ".ci.yml") || strings.HasSuffix(base, ".ci.yaml") ||
-			base == "ci"
+			strings.HasSuffix(base, ".ci.yml") || strings.HasSuffix(base, ".ci.yaml")
 
 		inGitHubWorkflows := strings.HasPrefix(lower, ".github/workflows/") || strings.Contains(lower, "/.github/workflows/")
-		isWorkflow := base == "workflow" ||
-			strings.HasPrefix(base, "workflow.") ||
+		isWorkflow := strings.HasPrefix(base, "workflow.") ||
 			strings.HasPrefix(base, "workflow-")
 
 		return inGitHubWorkflows || isCI || isWorkflow

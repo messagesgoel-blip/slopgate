@@ -94,8 +94,11 @@ func TestSLP108_FiresOnOpenWithDeferCancelOnly(t *testing.T) {
 +  defer cancel()
 `)
 	got := SLP108{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected finding for open with defer cancel but no db.Close")
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 finding for open with defer cancel but no db.Close, got %d", len(got))
+	}
+	if got[0].RuleID != "SLP108" || got[0].Severity != SeverityBlock {
+		t.Errorf("unexpected finding metadata: RuleID=%q Severity=%v", got[0].RuleID, got[0].Severity)
 	}
 }
 

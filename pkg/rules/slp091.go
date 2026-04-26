@@ -62,9 +62,8 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		if isDocFile(f.Path) {
-			continue
-		}
+		// Do not skip doc files for SLP091 — test fixtures like testdata/*.txt
+		// are legitimate locations for hardcoded dates.
 		inBlockComment := false
 		for _, ln := range f.AddedLines() {
 			content := ln.Content
@@ -93,10 +92,13 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 			case slp091Timestamp.MatchString(content):
 				msg = "hardcoded timestamp in test — use relative time or mock"
 			case slp091ISODate.MatchString(content):
-				if match := slp091ISODate.FindStringSubmatch(content); len(match) > 1 {
-					year := match[1]
-					if strings.HasPrefix(year, "202") || strings.HasPrefix(year, "203") {
-						msg = "hardcoded date literal in test — consider using a relative date expression"
+				for _, match := range slp091ISODate.FindAllStringSubmatch(content, -1) {
+					if len(match) > 1 {
+						year := match[1]
+						if strings.HasPrefix(year, "202") || strings.HasPrefix(year, "203") {
+							msg = "hardcoded date literal in test — consider using a relative date expression"
+							break
+						}
 					}
 				}
 			}
