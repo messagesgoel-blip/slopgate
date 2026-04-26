@@ -31,5 +31,12 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Build slopgate binary
+        run: |
+          go build -buildvcs=false -o ./slopgate ./cmd/slopgate
+
+      - name: Run slopgate check
+        run: ./slopgate --staged --no-color || true
+
       - name: Test
         run: go test -race ./...
