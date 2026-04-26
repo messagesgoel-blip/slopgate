@@ -80,17 +80,22 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 				} else {
 					continue
 				}
-			} else if strings.HasPrefix(trimmed, "/*") {
-				if closeIdx := strings.Index(trimmed, "*/"); closeIdx >= 0 {
-					trimmed = strings.TrimSpace(trimmed[closeIdx+2:])
+			} else if openIdx := strings.Index(trimmed, "/*"); openIdx >= 0 {
+				if closeIdx := strings.Index(trimmed, "*/"); closeIdx > openIdx {
+					trimmed = strings.TrimSpace(trimmed[:openIdx] + trimmed[closeIdx+2:])
 					content = trimmed
 					if trimmed == "" {
 						continue
 					}
 					// Fall through to process remainder
 				} else {
+					trimmed = strings.TrimSpace(trimmed[:openIdx])
+					content = trimmed
 					inBlockComment = true
-					continue
+					if trimmed == "" {
+						continue
+					}
+					// Fall through to process non-comment portion before "/*"
 				}
 			}
 			if strings.HasPrefix(trimmed, "//") ||

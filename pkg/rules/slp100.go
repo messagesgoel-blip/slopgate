@@ -20,7 +20,7 @@ func (SLP100) Description() string {
 
 var slp100FuncStart = regexp.MustCompile(`(?i)(?:func\s+|function\s+|def\s+|public\s+(?:static\s+)?(?:void\s+)?|private\s+(?:static\s+)?|fn\s+)\w+\s*\(`)
 
-var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None|nil\))\s*[;]?\s*$`)
+var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None)\s*[;]?\s*$`)
 
 func hasSideEffect(line string) bool {
 	stripped := stripCommentAndStrings(line)
@@ -76,8 +76,9 @@ func (r SLP100) Check(d *diff.Diff) []Finding {
 				}
 
 				if inFunc {
-					braceDepth += strings.Count(content, "{")
-					braceDepth -= strings.Count(content, "}")
+					cleanContent := stripCommentAndStrings(content)
+					braceDepth += strings.Count(cleanContent, "{")
+					braceDepth -= strings.Count(cleanContent, "}")
 
 					if !firstLine && hasSideEffect(content) {
 						hasWork = true

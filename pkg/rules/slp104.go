@@ -38,36 +38,38 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 
 		for _, ln := range f.AddedLines() {
 			trimmed := strings.TrimSpace(ln.Content)
-			if slp104MakeByte.MatchString(trimmed) {
-				for _, m := range slp104MakeByte.FindAllStringSubmatch(trimmed, -1) {
-					lenVal := m[1]
-					capVal := m[2]
-					isZero := false
-					if parsed, err := strconv.ParseInt(strings.ReplaceAll(lenVal, "_", ""), 0, 64); err == nil {
-						isZero = parsed == 0
-					}
-					if !isZero || capVal != "" {
-						out = append(out, Finding{
-							RuleID:   r.ID(),
-							Severity: r.DefaultSeverity(),
-							File:     f.Path,
-							Line:     ln.NewLineNo,
-							Message:  "hardcoded buffer size in make — use a named constant",
-							Snippet:  ln.Content,
-						})
-						break
+			if isGoFile(f.Path) {
+				if slp104MakeByte.MatchString(trimmed) {
+					for _, m := range slp104MakeByte.FindAllStringSubmatch(trimmed, -1) {
+						lenVal := m[1]
+						capVal := m[2]
+						isZero := false
+						if parsed, err := strconv.ParseInt(strings.ReplaceAll(lenVal, "_", ""), 0, 64); err == nil {
+							isZero = parsed == 0
+						}
+						if !isZero || capVal != "" {
+							out = append(out, Finding{
+								RuleID:   r.ID(),
+								Severity: r.DefaultSeverity(),
+								File:     f.Path,
+								Line:     ln.NewLineNo,
+								Message:  "hardcoded buffer size in make — use a named constant",
+								Snippet:  ln.Content,
+							})
+							break
+						}
 					}
 				}
-			}
-			if slp104BufioSize.MatchString(trimmed) {
-				out = append(out, Finding{
-					RuleID:   r.ID(),
-					Severity: r.DefaultSeverity(),
-					File:     f.Path,
-					Line:     ln.NewLineNo,
-					Message:  "hardcoded buffer size in bufio — use a named constant",
-					Snippet:  ln.Content,
-				})
+				if slp104BufioSize.MatchString(trimmed) {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "hardcoded buffer size in bufio — use a named constant",
+						Snippet:  ln.Content,
+					})
+				}
 			}
 			if slp104BufferConfig.MatchString(trimmed) {
 				out = append(out, Finding{

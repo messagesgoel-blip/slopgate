@@ -38,10 +38,11 @@ func (r SLP106) Check(d *diff.Diff) []Finding {
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
-				if slp106Acquire.MatchString(ln.Content) {
+				clean := stripCommentAndStrings(ln.Content)
+				if slp106Acquire.MatchString(clean) {
 					acquireLines = append(acquireLines, ln)
 				}
-				if slp106Release.MatchString(ln.Content) {
+				if slp106Release.MatchString(clean) {
 					releaseCount++
 				}
 			}

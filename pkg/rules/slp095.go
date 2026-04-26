@@ -47,7 +47,10 @@ func hasErrorHandling(cLower string) bool {
 		strings.Contains(cLower, "log.error") ||
 		strings.Contains(cLower, "log.warn") ||
 		strings.Contains(cLower, "logger.") ||
-		strings.Contains(cLower, "sentry.")
+		strings.Contains(cLower, "sentry.") ||
+		strings.Contains(cLower, "logging.error") ||
+		strings.Contains(cLower, "logging.warning") ||
+		strings.Contains(cLower, "logging.exception")
 }
 
 func (r SLP095) Check(d *diff.Diff) []Finding {
@@ -121,8 +124,17 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 					continue
 				}
 
-				catchBraceDepth += strings.Count(ln.Content, "{")
-				catchBraceDepth -= strings.Count(ln.Content, "}")
+				// Count closing braces that appear before the first opening brace (source order)
+				// so that transition lines like "} catch (e) {" close the current block first.
+				closesBeforeOpen := strings.Count(ln.Content, "}")
+				if firstOpen := strings.Index(ln.Content, "{"); firstOpen >= 0 {
+					closesBeforeOpen = strings.Count(ln.Content[:firstOpen], "}")
+					catchBraceDepth -= closesBeforeOpen
+					catchBraceDepth += strings.Count(ln.Content[firstOpen:], "{")
+					catchBraceDepth -= strings.Count(ln.Content[firstOpen:], "}")
+				} else {
+					catchBraceDepth -= closesBeforeOpen
+				}
 
 				blockEnded := false
 				if isPython {
@@ -130,7 +142,7 @@ func (r SLP095) Check(d *diff.Diff) []Finding {
 						blockEnded = true
 					}
 				} else {
-					if catchBraceDepth <= 0 && strings.Contains(ln.Content, "}") {
+					if catchBraceDepth <= 0 && closesBeforeOpen > 0 {
 						blockEnded = true
 					}
 				}

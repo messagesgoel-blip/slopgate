@@ -111,8 +111,9 @@ func (r SLP102) Check(d *diff.Diff) []Finding {
 					continue
 				}
 
-				braceDepth += strings.Count(content, "{")
-				braceDepth -= strings.Count(content, "}")
+				cleanContent := stripCommentAndStrings(content)
+				braceDepth += strings.Count(cleanContent, "{")
+				braceDepth -= strings.Count(cleanContent, "}")
 
 				if ln.Kind != diff.LineDelete && slp102AwaitRe.MatchString(content) {
 					hasAwait = true

@@ -22,7 +22,7 @@ var slp107Cleanup = regexp.MustCompile(`(?i)\b(?:Close|Destroy|Cleanup|Release|R
 var slp107IdentifierPattern = regexp.MustCompile(`(?i)\b([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*\.\s*(?:close|destroy|cleanup|release|remove|delete|cancel|free)\b\s*(?:\(|$)`)
 var slp107ErrorBlockStart = regexp.MustCompile(`(?i)(?:\bif\s+err\b|\bcatch\b|\bexcept\b)`)
 var slp107IfErrPattern = regexp.MustCompile(`(?i)\bif\s+err\b`)
-var slp107BareCallArg = regexp.MustCompile(`\b(?:close|destroy|cleanup|release|remove|delete|cancel|free)\s*\(\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\)`)
+var slp107BareCallArg = regexp.MustCompile(`(?i)\b(?:close|destroy|cleanup|release|remove|delete|cancel|free)\s*\(\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\)`)
 var slp107FuncBoundary = regexp.MustCompile(`^\s*(?:func\b|def\s+\w|class\s+\w|function\s+\w|\w[^=]*\)\s*=>\s*\{)`)
 
 func (r SLP107) Check(d *diff.Diff) []Finding {
@@ -230,11 +230,7 @@ func extractIdentifier(content string) string {
 		return match[1]
 	}
 	// Fall back: extract the first argument of a bare cleanup call like close(conn) or cancel(ctx).
-	if m := slp107BareCallArg.FindStringSubmatch(strings.ToLower(content)); len(m) == 2 {
-		// re-extract from original content to preserve case
-		if m2 := slp107BareCallArg.FindStringSubmatch(content); len(m2) == 2 {
-			return m2[1]
-		}
+	if m := slp107BareCallArg.FindStringSubmatch(content); len(m) == 2 {
 		return m[1]
 	}
 	return ""

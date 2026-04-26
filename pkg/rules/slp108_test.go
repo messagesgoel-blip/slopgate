@@ -22,7 +22,11 @@ func TestSLP108_FiresOnOpenWithoutDefer(t *testing.T) {
 @@ -1,1 +1,3 @@
 +  db, err := sql.Open("postgres", connStr)
 `)
-	assertSLP108Fires(t, SLP108{}.Check(d))
+	got := SLP108{}.Check(d)
+	assertSLP108Fires(t, got)
+	if got[0].Message != "open/connect without defer close — add resource lifecycle management" {
+		t.Errorf("Message = %q", got[0].Message)
+	}
 }
 
 func TestSLP108_FiresOnFetchWithoutTimeout(t *testing.T) {
@@ -32,7 +36,11 @@ func TestSLP108_FiresOnFetchWithoutTimeout(t *testing.T) {
 @@ -1,1 +1,3 @@
 +  const res = fetch("https://api.example.com/data")
 `)
-	assertSLP108Fires(t, SLP108{}.Check(d))
+	got := SLP108{}.Check(d)
+	assertSLP108Fires(t, got)
+	if got[0].Message != "fetch without timeout — add a timeout or AbortController to prevent hanging" {
+		t.Errorf("Message = %q", got[0].Message)
+	}
 }
 
 func TestSLP108_NoFireOnOpenWithDefer(t *testing.T) {

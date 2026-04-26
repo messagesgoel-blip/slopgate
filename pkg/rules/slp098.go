@@ -121,13 +121,24 @@ func slp098TestMatches(testPath, sourceBase string) bool {
 	}
 
 	// Also check if the test path lives under a parallel test/tests directory.
-	// Strip common test root prefixes and compare the remainder.
+	// Strip common test root prefixes and compare the remainder against the
+	// module-relative source path (exact match only — no loose suffix/base checks).
 	for _, root := range []string{"tests/", "test/", "src/tests/", "src/test/"} {
 		if strings.HasPrefix(testBase, root) {
 			remainder := testBase[len(root):]
-			// Match directly or under common source roots
-			if remainder == path.Base(sourceBase) || strings.HasSuffix(sourceBase, "/"+remainder) || sourceBase == remainder {
+			// Exact match
+			if sourceBase == remainder {
 				return true
+			}
+			// Exact module-relative match: strip a known source root from sourceBase
+			for _, srcRoot := range []string{"src", "lib", "app"} {
+				prefix := srcRoot + "/"
+				if strings.HasPrefix(sourceBase, prefix) {
+					rel := strings.TrimPrefix(sourceBase, prefix)
+					if rel == remainder {
+						return true
+					}
+				}
 			}
 		}
 	}

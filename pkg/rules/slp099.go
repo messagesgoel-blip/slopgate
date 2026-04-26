@@ -24,7 +24,7 @@ var slp099GoStructField = regexp.MustCompile(
 	`^\s*(?:` +
 		`[A-Z]\w*\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?` + // Exported field (uppercase)
 		`|\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)\w+(?:\.\w+)?` + // Any field with pointer/slice type
-		`|\w+\s+\w+\.\w+` + // Any field with package-qualified type
+		`|[A-Z]\w*\s+\w+\.\w+` + // Exported field with package-qualified type
 	`)(?:\s+` + "`" + `[^` + "`" + `]*` + "`" + `)?\s*$` + // Optional struct tag
 	`|^\s*\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?\s+` + "`" + `[^` + "`" + `]*` + "`" + `\s*$`) // Lowercase field with struct tag
 

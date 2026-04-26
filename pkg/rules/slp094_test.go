@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -150,6 +151,9 @@ func TestSLP094_BlockScalarSiblingKeyNotFlagged(t *testing.T) {
 	got := SLP094{}.Check(d)
 	if len(got) != 1 {
 		t.Fatalf("expected exactly 1 finding for run block command, got %d: %v", len(got), got)
+	}
+	if !strings.Contains(got[0].Snippet, "npm test || true") {
+		t.Errorf("expected finding to target the run block command, got snippet %q", got[0].Snippet)
 	}
 }
 
