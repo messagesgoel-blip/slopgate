@@ -53,6 +53,7 @@ var (
 	}
 )
 
+// Check scans source files for hardcoded credentials and secrets.
 func (r SLP088) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -67,8 +68,8 @@ func (r SLP088) Check(d *diff.Diff) []Finding {
 		if strings.Contains(fileLower, ".env") && !strings.Contains(fileLower, "example") {
 			continue
 		}
-		if (strings.Contains(fileLower, ".toml") || strings.Contains(fileLower, ".yml") ||
-			strings.Contains(fileLower, ".yaml") || strings.Contains(fileLower, ".json")) {
+		if strings.Contains(fileLower, ".toml") || strings.Contains(fileLower, ".yml") ||
+			strings.Contains(fileLower, ".yaml") || strings.Contains(fileLower, ".json") {
 			continue
 		}
 

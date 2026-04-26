@@ -53,6 +53,7 @@ func init() {
 	}
 }
 
+// Check scans for sensitive API routes without authorization checks.
 func (r SLP086) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {

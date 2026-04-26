@@ -52,6 +52,7 @@ var (
 	}
 )
 
+// Check scans API routes for missing error handling.
 func (r SLP090) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {

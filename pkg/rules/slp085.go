@@ -24,6 +24,7 @@ var (
 	slp085TemplateLiteralPattern = regexp.MustCompile("`(?:SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)[^`]*\\${")
 )
 
+// Check scans for SQL queries built via string concatenation or template literals.
 func (r SLP085) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {

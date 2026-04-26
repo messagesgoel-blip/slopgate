@@ -187,6 +187,7 @@ func hasLineAddEquivalent(h diff.Hunk, idx int) bool {
 	return false
 }
 
+// Check scans exported symbols for missing documentation.
 func (r SLP089) Check(d *diff.Diff) []Finding {
 	var out []Finding
 

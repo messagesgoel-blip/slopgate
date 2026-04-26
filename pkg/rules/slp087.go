@@ -48,6 +48,7 @@ var (
 	}
 )
 
+// Check scans webhook files for missing timeout configurations.
 func (r SLP087) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
