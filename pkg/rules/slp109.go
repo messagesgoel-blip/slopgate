@@ -136,6 +136,7 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 		type funcBody struct {
 			sigLine       int
 			bodyStartLine int
+			braceOff      int
 			sig           string
 			body          []string
 		}
@@ -165,7 +166,7 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 					}
 					inFunc = true
 					braceDepth = 0
-					cur = funcBody{sigLine: ln.NewLineNo, bodyStartLine: h.Lines[bodyStart].NewLineNo, sig: sig}
+					cur = funcBody{sigLine: ln.NewLineNo, bodyStartLine: h.Lines[bodyStart].NewLineNo, braceOff: braceOff, sig: sig}
 					if bodyStart == idx {
 						lineContent := h.Lines[bodyStart].Content
 						if braceOff >= 0 && braceOff < len(lineContent) {
@@ -205,7 +206,8 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 				if ln.Kind == diff.LineAdd && ln.NewLineNo != cur.sigLine {
 					if ln.NewLineNo == cur.bodyStartLine {
 						// For multi-line signatures: capture content after the opening '{' on the body-start line.
-						if bracePos := strings.Index(content, "{"); bracePos >= 0 && bracePos+1 < len(content) {
+						bracePos := cur.braceOff
+						if bracePos >= 0 && bracePos < len(ln.Content) {
 							inner := strings.TrimSpace(content[bracePos+1:])
 							inner = strings.TrimRight(inner, "} 	")
 							if inner != "" {

@@ -67,8 +67,26 @@ func (r SLP100) Check(d *diff.Diff) []Finding {
 					funcLineNo = ln.NewLineNo
 					funcSnippet = content
 					// Check the body fragment on the same line (text after the opening '{').
-					if idx := strings.Index(content, "{"); idx >= 0 {
-						bodyFragment := strings.TrimSpace(content[idx+1:])
+					// Find the first '{' that occurs when parentheses depth is zero (after header end)
+					cleanContent := stripCommentAndStrings(content)
+					parenDepth := 0
+					braceIdx := -1
+					for i, ch := range cleanContent {
+						switch ch {
+						case '(':
+							parenDepth++
+						case ')':
+							if parenDepth > 0 {
+								parenDepth--
+							}
+						case '{':
+							if parenDepth == 0 && braceIdx < 0 {
+								braceIdx = i
+							}
+						}
+					}
+					if braceIdx >= 0 {
+						bodyFragment := strings.TrimSpace(content[braceIdx+1:])
 						// Remove at most one trailing '}' so "return {} }" becomes "return {}" not "return {".
 						if strings.HasSuffix(bodyFragment, "}") {
 							bodyFragment = bodyFragment[:len(bodyFragment)-1]

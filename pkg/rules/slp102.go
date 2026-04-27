@@ -25,12 +25,17 @@ var slp102AwaitRe = regexp.MustCompile(`\bawait\b`)
 func slp102HasOpeningBraceLookahead(lines []diff.Line, start int) bool {
 	seenNonEmpty := 0
 	for i := start; i < len(lines) && seenNonEmpty < 3; i++ {
+		// Skip deleted lines
+		if lines[i].Kind == diff.LineDelete {
+			continue
+		}
 		content := strings.TrimSpace(lines[i].Content)
-		if content == "" {
+		stripped := stripCommentAndStrings(content)
+		// Only count non-empty, non-comment lines
+		if stripped == "" {
 			continue
 		}
 		seenNonEmpty++
-		stripped := stripCommentAndStrings(content)
 		// Stop if a new async function declaration is found — its { belongs to a different function.
 		if slp102AsyncFunc.MatchString(stripped) {
 			return false

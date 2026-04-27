@@ -109,7 +109,7 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 							inErrorBlock = true
 							errorBlockStart = k
 							errorIndentLevel = len(ln.Content) - len(strings.TrimLeft(ln.Content, " \t"))
-							if ln.Kind == diff.LineAdd && slp107Cleanup.MatchString(content) {
+							if ln.Kind == diff.LineAdd && slp107Cleanup.MatchString(cleanContent) {
 								cleanupLines = append(cleanupLines, *ln)
 							}
 						}

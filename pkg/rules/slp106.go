@@ -19,7 +19,7 @@ func (SLP106) Description() string {
 }
 
 var slp106Acquire = regexp.MustCompile(`(?i)\b(?:os\.Open|OpenFile|sql\.Open|Connect|Acquire|Dial|Listen|NewClient|NewConsumer|NewProducer)\(`)
-var slp106Release = regexp.MustCompile(`(?i)\b(?:Close|Release|Disconnect|Shutdown|defer.*\bclose|defer.*\bcancel)\(`)
+var slp106Release = regexp.MustCompile(`(?i)\b(?:Close|Release|Disconnect|Shutdown|defer.*?\bclose|defer.*?\bcancel)\(`)
 
 func (r SLP106) Check(d *diff.Diff) []Finding {
 	var out []Finding

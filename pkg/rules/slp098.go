@@ -35,6 +35,12 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 	routeFiles := make(map[string]bool)
 	testFiles := make(map[string]bool)
 
+	// Create a one-time map for file lookup to avoid re-scanning d.Files
+	fileByPath := make(map[string]*diff.File)
+	for i := range d.Files {
+		fileByPath[d.Files[i].Path] = &d.Files[i]
+	}
+
 	for _, f := range d.Files {
 		if f.IsDelete {
 			continue
@@ -81,11 +87,9 @@ func (r SLP098) Check(d *diff.Diff) []Finding {
 		}
 
 		if !foundTest {
-			// Emit findings for this file
-			for _, f := range d.Files {
-				if f.Path != rf {
-					continue
-				}
+			// Emit findings for this file using direct lookup
+			f, ok := fileByPath[rf]
+			if ok {
 				for _, ln := range f.AddedLines() {
 					for _, pat := range slp098RoutePatterns {
 						if pat.MatchString(ln.Content) {
@@ -208,7 +212,7 @@ func slp098TestTarget(testPath string) string {
 			}
 			// Java-style: UserTest.java or UserTests.java (fullLowerBase has extension)
 			if strings.HasSuffix(fullLowerBase, sfx+".java") {
-				newBase := base[:len(base)-len(sfx)] + ".java"
+				newBase := base[:len(base)-len(sfx)]
 				return path.Join(dir, newBase)
 			}
 			for _, delim := range []string{".", "-"} {

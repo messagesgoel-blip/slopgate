@@ -22,7 +22,7 @@ var slp104NumLit = `(?:0[xX][0-9A-Fa-f][0-9A-Fa-f_]*|0[bB][01][01_]*|0[oO][0-7][
 var slp104IntLit = `(?:0[xX][0-9A-Fa-f][0-9A-Fa-f_]*|0[bB][01][01_]*|0[oO][0-7][0-7_]*|[0-9][0-9_]*)`
 var slp104MakeByte = regexp.MustCompile(`make\s*\(\s*\[\s*\]byte\s*,\s*(` + slp104IntLit + `)(?:\s*,\s*(` + slp104IntLit + `))?\s*\)`)
 var slp104BufioSize = regexp.MustCompile(`bufio\.NewReaderSize\s*\((?:[^(),]+|\([^()]*\))+,\s*` + slp104IntLit + `\s*\)`)
-var slp104BufferConfig = regexp.MustCompile(`(?i)\b(?:bufferSize|maxSize|bufSize|chunkSize)\b(?:\s*:\s*[A-Za-z_]\w*)?\s*(?:[:=]|:=)\s*` + slp104NumLit)
+var slp104BufferConfig = regexp.MustCompile(`(?i)\b(?:bufferSize|maxSize|bufSize|chunkSize)\b(?:\s*:\s*[^:=]+?)?\s*(?:[:=]|:=)\s*` + slp104NumLit)
 
 func (r SLP104) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -51,6 +51,10 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 
 		for _, ln := range f.AddedLines() {
 			trimmed := strings.TrimSpace(ln.Content)
+			// Skip comment lines
+			if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
+				continue
+			}
 			if isGo {
 				if slp104MakeByte.MatchString(trimmed) {
 					for _, m := range slp104MakeByte.FindAllStringSubmatch(trimmed, -1) {

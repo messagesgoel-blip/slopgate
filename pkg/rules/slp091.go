@@ -52,6 +52,42 @@ func isTestFile(path string) bool {
 	return false
 }
 
+// indexOutsideQuotes returns the index of substr in s, but only if substr
+// is found outside of any quoted string (single, double, or backtick).
+// Returns -1 if not found or if substr is inside quotes.
+func indexOutsideQuotes(s, substr string) int {
+	inSingle := false
+	inDouble := false
+	inBacktick := false
+	escaped := false
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if (inSingle || inDouble) && ch == '\\' {
+			escaped = true
+			continue
+		}
+		switch {
+		case !inDouble && !inBacktick && ch == '\'':
+			inSingle = !inSingle
+		case !inSingle && !inBacktick && ch == '"':
+			inDouble = !inDouble
+		case !inSingle && !inDouble && ch == '`':
+			inBacktick = !inBacktick
+		}
+		if inSingle || inDouble || inBacktick {
+			continue
+		}
+		if i+len(substr) <= len(s) && s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}
+
 // stripInlineCommentOutsideQuotes removes an inline comment suffix from s
 // while respecting single-quoted, double-quoted, and backtick-quoted strings.
 // "//" is always treated as a comment start outside quotes; " #" and " --"
@@ -116,7 +152,7 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 			trimmed := strings.TrimSpace(content)
 			// If we're inside a block comment, skip until */ is found.
 			if inBlockComment {
-				if closeIdx := strings.Index(trimmed, "*/"); closeIdx >= 0 {
+				if closeIdx := indexOutsideQuotes(trimmed, "*/"); closeIdx >= 0 {
 					trimmed = strings.TrimSpace(trimmed[closeIdx+2:])
 					content = trimmed
 					inBlockComment = false
@@ -130,11 +166,11 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 			}
 			// Repeatedly strip all /* */ comment spans from the line.
 			for {
-				openIdx := strings.Index(trimmed, "/*")
+				openIdx := indexOutsideQuotes(trimmed, "/*")
 				if openIdx < 0 {
 					break
 				}
-				closeOff := strings.Index(trimmed[openIdx+2:], "*/")
+				closeOff := indexOutsideQuotes(trimmed[openIdx+2:], "*/")
 				if closeOff < 0 {
 					// Unclosed /* — truncate at the comment open and set inBlockComment.
 					trimmed = strings.TrimSpace(trimmed[:openIdx])
@@ -188,7 +224,7 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 				File:     f.Path,
 				Line:     ln.NewLineNo,
 				Message:  msg,
-				Snippet:  strings.TrimSpace(ln.Content),
+				Snippet:  ln.Content,
 			})
 		}
 	}
