@@ -194,16 +194,17 @@ func (r SLP107) emitIfNoSuccessCleanup(out *[]Finding, filePath string, cleanupL
 }
 
 func slp107LineMatchesCleanup(content string, identifier string) bool {
-	lower := strings.ToLower(content)
-	if !slp107Cleanup.MatchString(content) && !strings.Contains(lower, "defer ") {
+	clean := stripCommentAndStrings(content)
+	lower := strings.ToLower(clean)
+	if !slp107Cleanup.MatchString(clean) && !strings.Contains(lower, "defer ") {
 		return false
 	}
 	if identifier == "" {
 		// For bare cleanup calls (no receiver), only accept other bare cleanup calls,
 		// not deferred method calls with receivers.
-		return slp107Cleanup.MatchString(content) && extractIdentifier(content) == ""
+		return slp107Cleanup.MatchString(clean) && extractIdentifier(clean) == ""
 	}
-	return extractIdentifier(content) == identifier
+	return extractIdentifier(clean) == identifier
 }
 
 func slp107NextNonDeletedIndent(lines []diff.Line, start int) int {

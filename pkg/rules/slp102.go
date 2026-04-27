@@ -64,10 +64,11 @@ func (r SLP102) Check(d *diff.Diff) []Finding {
 
 			for idx, ln := range h.Lines {
 				content := strings.TrimSpace(ln.Content)
+				strippedContent := stripCommentAndStrings(content)
 
-				if !inAsync && ln.Kind == diff.LineAdd && slp102AsyncFunc.MatchString(content) {
+				if !inAsync && ln.Kind == diff.LineAdd && slp102AsyncFunc.MatchString(strippedContent) {
 					// brace-less arrow expression: handle single-line
-					if !strings.Contains(content, "{") {
+					if !strings.Contains(strippedContent, "{") {
 						if slp102HasOpeningBraceLookahead(h.Lines, idx+1) {
 							inAsync = true
 							asyncLine = ln.NewLineNo
@@ -80,10 +81,10 @@ func (r SLP102) Check(d *diff.Diff) []Finding {
 							// Avoid false positives on multiline like:
 							// const x = async () =>
 							//    1
-							arrowIdx := strings.Index(content, "=>")
+							arrowIdx := strings.Index(strippedContent, "=>")
 							if arrowIdx != -1 {
-								rhs := strings.TrimSpace(content[arrowIdx+2:])
-								if rhs != "" && !slp102AwaitRe.MatchString(content) {
+								rhs := strings.TrimSpace(strippedContent[arrowIdx+2:])
+								if rhs != "" && !slp102AwaitRe.MatchString(strippedContent) {
 									out = append(out, Finding{
 										RuleID:   r.ID(),
 										Severity: r.DefaultSeverity(),
@@ -113,16 +114,16 @@ func (r SLP102) Check(d *diff.Diff) []Finding {
 				}
 
 				cleanContent := stripCommentAndStrings(content)
-				if !inAsync || ln.Kind != diff.LineDelete {
+				if ln.Kind != diff.LineDelete {
 					braceDepth += strings.Count(cleanContent, "{")
 					braceDepth -= strings.Count(cleanContent, "}")
 				}
 
-				if ln.Kind != diff.LineDelete && slp102AwaitRe.MatchString(content) {
+				if ln.Kind != diff.LineDelete && slp102AwaitRe.MatchString(cleanContent) {
 					hasAwait = true
 				}
 
-				if braceDepth <= 0 && strings.Contains(content, "}") {
+				if braceDepth <= 0 && strings.Contains(cleanContent, "}") {
 					if !hasAwait {
 						out = append(out, Finding{
 							RuleID:   r.ID(),

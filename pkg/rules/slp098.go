@@ -199,14 +199,16 @@ func slp098TestTarget(testPath string) string {
 		// or are preceded by a delimiter, to avoid truncating words like "latest".
 		base := path.Base(stem)
 		lowerBase := strings.ToLower(base)
+		// fullLowerBase includes the extension for Java-style suffix checks.
+		fullLowerBase := strings.ToLower(path.Base(testPath))
 		dir := path.Dir(stem)
 		for _, sfx := range []string{"tests", "test"} {
 			if lowerBase == sfx {
 				return dir
 			}
-			// Java-style: UserTest.java or UserTests.java
-			if strings.HasSuffix(lowerBase, sfx+".java") {
-				newBase := base[:len(base)-len(sfx+".java")] + ".java"
+			// Java-style: UserTest.java or UserTests.java (fullLowerBase has extension)
+			if strings.HasSuffix(fullLowerBase, sfx+".java") {
+				newBase := base[:len(base)-len(sfx)] + ".java"
 				return path.Join(dir, newBase)
 			}
 			for _, delim := range []string{".", "-"} {

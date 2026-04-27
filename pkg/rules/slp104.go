@@ -37,6 +37,7 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
+		isGo := isGoFile(f.Path)
 		newFinding := func(ln diff.Line, msg string) Finding {
 			return Finding{
 				RuleID:   r.ID(),
@@ -50,7 +51,7 @@ func (r SLP104) Check(d *diff.Diff) []Finding {
 
 		for _, ln := range f.AddedLines() {
 			trimmed := strings.TrimSpace(ln.Content)
-			if isGoFile(f.Path) {
+			if isGo {
 				if slp104MakeByte.MatchString(trimmed) {
 					for _, m := range slp104MakeByte.FindAllStringSubmatch(trimmed, -1) {
 						lenVal := m[1]

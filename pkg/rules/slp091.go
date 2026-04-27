@@ -52,6 +52,52 @@ func isTestFile(path string) bool {
 	return false
 }
 
+// stripInlineCommentOutsideQuotes removes an inline comment suffix from s
+// while respecting single-quoted, double-quoted, and backtick-quoted strings.
+// "//" is always treated as a comment start outside quotes; " #" and " --"
+// require a preceding space so that "http://" and SQL dates are not truncated.
+func stripInlineCommentOutsideQuotes(s string) string {
+	inSingle := false
+	inDouble := false
+	inBacktick := false
+	escaped := false
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if (inSingle || inDouble) && ch == '\\' {
+			escaped = true
+			continue
+		}
+		switch {
+		case !inDouble && !inBacktick && ch == '\'':
+			inSingle = !inSingle
+		case !inSingle && !inBacktick && ch == '"':
+			inDouble = !inDouble
+		case !inSingle && !inDouble && ch == '`':
+			inBacktick = !inBacktick
+		}
+		if inSingle || inDouble || inBacktick {
+			continue
+		}
+		// "//" — always a line comment when outside quotes.
+		if ch == '/' && i+1 < len(s) && s[i+1] == '/' {
+			return strings.TrimSpace(s[:i])
+		}
+		// " #" — hash preceded by whitespace (shell/Python inline comment).
+		if ch == '#' && i > 0 && (s[i-1] == ' ' || s[i-1] == '\t') {
+			return strings.TrimSpace(s[:i-1])
+		}
+		// " --" — double-dash preceded by whitespace (SQL inline comment).
+		if ch == '-' && i > 0 && (s[i-1] == ' ' || s[i-1] == '\t') && i+1 < len(s) && s[i+1] == '-' {
+			return strings.TrimSpace(s[:i-1])
+		}
+	}
+	return strings.TrimSpace(s)
+}
+
 func (r SLP091) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -109,17 +155,8 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 				continue
 			}
 
-			// Strip inline comment suffixes before regex matching (best-effort).
-			contentForMatch := content
-			if i := strings.Index(contentForMatch, "//"); i >= 0 {
-				contentForMatch = strings.TrimSpace(contentForMatch[:i])
-			}
-			if i := strings.Index(contentForMatch, " #"); i >= 0 {
-				contentForMatch = strings.TrimSpace(contentForMatch[:i])
-			}
-			if i := strings.Index(contentForMatch, " --"); i >= 0 {
-				contentForMatch = strings.TrimSpace(contentForMatch[:i])
-			}
+			// Strip inline comment suffixes (quote-aware) before regex matching.
+			contentForMatch := stripInlineCommentOutsideQuotes(content)
 			if contentForMatch == "" {
 				continue
 			}

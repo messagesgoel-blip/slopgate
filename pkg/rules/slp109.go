@@ -72,6 +72,7 @@ func slp109HasFuncKeyword(content string) bool {
 		strings.Contains(cLower, "function ") ||
 		strings.Contains(cLower, "public ") ||
 		strings.Contains(cLower, "private ") ||
+		strings.Contains(cLower, "protected ") ||
 		strings.Contains(cLower, "static ")
 }
 
@@ -198,7 +199,7 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				content := strings.TrimSpace(ln.Content)
-				sanitized := stripStringLiterals(content)
+				sanitized := stripCommentAndStrings(content)
 				braceDepth += strings.Count(sanitized, "{")
 				braceDepth -= strings.Count(sanitized, "}")
 				if ln.Kind == diff.LineAdd && ln.NewLineNo != cur.sigLine {

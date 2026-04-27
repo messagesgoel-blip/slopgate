@@ -38,12 +38,22 @@ func (r SLP106) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				clean := stripCommentAndStrings(ln.Content)
-				if slp106Acquire.MatchString(clean) {
-					acquireLines = append(acquireLines, ln)
-				}
-				// Pop the most recently unmatched acquire when a release is seen.
-				if slp106Release.MatchString(clean) && len(acquireLines) > 0 {
-					acquireLines = acquireLines[:len(acquireLines)-1]
+				// Process all acquire/release tokens in source order so same-line
+				// pairs (e.g. sql.Open followed by db.Close) cancel correctly.
+				acqPos := slp106Acquire.FindAllStringIndex(clean, -1)
+				relPos := slp106Release.FindAllStringIndex(clean, -1)
+				ai, ri := 0, 0
+				for ai < len(acqPos) || ri < len(relPos) {
+					acqFirst := ri >= len(relPos) || (ai < len(acqPos) && acqPos[ai][0] < relPos[ri][0])
+					if acqFirst {
+						acquireLines = append(acquireLines, ln)
+						ai++
+					} else {
+						if len(acquireLines) > 0 {
+							acquireLines = acquireLines[:len(acquireLines)-1]
+						}
+						ri++
+					}
 				}
 			}
 			// Emit findings for any remaining unmatched acquires.

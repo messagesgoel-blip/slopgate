@@ -54,6 +54,7 @@ func (r SLP100) Check(d *diff.Diff) []Finding {
 
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
+					inFunc = false
 					continue
 				}
 				content := strings.TrimSpace(ln.Content)
@@ -88,7 +89,7 @@ func (r SLP100) Check(d *diff.Diff) []Finding {
 					}
 					firstLine = false
 
-					if braceDepth <= 0 && strings.Contains(content, "}") {
+					if braceDepth <= 0 && strings.Contains(cleanContent, "}") {
 						if !hasWork {
 							out = append(out, Finding{
 								RuleID:   r.ID(),
