@@ -52,42 +52,41 @@ func (r SLP115) Check(d *diff.Diff) []Finding {
 					content = raw
 				}
 				contentLower := strings.ToLower(content)
+				rawLower := strings.ToLower(raw)
+
 				for _, group := range slp115ExtensionGroups {
-					if !strings.Contains(contentLower, group.narrow) {
-						if !strings.Contains(strings.ToLower(raw), group.narrow) {
+					groupContent := contentLower
+					if !strings.Contains(groupContent, group.narrow) {
+						if !strings.Contains(rawLower, group.narrow) {
 							continue
 						}
-						contentLower = strings.ToLower(raw)
+						groupContent = rawLower
 					}
 
 					hasNarrow := false
 					for _, ext := range group.broader {
-						if strings.Contains(contentLower, ext) {
-							if ext == group.narrow {
-								hasNarrow = true
-							}
+						if strings.Contains(groupContent, ext) && ext == group.narrow {
+							hasNarrow = true
+							break
 						}
 					}
 
 					hasAnyBroader := false
 					for _, ext := range group.broader {
-						if ext != group.narrow && strings.Contains(contentLower, ext) {
+						if ext != group.narrow && strings.Contains(groupContent, ext) {
 							hasAnyBroader = true
 							break
 						}
 					}
 
 					if hasNarrow && !hasAnyBroader {
-						narrowExt := group.narrow
-						if strings.HasPrefix(narrowExt, ".") {
-							narrowExt = narrowExt[1:]
-						}
+						narrowExt := strings.TrimPrefix(group.narrow, ".")
 						out = append(out, Finding{
 							RuleID:   r.ID(),
 							Severity: r.DefaultSeverity(),
 							File:     f.Path,
 							Line:     ln.NewLineNo,
-							Message:  "narrow extension check for ." + narrowExt + " — consider including " + formatExtList(group.broader),
+							Message:  "narrow extension check for ." + narrowExt + " — consider including " + strings.Join(group.broader, ", "),
 							Snippet:  ln.Content,
 						})
 						break
@@ -97,12 +96,4 @@ func (r SLP115) Check(d *diff.Diff) []Finding {
 		}
 	}
 	return out
-}
-
-func formatExtList(exts []string) string {
-	var parts []string
-	for _, e := range exts {
-		parts = append(parts, e)
-	}
-	return strings.Join(parts, ", ")
 }

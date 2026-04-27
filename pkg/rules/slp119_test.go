@@ -124,6 +124,36 @@ func TestSLP119_NoFireOnStartsWith(t *testing.T) {
 	}
 }
 
+func TestSLP119_FiresWhenHasSuffixOnlyOnDeletedLine(t *testing.T) {
+	d := parseDiff(t, `diff --git a/process.go b/process.go
+--- a/process.go
++++ b/process.go
+@@ -1,2 +1,2 @@
+ package main
+-if strings.HasSuffix(name, ".txt") { }
++var result = strings.TrimSuffix(name, ".txt")
+`)
+	got := SLP119{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings when HasSuffix is only on deleted line")
+	}
+}
+
+func TestSLP119_FiresWhenHasSuffixInComment(t *testing.T) {
+	d := parseDiff(t, `diff --git a/process.go b/process.go
+--- a/process.go
++++ b/process.go
+@@ -1,1 +1,3 @@
+ package main
++// strings.HasSuffix(name, ".txt")
++var result = strings.TrimSuffix(name, ".txt")
+`)
+	got := SLP119{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings when HasSuffix is only in an adjacent comment")
+	}
+}
+
 func TestSLP119_Description(t *testing.T) {
 	r := SLP119{}
 	if r.ID() != "SLP119" {

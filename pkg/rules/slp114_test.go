@@ -97,6 +97,48 @@ func TestSLP114_FiresOnErrUppercasePrefixedCall(t *testing.T) {
 	}
 }
 
+func TestSLP114_FiresOnPackageQualifiedCall(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,1 +1,3 @@
+ package main
++errors.New("something failed")
+`)
+	got := SLP114{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for errors.New package-qualified call")
+	}
+}
+
+func TestSLP114_FiresOnMultipleCallsPerLine(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,1 +1,3 @@
+ package main
++file.Close(); db.Exec(query)
+`)
+	got := SLP114{}.Check(d)
+	if len(got) < 2 {
+		t.Fatalf("expected 2 findings for multiple calls, got %d", len(got))
+	}
+}
+
+func TestSLP114_FiresOnInlineIfBody(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,1 +1,3 @@
+ package main
++if err := setup(); err != nil { db.Exec(query) }
+`)
+	got := SLP114{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for error-returning call inside inline if body")
+	}
+}
+
 func TestSLP114_Description(t *testing.T) {
 	r := SLP114{}
 	if r.ID() != "SLP114" {

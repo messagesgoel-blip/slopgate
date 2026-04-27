@@ -36,16 +36,11 @@ func slp113IsTestFile(path string) bool {
 	if strings.Contains(path, ".test.") || strings.Contains(path, "_test.") {
 		return true
 	}
-	dir := filepath.Dir(path)
-	testDir := filepath.ToSlash(filepath.Join(dir, "testdata"))
-	if strings.HasPrefix(path, testDir+"/") {
+	normalized := filepath.ToSlash(path)
+	if strings.Contains(normalized, "/testdata/") || strings.HasSuffix(normalized, "/testdata") {
 		return true
 	}
 	return false
-}
-
-func slp113SourceExts() map[string]string {
-	return slp113SourceExtMap
 }
 
 func slp113TestPath(dir, base, testSuffix string) string {
@@ -65,13 +60,6 @@ func slp113HasTestFile(sourcePath string, allFiles map[string]bool) bool {
 	dir := filepath.Dir(sourcePath)
 	base := strings.TrimSuffix(filepath.Base(sourcePath), ext)
 
-	if strings.HasSuffix(testSuffix, ext) {
-		testName := slp113TestPath(dir, base, testSuffix)
-		if allFiles[testName] {
-			return true
-		}
-	}
-
 	testName := slp113TestPath(dir, base, testSuffix)
 	if allFiles[testName] {
 		return true
@@ -87,20 +75,29 @@ func slp113HasTestFile(sourcePath string, allFiles map[string]bool) bool {
 	return false
 }
 
+func slp113ExpectedTestFile(dir, base, ext string) string {
+	testSuffix := slp113SourceExtMap[ext]
+	switch ext {
+	case ".go":
+		return slp113TestPath(dir, base, "_test.go")
+	case ".py":
+		return slp113TestPath(dir, base, "_test.py")
+	case ".java":
+		return slp113TestPath(dir, base, "Test.java")
+	case ".kt":
+		return slp113TestPath(dir, base, "Test.kt")
+	default:
+		return slp113TestPath(dir, base, testSuffix)
+	}
+}
+
 func (r SLP113) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	allFiles := make(map[string]bool)
-	sourceFiles := make(map[string]bool)
 
 	for _, f := range d.Files {
 		if !f.IsDelete {
 			allFiles[f.Path] = true
-			ext := filepath.Ext(f.Path)
-			if _, ok := slp113SourceExtMap[ext]; ok {
-				if !slp113IsTestFile(f.Path) {
-					sourceFiles[f.Path] = true
-				}
-			}
 		}
 	}
 
@@ -120,20 +117,7 @@ func (r SLP113) Check(d *diff.Diff) []Finding {
 		if !slp113HasTestFile(f.Path, allFiles) {
 			dir := filepath.Dir(f.Path)
 			base := strings.TrimSuffix(filepath.Base(f.Path), ext)
-			testSuffix, _ := slp113SourceExtMap[ext]
-			var expectedTestFile string
-			switch ext {
-			case ".go":
-				expectedTestFile = slp113TestPath(dir, base, "_test.go")
-			case ".py":
-				expectedTestFile = slp113TestPath(dir, base, "_test.py")
-			case ".java":
-				expectedTestFile = slp113TestPath(dir, base, "Test.java")
-			case ".kt":
-				expectedTestFile = slp113TestPath(dir, base, "Test.kt")
-			default:
-				expectedTestFile = slp113TestPath(dir, base, testSuffix)
-			}
+			expectedTestFile := slp113ExpectedTestFile(dir, base, ext)
 			out = append(out, Finding{
 				RuleID:   r.ID(),
 				Severity: r.DefaultSeverity(),

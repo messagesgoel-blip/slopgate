@@ -2,6 +2,7 @@ package rules
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -16,6 +17,7 @@ func (SLP118) Description() string {
 }
 
 var slp118IndexRe = regexp.MustCompile(`(?:[A-Za-z0-9_]|[\)\]\}])\s*\[\d+\]`)
+var slp118IndexNumRe = regexp.MustCompile(`\[(\d+)\]`)
 var slp118GoGuardRe = regexp.MustCompile(`if len\((.+?)\)\s*>\s*(\d+)|if len\((.+?)\)\s*>=\s*(\d+)`)
 var slp118JSGuardRe = regexp.MustCompile(`if\s*\(\s*(.+?)\.length\s*>\s*(\d+)\)|if\s*\(\s*(.+?)\.length\s*>=\s*(\d+)\)`)
 var slp118PyGuardRe = regexp.MustCompile(`if len\((.+?)\)\s*>\s*(\d+)|if len\((.+?)\)\s*>=\s*(\d+)`)
@@ -26,16 +28,21 @@ type slp118Guard struct {
 	op         string
 }
 
+func atoiSafe(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
+}
+
 func slp118ExtractGoGuard(line string) *slp118Guard {
 	m := slp118GoGuardRe.FindStringSubmatch(line)
 	if m == nil {
 		return nil
 	}
 	if m[1] != "" {
-		return &slp118Guard{collection: m[1], op: ">"}
+		return &slp118Guard{collection: m[1], bound: atoiSafe(m[2]), op: ">"}
 	}
 	if m[3] != "" {
-		return &slp118Guard{collection: m[3], op: ">="}
+		return &slp118Guard{collection: m[3], bound: atoiSafe(m[4]), op: ">="}
 	}
 	return nil
 }
@@ -46,10 +53,10 @@ func slp118ExtractJSGuard(line string) *slp118Guard {
 		return nil
 	}
 	if m[1] != "" {
-		return &slp118Guard{collection: m[1], op: ">"}
+		return &slp118Guard{collection: m[1], bound: atoiSafe(m[2]), op: ">"}
 	}
 	if m[3] != "" {
-		return &slp118Guard{collection: m[3], op: ">="}
+		return &slp118Guard{collection: m[3], bound: atoiSafe(m[4]), op: ">="}
 	}
 	return nil
 }
@@ -60,10 +67,10 @@ func slp118ExtractPyGuard(line string) *slp118Guard {
 		return nil
 	}
 	if m[1] != "" {
-		return &slp118Guard{collection: m[1], op: ">"}
+		return &slp118Guard{collection: m[1], bound: atoiSafe(m[2]), op: ">"}
 	}
 	if m[3] != "" {
-		return &slp118Guard{collection: m[3], op: ">="}
+		return &slp118Guard{collection: m[3], bound: atoiSafe(m[4]), op: ">="}
 	}
 	return nil
 }
@@ -81,11 +88,46 @@ func slp118ExtractGuard(line string, filePath string) *slp118Guard {
 	return nil
 }
 
+func slp118CollectionRe(guard *slp118Guard) *regexp.Regexp {
+	if guard == nil {
+		return nil
+	}
+	pattern := `\b` + regexp.QuoteMeta(guard.collection) + `(?:\b|\s*\[|\s*\.)`
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil
+	}
+	return re
+}
+
+func slp118ExtractIndex(content string) int {
+	m := slp118IndexNumRe.FindStringSubmatch(content)
+	if m == nil {
+		return -1
+	}
+	return atoiSafe(m[1])
+}
+
 func slp118IsGuardedBy(guard *slp118Guard, content string) bool {
 	if guard == nil {
 		return false
 	}
-	return strings.Contains(content, guard.collection)
+	re := slp118CollectionRe(guard)
+	if re == nil || !re.MatchString(content) {
+		return false
+	}
+	idx := slp118ExtractIndex(content)
+	if idx < 0 {
+		return true
+	}
+	switch guard.op {
+	case ">":
+		return idx <= guard.bound
+	case ">=":
+		return idx < guard.bound
+	default:
+		return true
+	}
 }
 
 func slp118IsBlockEnd(content string) bool {

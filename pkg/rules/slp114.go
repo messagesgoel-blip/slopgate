@@ -39,44 +39,72 @@ func (r SLP114) Check(d *diff.Diff) []Finding {
 				if strings.HasPrefix(stripped, "return ") {
 					continue
 				}
-				if slp114ErrGuardRe.MatchString(stripped) {
-					continue
-				}
 
 				if strings.HasPrefix(stripped, "_ = ") {
 					continue
 				}
 
-				if idx := indexOutsideQuotes(stripped, "("); idx > 0 {
-					funcCall := stripped[:idx]
-					lastIdent := funcCall
-					if dot := strings.LastIndexByte(funcCall, '.'); dot >= 0 {
-						lastIdent = funcCall[dot+1:]
-					}
-					lastIdent = strings.TrimSpace(lastIdent)
-					if lastIdent != "" {
-						if strings.HasSuffix(stripped, ")") || strings.HasSuffix(stripped, "){") ||
-						strings.Contains(stripped, ") {") || strings.Contains(stripped, ")}") ||
-						strings.Contains(stripped, ") }") {
-							hasErrorReturn := false
-							if isErrorReturningFunc(lastIdent, stripped) {
-								hasErrorReturn = true
-							}
-
-							if hasErrorReturn {
-								out = append(out, Finding{
-									RuleID:   r.ID(),
-									Severity: r.DefaultSeverity(),
-									File:     f.Path,
-									Line:     ln.NewLineNo,
-									Message:  "error-returning function '" + lastIdent + "' called as statement — check for missing error check",
-									Snippet:  content,
-								})
-							}
+				var body string
+				if strings.HasPrefix(stripped, "if ") {
+					braceIdx := indexOutsideQuotes(stripped, "{")
+					if braceIdx >= 0 && braceIdx < len(stripped) {
+						body = stripped[braceIdx+1:]
+						closeIdx := strings.LastIndex(body, "}")
+						if closeIdx > 0 {
+							body = body[:closeIdx]
 						}
+					} else if slp114ErrGuardRe.MatchString(stripped) {
+						continue
+					} else {
+						body = stripped
 					}
+				} else {
+					body = stripped
 				}
+
+				out = append(out, r.slp114ScanCalls(body, f.Path, ln.NewLineNo, content)...)
 			}
+		}
+	}
+	return out
+}
+
+func (r SLP114) slp114ScanCalls(body string, filePath string, lineNo int, raw string) []Finding {
+	var out []Finding
+	search := body
+	for {
+		idx := indexOutsideQuotes(search, "(")
+		if idx <= 0 {
+			break
+		}
+		funcCall := search[:idx]
+		fullCallee := strings.TrimSpace(funcCall)
+		lastIdent := fullCallee
+		if dot := strings.LastIndexByte(funcCall, '.'); dot >= 0 {
+			lastIdent = strings.TrimSpace(funcCall[dot+1:])
+		}
+
+		afterParen := search[idx:]
+		if isErrorReturningFunc(fullCallee) || isErrorReturningFunc(lastIdent) {
+			if strings.Contains(afterParen, ")") {
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
+					File:     filePath,
+					Line:     lineNo,
+					Message:  "error-returning function '" + fullCallee + "' called as statement — check for missing error check",
+					Snippet:  raw,
+				})
+			}
+		}
+
+		closeIdx := indexOutsideQuotes(afterParen, ")")
+		if closeIdx < 0 {
+			break
+		}
+		search = afterParen[closeIdx+1:]
+		if search == "" {
+			break
 		}
 	}
 	return out
@@ -94,13 +122,11 @@ var slp114ErrorReturnNames = map[string]bool{
 
 var slp114ErrorReturnPrefixes = []string{
 	"err", "Err", "Error", "errors.",
+	"New", "new",
 }
 
-func isErrorReturningFunc(name string, callSnippet string) bool {
+func isErrorReturningFunc(name string) bool {
 	if slp114ErrorReturnNames[name] {
-		return true
-	}
-	if strings.HasPrefix(name, "New") || strings.HasPrefix(name, "new") {
 		return true
 	}
 	for _, prefix := range slp114ErrorReturnPrefixes {
