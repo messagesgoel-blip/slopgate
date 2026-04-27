@@ -40,10 +40,13 @@ func (r SLP119) Check(d *diff.Diff) []Finding {
 				}
 
 				if strings.Contains(content, "TrimSuffix") || strings.Contains(content, "TrimPrefix") ||
-					strings.Contains(content, "trimSuffix") || strings.Contains(content, "trimPrefix") ||
-					strings.Contains(content, "TrimLeft") || strings.Contains(content, "TrimRight") ||
-					strings.Contains(content, "endsWith") || strings.Contains(content, "startsWith") ||
-					strings.Contains(content, "EndsWith") || strings.Contains(content, "StartsWith") {
+					strings.Contains(content, "trimSuffix") || strings.Contains(content, "trimPrefix") {
+					if strings.Contains(content, "HasSuffix") || strings.Contains(content, "HasPrefix") ||
+						strings.Contains(content, "hasSuffix") || strings.Contains(content, "hasPrefix") ||
+						strings.Contains(content, `== ""`) || strings.Contains(content, `!= ""`) ||
+						strings.Contains(content, `==''`) || strings.Contains(content, `!=''`) {
+						continue
+					}
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),

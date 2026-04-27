@@ -51,6 +51,22 @@ func TestSLP114_NoFireOnIfCheck(t *testing.T) {
 	}
 }
 
+func TestSLP114_FiresOnErrPrefixedCall(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,1 +1,4 @@
+ package main
++func do() {
++    errWrap(data)
++}
+`)
+	got := SLP114{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for err-prefixed function called as statement")
+	}
+}
+
 func TestSLP114_Description(t *testing.T) {
 	r := SLP114{}
 	if r.ID() != "SLP114" {

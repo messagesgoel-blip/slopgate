@@ -14,6 +14,12 @@ func (SLP117) Description() string {
 	return "unanchored regex — add ^, $, or \\b anchor to prevent unintended substring matches"
 }
 
+func slp117HasAnchor(s string) bool {
+	return strings.Contains(s, `^`) || strings.Contains(s, `$`) ||
+		strings.Contains(s, `\b`) || strings.Contains(s, `\A`) ||
+		strings.Contains(s, `\z`) || strings.Contains(s, `\Z`)
+}
+
 func (r SLP117) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -36,24 +42,27 @@ func (r SLP117) Check(d *diff.Diff) []Finding {
 				if cleaned == "" || strings.HasPrefix(raw, "//") || strings.HasPrefix(raw, "/*") || strings.HasPrefix(raw, "#") {
 					continue
 				}
-				content := raw
 
-				if !strings.Contains(content, "/") && !strings.Contains(content, "regex") &&
-					!strings.Contains(content, "Regex") && !strings.Contains(content, "re.") &&
-					!strings.Contains(content, "pattern") && !strings.Contains(content, "Pattern") {
+				indicatorSource := cleaned
+				if indicatorSource == "" {
+					indicatorSource = raw
+				}
+				indicatorLower := strings.ToLower(indicatorSource)
+
+				hasIndicator := strings.Contains(indicatorSource, "/") ||
+					strings.Contains(indicatorLower, "regex") ||
+					strings.Contains(indicatorSource, "re.") ||
+					strings.Contains(indicatorLower, "pattern") ||
+					strings.Contains(indicatorSource, `\d`) || strings.Contains(indicatorSource, `\w`) ||
+					strings.Contains(indicatorSource, `\s`) || strings.Contains(indicatorSource, "[") ||
+					strings.Contains(indicatorSource, "]") || strings.Contains(indicatorSource, "+") ||
+					strings.Contains(indicatorSource, "*") || strings.Contains(indicatorSource, "?") ||
+					strings.Contains(indicatorSource, "{")
+				if !hasIndicator {
 					continue
 				}
 
-				if !strings.Contains(content, "regex") && !strings.Contains(content, "Regex") &&
-					!strings.Contains(content, "re.") && !strings.Contains(content, "pattern") &&
-					!strings.Contains(content, "Pattern") && !strings.Contains(content, `\d`) &&
-					!strings.Contains(content, `\w`) && !strings.Contains(content, `\s`) {
-					continue
-				}
-
-				if strings.Contains(content, `^`) || strings.Contains(content, `$`) ||
-					strings.Contains(content, `\b`) || strings.Contains(content, `\A`) ||
-					strings.Contains(content, `\z`) || strings.Contains(content, `\Z`) {
+				if slp117HasAnchor(cleaned) || slp117HasAnchor(raw) {
 					continue
 				}
 

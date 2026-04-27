@@ -145,6 +145,8 @@ func TestDefault_NoExtraRules(t *testing.T) {
 		"SLP101", "SLP102", "SLP103", "SLP104",
 		"SLP106", "SLP107", "SLP108", "SLP109", "SLP110",
 		"SLP111", "SLP112",
+		"SLP113", "SLP114", "SLP115", "SLP116", "SLP117",
+		"SLP118", "SLP119", "SLP120",
 	}
 	for _, id := range newRules {
 		if !ruleIDs[id] {

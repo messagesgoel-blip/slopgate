@@ -51,7 +51,7 @@ func (r SLP114) Check(d *diff.Diff) []Finding {
 						lastIdent = funcCall[dot+1:]
 					}
 					lastIdent = strings.TrimSpace(lastIdent)
-					if !strings.HasPrefix(lastIdent, "err") && !strings.HasPrefix(lastIdent, "Err") && lastIdent != "" {
+					if lastIdent != "" {
 						if strings.HasSuffix(stripped, ")") || strings.HasSuffix(stripped, "){") {
 							hasErrorReturn := false
 							if isErrorReturningFunc(lastIdent, stripped) {

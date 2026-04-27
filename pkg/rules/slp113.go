@@ -105,6 +105,12 @@ func (r SLP113) Check(d *diff.Diff) []Finding {
 			switch ext {
 			case ".go":
 				expectedTestFile = slp113TestPath(dir, base, "_test.go")
+			case ".py":
+				expectedTestFile = slp113TestPath(dir, base, "_test.py")
+			case ".java":
+				expectedTestFile = slp113TestPath(dir, base, "Test.java")
+			case ".kt":
+				expectedTestFile = slp113TestPath(dir, base, "Test.kt")
 			default:
 				expectedTestFile = slp113TestPath(dir, base, ".test"+ext)
 			}

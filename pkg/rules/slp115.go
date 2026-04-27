@@ -48,11 +48,17 @@ func (r SLP115) Check(d *diff.Diff) []Finding {
 				if cleaned == "" || strings.HasPrefix(raw, "//") || strings.HasPrefix(raw, "/*") || strings.HasPrefix(raw, "#") {
 					continue
 				}
-				content := raw
+				content := cleaned
+				if content == "" {
+					content = raw
+				}
 				contentLower := strings.ToLower(content)
 				for _, group := range slp115ExtensionGroups {
 					if !strings.Contains(contentLower, group.narrow) {
-						continue
+						if !strings.Contains(strings.ToLower(raw), group.narrow) {
+							continue
+						}
+						contentLower = strings.ToLower(raw)
 					}
 
 					hasNarrow := false

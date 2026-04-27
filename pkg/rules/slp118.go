@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -12,6 +13,27 @@ func (SLP118) ID() string                { return "SLP118" }
 func (SLP118) DefaultSeverity() Severity { return SeverityBlock }
 func (SLP118) Description() string {
 	return "slice or index access without length guard — may panic on empty collection"
+}
+
+var slp118IndexRe = regexp.MustCompile(`\[\d+\]`)
+var slp118GoGuardRe = regexp.MustCompile(`if len\(.+\)\s*>\s*\d+|if len\(.+\)\s*>=\s*\d+`)
+var slp118JSGuardRe = regexp.MustCompile(`if\s*\(.+\.length\s*>\s*\d+\)|if\s*\(.+\.length\s*>=\s*\d+\)`)
+var slp118PyGuardRe = regexp.MustCompile(`if len\(.+\)\s*>\s*\d+|if len\(.+\)\s*>=\s*\d+`)
+
+func slp118IsGuarded(prevContent string, filePath string) bool {
+	if prevContent == "" {
+		return false
+	}
+	if isGoFile(filePath) && slp118GoGuardRe.MatchString(prevContent) {
+		return true
+	}
+	if isJSOrTSFile(filePath) && slp118JSGuardRe.MatchString(prevContent) {
+		return true
+	}
+	if isPythonFile(filePath) && slp118PyGuardRe.MatchString(prevContent) {
+		return true
+	}
+	return false
 }
 
 func (r SLP118) Check(d *diff.Diff) []Finding {
@@ -28,13 +50,11 @@ func (r SLP118) Check(d *diff.Diff) []Finding {
 			prevContent := ""
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
-					prevContent = ""
 					continue
 				}
 				content := stripCommentAndStrings(ln.Content)
 				content = strings.TrimSpace(content)
 				if content == "" {
-					prevContent = ""
 					continue
 				}
 
@@ -45,13 +65,12 @@ func (r SLP118) Check(d *diff.Diff) []Finding {
 					continue
 				}
 
-				if strings.HasPrefix(prevContent, "if len") || strings.HasPrefix(prevContent, "if len(") {
+				if slp118IsGuarded(prevContent, f.Path) {
+					prevContent = content
 					continue
 				}
 
-				if strings.Contains(content, "[0]") || strings.Contains(content, "[0]=") ||
-					strings.Contains(content, "[1]") || strings.HasSuffix(content, "[0]") ||
-					strings.HasSuffix(content, "[1]") {
+				if slp118IndexRe.MatchString(content) {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),
