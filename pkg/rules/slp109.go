@@ -99,6 +99,12 @@ func slp109CollectSignature(lines []diff.Line, start int) (string, int, int, boo
 				if depth > 0 {
 					depth--
 				}
+			case '[':
+				depth++
+			case ']':
+				if depth > 0 {
+					depth--
+				}
 			case '{':
 				if depth == 0 && bodyBraceOff < 0 {
 					bodyBraceOff = off
@@ -192,9 +198,9 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				content := strings.TrimSpace(ln.Content)
-
-				braceDepth += strings.Count(content, "{")
-				braceDepth -= strings.Count(content, "}")
+				sanitized := stripStringLiterals(content)
+				braceDepth += strings.Count(sanitized, "{")
+				braceDepth -= strings.Count(sanitized, "}")
 				if ln.Kind == diff.LineAdd && ln.NewLineNo != cur.sigLine {
 					if ln.NewLineNo == cur.bodyStartLine {
 						// For multi-line signatures: capture content after the opening '{' on the body-start line.
@@ -209,7 +215,7 @@ func (r SLP109) Check(d *diff.Diff) []Finding {
 						cur.body = append(cur.body, content)
 					}
 				}
-				if braceDepth <= 0 && strings.Contains(content, "}") {
+				if braceDepth <= 0 && strings.Contains(sanitized, "}") {
 					if len(cur.body) > 0 {
 						funcs = append(funcs, cur)
 					}

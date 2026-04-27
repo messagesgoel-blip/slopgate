@@ -154,7 +154,7 @@ func slp098TestMatches(testPath, sourceBase string) bool {
 			if testDir == root || strings.HasPrefix(testDir, root+"/") {
 				remainder := strings.TrimPrefix(testDir, root)
 				remainder = strings.TrimPrefix(remainder, "/")
-				if remainder == "" || strings.HasSuffix(srcDir, remainder) {
+				if remainder == "" || srcDir == remainder || strings.HasSuffix(srcDir, "/"+remainder) {
 					return true
 				}
 			}
@@ -203,6 +203,11 @@ func slp098TestTarget(testPath string) string {
 		for _, sfx := range []string{"tests", "test"} {
 			if lowerBase == sfx {
 				return dir
+			}
+			// Java-style: UserTest.java or UserTests.java
+			if strings.HasSuffix(lowerBase, sfx+".java") {
+				newBase := base[:len(base)-len(sfx+".java")] + ".java"
+				return path.Join(dir, newBase)
 			}
 			for _, delim := range []string{".", "-"} {
 				if strings.HasSuffix(lowerBase, delim+sfx) {

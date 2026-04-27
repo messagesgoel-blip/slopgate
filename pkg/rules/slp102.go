@@ -30,11 +30,12 @@ func slp102HasOpeningBraceLookahead(lines []diff.Line, start int) bool {
 			continue
 		}
 		seenNonEmpty++
+		stripped := stripCommentAndStrings(content)
 		// Stop if a new async function declaration is found — its { belongs to a different function.
-		if slp102AsyncFunc.MatchString(content) {
+		if slp102AsyncFunc.MatchString(stripped) {
 			return false
 		}
-		if strings.Contains(content, "{") {
+		if strings.Contains(stripped, "{") {
 			return true
 		}
 	}
@@ -112,8 +113,10 @@ func (r SLP102) Check(d *diff.Diff) []Finding {
 				}
 
 				cleanContent := stripCommentAndStrings(content)
-				braceDepth += strings.Count(cleanContent, "{")
-				braceDepth -= strings.Count(cleanContent, "}")
+				if !inAsync || ln.Kind != diff.LineDelete {
+					braceDepth += strings.Count(cleanContent, "{")
+					braceDepth -= strings.Count(cleanContent, "}")
+				}
 
 				if ln.Kind != diff.LineDelete && slp102AwaitRe.MatchString(content) {
 					hasAwait = true

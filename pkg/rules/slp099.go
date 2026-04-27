@@ -25,10 +25,10 @@ var slp099GoStructField = regexp.MustCompile(
 		`[A-Z]\w*\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?` + // Exported field (uppercase)
 		`|\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)\w+(?:\.\w+)?` + // Any field with pointer/slice type
 		`|[A-Z]\w*\s+\w+\.\w+` + // Exported field with package-qualified type
-		`)(?:\s+` + "`" + `[^` + "`" + `]*` + "`" + `)?\s*$` + // Optional struct tag
-		`|^\s*\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?\s+` + "`" + `[^` + "`" + `]*` + "`" + `\s*$`) // Lowercase field with struct tag
+		`)(?:\s+` + "`" + `[^` + "`" + `]*` + "`" + `)?(?:\s*//.*)?$` + // Optional struct tag
+		`|^\s*\w+\s+(?:\*\[\]|\[\]\*|\[\]|\*)?\w+(?:\.\w+)?\s+` + "`" + `[^` + "`" + `]*` + "`" + `(?:\s*//.*)?$`) // Lowercase field with struct tag
 
-var slp099TSInterfaceProp = regexp.MustCompile(`(?i)^(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?$`)
+var slp099TSInterfaceProp = regexp.MustCompile(`(?i)^(?:readonly\s+)?\w+(?:\?)?:\s*(?:string|number|boolean|Date|\[\]\w+|\w+\[\])[;,]?(?:\s*//.*)?$`)
 
 var slp099ResponseKeywords = map[string]struct{}{
 	"response": {},
@@ -146,15 +146,23 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 	return out
 }
 
+func slp099NormalizeStem(s string) string {
+	s = strings.ToLower(s)
+	s = strings.ReplaceAll(s, "_", "")
+	s = strings.ReplaceAll(s, "-", "")
+	return s
+}
+
 func testMatchesResponse(respPath string, testFiles map[string]bool) bool {
 	if len(testFiles) == 0 {
 		return false
 	}
 	respStem := slp099FileStem(respPath)
+	normRespStem := slp099NormalizeStem(respStem)
 	respDir := path.Dir(respPath)
 
 	for tf := range testFiles {
-		if slp099FileStem(tf) != respStem {
+		if slp099NormalizeStem(slp099FileStem(tf)) != normRespStem {
 			continue
 		}
 		if slp099RelatedDir(respDir, path.Dir(tf)) {

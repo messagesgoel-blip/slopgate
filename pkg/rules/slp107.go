@@ -65,24 +65,24 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 							// Only count braces from the error keyword onwards so that a
 							// leading "}" (e.g. "} catch (err) {") is not counted against
 							// the catch block's own brace depth.
-							headerSuffix := content
-							if loc := slp107ErrorBlockStart.FindStringIndex(content); loc != nil {
-								headerSuffix = content[loc[0]:]
-							} else if loc := slp107IfErrPattern.FindStringIndex(content); loc != nil {
-								headerSuffix = content[loc[0]:]
+							cleanHeaderSuffix := cleanContent
+							if loc := slp107ErrorBlockStart.FindStringIndex(cleanContent); loc != nil {
+								cleanHeaderSuffix = cleanContent[loc[0]:]
+							} else if loc := slp107IfErrPattern.FindStringIndex(cleanContent); loc != nil {
+								cleanHeaderSuffix = cleanContent[loc[0]:]
 							}
-							errorBraceDepth += strings.Count(headerSuffix, "{")
-							errorBraceDepth -= strings.Count(headerSuffix, "}")
+							errorBraceDepth += strings.Count(cleanHeaderSuffix, "{")
+							errorBraceDepth -= strings.Count(cleanHeaderSuffix, "}")
 						}
 
 						// Handle cases where the cleanup might be on the same line as the if err (e.g. Go one-liners)
 						// ONLY if it's an added line
-						if ln.Kind == diff.LineAdd && slp107Cleanup.MatchString(content) {
+						if ln.Kind == diff.LineAdd && slp107Cleanup.MatchString(cleanContent) {
 							cleanupLines = append(cleanupLines, *ln)
 						}
 
 						// Check if the block closed immediately (one-liner)
-						if (!isPython && errorBraceDepth <= 0 && strings.Contains(content, "}")) || (isPython && slp107NextNonDeletedIndent(h.Lines, k+1) <= errorIndentLevel) {
+						if (!isPython && errorBraceDepth <= 0 && strings.Contains(cleanContent, "}")) || (isPython && slp107NextNonDeletedIndent(h.Lines, k+1) <= errorIndentLevel) {
 							if len(cleanupLines) > 0 {
 								r.emitIfNoSuccessCleanup(&out, f.Path, cleanupLines, h, errorBlockStart, k+1)
 							}
@@ -116,15 +116,15 @@ func (r SLP107) Check(d *diff.Diff) []Finding {
 						continue
 					}
 				} else {
-					errorBraceDepth += strings.Count(content, "{")
-					errorBraceDepth -= strings.Count(content, "}")
+					errorBraceDepth += strings.Count(cleanContent, "{")
+					errorBraceDepth -= strings.Count(cleanContent, "}")
 				}
 
-				if ln.Kind == diff.LineAdd && slp107Cleanup.MatchString(content) {
+				if ln.Kind == diff.LineAdd && slp107Cleanup.MatchString(cleanContent) {
 					cleanupLines = append(cleanupLines, *ln)
 				}
 
-				if !isPython && errorBraceDepth <= 0 && strings.Contains(content, "}") {
+				if !isPython && errorBraceDepth <= 0 && strings.Contains(cleanContent, "}") {
 					if len(cleanupLines) > 0 {
 						r.emitIfNoSuccessCleanup(&out, f.Path, cleanupLines, h, errorBlockStart, k+1)
 					}

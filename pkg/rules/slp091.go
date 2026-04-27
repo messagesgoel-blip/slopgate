@@ -25,7 +25,7 @@ var slp091ISODate = regexp.MustCompile(`\b(20[1-3]\d)[-/](0[1-9]|1[0-2])[-/](0[1
 
 var slp091JSDate = regexp.MustCompile(`new\s+Date\s*\(\s*["'\x60]`)
 
-var slp091SQLDate = regexp.MustCompile(`(?i)(expires?_?at|valid_until|not_after|expiry_date)\s*[:=]\s*\d`)
+var slp091SQLDate = regexp.MustCompile(`(?i)(expires?_?at|valid_until|not_after|expiry_date)\s*[:=]\s*\d{4}[-/]\d{1,2}[-/]\d{1,2}`)
 
 var slp091Timestamp = regexp.MustCompile(`(?i)"(?:expires?_?(?:at|in)|ttl|deadline)"\s*[:=]\s*\d{10,13}\b|(?i)(expires?_?(?:at|in)|ttl|deadline)\s*[:=]\s*\d{10,13}\b`)
 
@@ -109,16 +109,30 @@ func (r SLP091) Check(d *diff.Diff) []Finding {
 				continue
 			}
 
+			// Strip inline comment suffixes before regex matching (best-effort).
+			contentForMatch := content
+			if i := strings.Index(contentForMatch, "//"); i >= 0 {
+				contentForMatch = strings.TrimSpace(contentForMatch[:i])
+			}
+			if i := strings.Index(contentForMatch, " #"); i >= 0 {
+				contentForMatch = strings.TrimSpace(contentForMatch[:i])
+			}
+			if i := strings.Index(contentForMatch, " --"); i >= 0 {
+				contentForMatch = strings.TrimSpace(contentForMatch[:i])
+			}
+			if contentForMatch == "" {
+				continue
+			}
 			var msg string
 			switch {
-			case slp091JSDate.MatchString(content):
+			case slp091JSDate.MatchString(contentForMatch):
 				msg = "hardcoded JS Date with string literal in test — use relative date instead"
-			case slp091SQLDate.MatchString(content):
+			case slp091SQLDate.MatchString(contentForMatch):
 				msg = "hardcoded expiry date in test fixture — will expire and break CI"
-			case slp091Timestamp.MatchString(content):
+			case slp091Timestamp.MatchString(contentForMatch):
 				msg = "hardcoded timestamp in test — use relative time or mock"
-			case slp091ISODate.MatchString(content):
-				for _, match := range slp091ISODate.FindAllStringSubmatch(content, -1) {
+			case slp091ISODate.MatchString(contentForMatch):
+				for _, match := range slp091ISODate.FindAllStringSubmatch(contentForMatch, -1) {
 					if len(match) > 1 {
 						year := match[1]
 						if strings.HasPrefix(year, "202") || strings.HasPrefix(year, "203") {

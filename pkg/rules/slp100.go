@@ -20,7 +20,7 @@ func (SLP100) Description() string {
 
 var slp100FuncStart = regexp.MustCompile(`(?i)(?:func\s+(?:\([^)]*\)\s+)?|function\s+|def\s+|(?:public|private|protected)\s+(?:static\s+)?(?:final\s+)?(?:\w+\s+)?|fn\s+)\w+\s*\(`)
 
-var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None)\s*[;]?\s*$`)
+var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return(?:\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None))?\s*[;]?\s*$`)
 
 func hasSideEffect(line string) bool {
 	stripped := stripCommentAndStrings(line)
@@ -68,7 +68,10 @@ func (r SLP100) Check(d *diff.Diff) []Finding {
 					// Check the body fragment on the same line (text after the opening '{').
 					if idx := strings.Index(content, "{"); idx >= 0 {
 						bodyFragment := strings.TrimSpace(content[idx+1:])
-						bodyFragment = strings.TrimRight(bodyFragment, "} \t")
+						// Remove at most one trailing '}' so "return {} }" becomes "return {}" not "return {".
+						if strings.HasSuffix(bodyFragment, "}") {
+							bodyFragment = bodyFragment[:len(bodyFragment)-1]
+						}
 						if hasSideEffect(bodyFragment) {
 							hasWork = true
 						}
