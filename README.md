@@ -58,7 +58,7 @@ slopgate runs automatically in CI on every push to main and on pull requests. Th
 
 For a complete CI setup example, see `.github/workflows/ci.yml`.
 
-## Rules (v0.0.11)
+## Rules (v0.0.12)
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
@@ -95,7 +95,42 @@ For a complete CI setup example, see `.github/workflows/ci.yml`.
 | SLP034 | Potential state management anti-pattern detected | warn | JS/TS |
 | SLP035 | Code quality or style issue detected (console/debugger, TODO without ticket, trailing whitespace, long lines) | warn | all |
 
+| SLP091 | Hardcoded date/time in test fixture (will expire) | block | JS/TS, Go, Python, SQL |
+| SLP092 | Mock return shape doesn't match API envelope | warn | JS/TS |
+| SLP093 | New mock/setup without corresponding new assertion | warn | all |
+| SLP094 | Shell command with \|\| true (silent failure) | block | sh, bash, Makefile, CI YAML |
+| SLP095 | Try/catch returns silently without error handling | block | JS/TS, Python, Java |
+| SLP096 | Shell script missing set -e (error propagation) | warn | sh, bash |
+| SLP097 | Response destructuring vs API envelope mismatch | warn | JS/TS |
+| SLP098 | New route/handler without corresponding test | warn | Go, JS/TS, Python, Java |
+| SLP099 | Response field changed without test update | warn | Go, JS/TS |
+| SLP100 | Function returns zero value with no side effects (no-op) | block | Go, JS/TS, Python, Java, Rust |
+| SLP101 | Dead feature flag (both branches identical) | warn | JS/TS, Go, Java |
+| SLP102 | Async function with no await (stub) | warn | JS/TS |
+| SLP103 | Hardcoded timeout duration | info | Go, JS/TS, Python |
+| SLP104 | Hardcoded buffer/size limit | info | Go, JS/TS |
+| SLP106 | Resource acquired without release/close in scope | warn | Go, JS/TS, Python, Java, Rust |
+| SLP107 | Cleanup/destroy only in error path, missing on success | block | Go, JS/TS, Python |
+| SLP108 | Open/connect without defer close or timeout | block | Go, JS/TS |
+| SLP109 | Duplicate function body (>80% identical) | warn | Go, JS/TS, Python, Java |
+| SLP110 | Duplicate file (>60% identical imports/declarations) | warn | all |
+| SLP111 | Binary/executable committed without .gitignore | block | all |
+| SLP112 | Generated file committed without corresponding source | warn | Go, JS/TS, protobuf |
+
 \* SLP020 escalates to **warn** when security-context keywords (password, token, secret, key, session, nonce, salt, credential, auth) appear nearby.
+
+### v0.0.12 Changes
+
+- **SLP091-SLP093**: Test/mock/fixture quality rules (hardcoded dates, mock envelope mismatches, mock without assertion)
+- **SLP094-SLP096**: Silent failure detection (shell \|\| true, empty catch handlers, missing set -e)
+- **SLP097-SLP099**: API contract/route testing rules (destructuring vs envelope, route without test, field change without test update)
+- **SLP100-SLP102**: Stub/incomplete implementation detection (no-op functions, dead feature flags, async without await)
+- **SLP103-SLP104**: Magic literal detection expansion (timeout durations, buffer sizes)
+- **SLP106-SLP108**: Resource management rules (acquire without release, cleanup only in error path, open without defer/timeout)
+- **SLP109-SLP110**: Code duplication detection (similar function bodies, similar files)
+- **SLP111-SLP112**: Binary/asset hygiene (binary without .gitignore, generated files without source)
+
+Total: 108 rules
 
 ### v0.0.11 Changes
 

@@ -72,6 +72,37 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 		"SLP068": false,
 		"SLP069": false,
 		"SLP070": false,
+		"SLP081": false,
+		"SLP082": false,
+		"SLP083": false,
+		"SLP084": false,
+		"SLP085": false,
+		"SLP086": false,
+		"SLP087": false,
+		"SLP088": false,
+		"SLP089": false,
+		"SLP090": false,
+		"SLP091": false,
+		"SLP092": false,
+		"SLP093": false,
+		"SLP094": false,
+		"SLP095": false,
+		"SLP096": false,
+		"SLP097": false,
+		"SLP098": false,
+		"SLP099": false,
+		"SLP100": false,
+		"SLP101": false,
+		"SLP102": false,
+		"SLP103": false,
+		"SLP104": false,
+		"SLP106": false,
+		"SLP107": false,
+		"SLP108": false,
+		"SLP109": false,
+		"SLP110": false,
+		"SLP111": false,
+		"SLP112": false,
 	}
 	for _, rule := range r.All() {
 		if _, ok := want[rule.ID()]; ok {
@@ -88,20 +119,25 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 func TestDefault_NoExtraRules(t *testing.T) {
 	r := Default()
 
-	// Check count first
-	wantCount := 77
+	wantCount := 98
 	if got := len(r.All()); got != wantCount {
 		t.Errorf("Default registry has %d rules, want %d", got, wantCount)
 	}
 
-	// Build set of all registered rule IDs
 	ruleIDs := make(map[string]bool)
 	for _, rule := range r.All() {
 		ruleIDs[rule.ID()] = true
 	}
 
-	// Verify SLP081-SLP090 are present
-	newRules := []string{"SLP081", "SLP082", "SLP083", "SLP084", "SLP085", "SLP086", "SLP087", "SLP088", "SLP089", "SLP090"}
+	newRules := []string{
+		"SLP081", "SLP082", "SLP083", "SLP084", "SLP085",
+		"SLP086", "SLP087", "SLP088", "SLP089", "SLP090",
+		"SLP091", "SLP092", "SLP093", "SLP094", "SLP095",
+		"SLP096", "SLP097", "SLP098", "SLP099", "SLP100",
+		"SLP101", "SLP102", "SLP103", "SLP104",
+		"SLP106", "SLP107", "SLP108", "SLP109", "SLP110",
+		"SLP111", "SLP112",
+	}
 	for _, id := range newRules {
 		if !ruleIDs[id] {
 			t.Errorf("new rule %s not registered in Default()", id)
