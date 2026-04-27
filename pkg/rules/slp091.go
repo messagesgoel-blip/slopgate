@@ -56,6 +56,7 @@ func isTestFile(path string) bool {
 // is found outside of any quoted string (single, double, or backtick).
 // Returns -1 if not found or if substr is inside quotes.
 func indexOutsideQuotes(s, substr string) int {
+	// Track quote state to avoid matching inside strings
 	inSingle := false
 	inDouble := false
 	inBacktick := false
