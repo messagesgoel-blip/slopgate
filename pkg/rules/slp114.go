@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -13,6 +14,8 @@ func (SLP114) DefaultSeverity() Severity { return SeverityWarn }
 func (SLP114) Description() string {
 	return "error-returning function called as statement — check the error return"
 }
+
+var slp114ErrGuardRe = regexp.MustCompile(`^if\s+err\s*:=|^if\s+[^;]+;\s*err\s*!=`)
 
 func (r SLP114) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -36,7 +39,7 @@ func (r SLP114) Check(d *diff.Diff) []Finding {
 				if strings.HasPrefix(stripped, "return ") {
 					continue
 				}
-				if strings.HasPrefix(stripped, "if ") {
+				if slp114ErrGuardRe.MatchString(stripped) {
 					continue
 				}
 
@@ -52,7 +55,9 @@ func (r SLP114) Check(d *diff.Diff) []Finding {
 					}
 					lastIdent = strings.TrimSpace(lastIdent)
 					if lastIdent != "" {
-						if strings.HasSuffix(stripped, ")") || strings.HasSuffix(stripped, "){") {
+						if strings.HasSuffix(stripped, ")") || strings.HasSuffix(stripped, "){") ||
+						strings.Contains(stripped, ") {") || strings.Contains(stripped, ")}") ||
+						strings.Contains(stripped, ") }") {
 							hasErrorReturn := false
 							if isErrorReturningFunc(lastIdent, stripped) {
 								hasErrorReturn = true

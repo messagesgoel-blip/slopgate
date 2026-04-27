@@ -64,6 +64,23 @@ func TestSLP118_NoFireOnGuardedAccess(t *testing.T) {
 	}
 }
 
+func TestSLP118_FireOnUnguardedDifferentCollection(t *testing.T) {
+	d := parseDiff(t, `diff --git a/process.go b/process.go
+--- a/process.go
++++ b/process.go
+@@ -1,1 +1,4 @@
+ package main
++
++if len(items) > 0 {
++    var first = other[0]
++}
+`)
+	got := SLP118{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for unguarded different collection index access")
+	}
+}
+
 func TestSLP118_NoFireOnJSGuardedAccess(t *testing.T) {
 	d := parseDiff(t, `diff --git a/app.ts b/app.ts
 --- a/app.ts
@@ -101,17 +118,47 @@ func TestSLP118_PrevContentPreservedAcrossContextLines(t *testing.T) {
 	d := parseDiff(t, `diff --git a/process.go b/process.go
 --- a/process.go
 +++ b/process.go
-@@ -1,1 +1,5 @@
+@@ -1,3 +1,5 @@
  package main
-+
+-// old line
 +if len(items) > 0 {
-+    // safe access
+ // safe access
 +    var first = items[0]
 +}
 `)
 	got := SLP118{}.Check(d)
 	if len(got) != 0 {
-		t.Fatalf("expected 0 findings when guard is present, got %d", len(got))
+		t.Fatalf("expected 0 findings when guard is present via context line, got %d", len(got))
+	}
+}
+
+func TestSLP118_NoFireOnArrayTypeDeclaration(t *testing.T) {
+	d := parseDiff(t, `diff --git a/types.go b/types.go
+--- a/types.go
++++ b/types.go
+@@ -1,1 +1,3 @@
+ package main
++
++var buf [16]byte
+`)
+	got := SLP118{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for array type declaration, got %d", len(got))
+	}
+}
+
+func TestSLP118_FiresOnChainedIndexAfterCall(t *testing.T) {
+	d := parseDiff(t, `diff --git a/process.go b/process.go
+--- a/process.go
++++ b/process.go
+@@ -1,1 +1,3 @@
+ package main
++
++var result = getData()[0]
+`)
+	got := SLP118{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for chained index access without guard")
 	}
 }
 

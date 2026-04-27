@@ -51,14 +51,31 @@ func TestSLP119_NoFireOnHasSuffixCheck(t *testing.T) {
 	d := parseDiff(t, `diff --git a/process.go b/process.go
 --- a/process.go
 +++ b/process.go
-@@ -1,1 +1,3 @@
+@@ -1,1 +1,4 @@
  package main
 +
-+if strings.HasSuffix(name, ".txt") { var result = strings.TrimSuffix(name, ".txt") }
++if strings.HasSuffix(name, ".txt") {
++    var result = strings.TrimSuffix(name, ".txt")
++}
 `)
 	got := SLP119{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings when HasSuffix guard present, got %d", len(got))
+	}
+}
+
+func TestSLP119_NoFireOnHasSuffixOnAdjacentLine(t *testing.T) {
+	d := parseDiff(t, `diff --git a/process.go b/process.go
+--- a/process.go
++++ b/process.go
+@@ -1,1 +1,3 @@
+ package main
++if strings.HasSuffix(name, ".txt") {}
++var result = strings.TrimSuffix(name, ".txt")
+`)
+	got := SLP119{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when HasSuffix on adjacent line, got %d", len(got))
 	}
 }
 

@@ -14,6 +14,13 @@ func (SLP119) Description() string {
 	return "TrimSuffix/TrimPrefix result used without checking if the suffix/prefix was present"
 }
 
+func slp119HasSafetyCheck(text string) bool {
+	return strings.Contains(text, "HasSuffix") || strings.Contains(text, "HasPrefix") ||
+		strings.Contains(text, "hasSuffix") || strings.Contains(text, "hasPrefix") ||
+		strings.Contains(text, `== ""`) || strings.Contains(text, `!= ""`) ||
+		strings.Contains(text, `==''`) || strings.Contains(text, `!=''`)
+}
+
 func (r SLP119) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -25,7 +32,8 @@ func (r SLP119) Check(d *diff.Diff) []Finding {
 		}
 
 		for _, h := range f.Hunks {
-			for _, ln := range h.Lines {
+			lines := h.Lines
+			for i, ln := range lines {
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
@@ -41,10 +49,17 @@ func (r SLP119) Check(d *diff.Diff) []Finding {
 
 				if strings.Contains(content, "TrimSuffix") || strings.Contains(content, "TrimPrefix") ||
 					strings.Contains(content, "trimSuffix") || strings.Contains(content, "trimPrefix") {
-					if strings.Contains(content, "HasSuffix") || strings.Contains(content, "HasPrefix") ||
-						strings.Contains(content, "hasSuffix") || strings.Contains(content, "hasPrefix") ||
-						strings.Contains(content, `== ""`) || strings.Contains(content, `!= ""`) ||
-						strings.Contains(content, `==''`) || strings.Contains(content, `!=''`) {
+
+					window := ln.Content
+					for j := 1; j <= 2; j++ {
+						if i-j >= 0 {
+							window += " " + lines[i-j].Content
+						}
+						if i+j < len(lines) {
+							window += " " + lines[i+j].Content
+						}
+					}
+					if slp119HasSafetyCheck(window) {
 						continue
 					}
 					out = append(out, Finding{

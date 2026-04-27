@@ -1,7 +1,6 @@
 package rules
 
 import (
-	"path/filepath"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -106,8 +105,4 @@ func formatExtList(exts []string) string {
 		parts = append(parts, e)
 	}
 	return strings.Join(parts, ", ")
-}
-
-func init() {
-	_ = filepath.Ext
 }

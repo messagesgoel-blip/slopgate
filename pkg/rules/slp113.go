@@ -15,17 +15,37 @@ func (SLP113) Description() string {
 	return "source file changed without corresponding test update — update tests or add a test file"
 }
 
-func slp113SourceExts() map[string]string {
-	return map[string]string{
-		".go":     "_test.go",
-		".js":     ".test.js",
-		".ts":     ".test.ts",
-		".tsx":    ".test.tsx",
-		".jsx":    ".test.jsx",
-		".py":     "_test.py",
-		".java":   "Test.java",
-		".kt":     "Test.kt",
+var slp113SourceExtMap = map[string]string{
+	".go":   "_test.go",
+	".js":   ".test.js",
+	".ts":   ".test.ts",
+	".tsx":  ".test.tsx",
+	".jsx":  ".test.jsx",
+	".py":   "_test.py",
+	".java": "Test.java",
+	".kt":   "Test.kt",
+}
+
+func slp113IsTestFile(path string) bool {
+	base := filepath.Base(path)
+	ext := filepath.Ext(path)
+	testSuffix, ok := slp113SourceExtMap[ext]
+	if ok && strings.HasSuffix(base, testSuffix) {
+		return true
 	}
+	if strings.Contains(path, ".test.") || strings.Contains(path, "_test.") {
+		return true
+	}
+	dir := filepath.Dir(path)
+	testDir := filepath.ToSlash(filepath.Join(dir, "testdata"))
+	if strings.HasPrefix(path, testDir+"/") {
+		return true
+	}
+	return false
+}
+
+func slp113SourceExts() map[string]string {
+	return slp113SourceExtMap
 }
 
 func slp113TestPath(dir, base, testSuffix string) string {
@@ -37,7 +57,7 @@ func slp113TestPath(dir, base, testSuffix string) string {
 
 func slp113HasTestFile(sourcePath string, allFiles map[string]bool) bool {
 	ext := filepath.Ext(sourcePath)
-	testSuffix, ok := slp113SourceExts()[ext]
+	testSuffix, ok := slp113SourceExtMap[ext]
 	if !ok {
 		return true
 	}
@@ -76,9 +96,8 @@ func (r SLP113) Check(d *diff.Diff) []Finding {
 		if !f.IsDelete {
 			allFiles[f.Path] = true
 			ext := filepath.Ext(f.Path)
-			switch ext {
-			case ".go", ".js", ".ts", ".tsx", ".jsx", ".py", ".java", ".kt":
-				if !strings.HasSuffix(f.Path, "_test.go") && !strings.Contains(f.Path, ".test.") && !strings.Contains(f.Path, "_test.") {
+			if _, ok := slp113SourceExtMap[ext]; ok {
+				if !slp113IsTestFile(f.Path) {
 					sourceFiles[f.Path] = true
 				}
 			}
@@ -91,16 +110,17 @@ func (r SLP113) Check(d *diff.Diff) []Finding {
 		}
 
 		ext := filepath.Ext(f.Path)
-		if _, ok := slp113SourceExts()[ext]; !ok {
+		if _, ok := slp113SourceExtMap[ext]; !ok {
 			continue
 		}
-		if strings.HasSuffix(f.Path, "_test.go") || strings.Contains(f.Path, ".test.") || strings.Contains(f.Path, "_test.") {
+		if slp113IsTestFile(f.Path) {
 			continue
 		}
 
 		if !slp113HasTestFile(f.Path, allFiles) {
 			dir := filepath.Dir(f.Path)
 			base := strings.TrimSuffix(filepath.Base(f.Path), ext)
+			testSuffix, _ := slp113SourceExtMap[ext]
 			var expectedTestFile string
 			switch ext {
 			case ".go":
@@ -112,7 +132,7 @@ func (r SLP113) Check(d *diff.Diff) []Finding {
 			case ".kt":
 				expectedTestFile = slp113TestPath(dir, base, "Test.kt")
 			default:
-				expectedTestFile = slp113TestPath(dir, base, ".test"+ext)
+				expectedTestFile = slp113TestPath(dir, base, testSuffix)
 			}
 			out = append(out, Finding{
 				RuleID:   r.ID(),
