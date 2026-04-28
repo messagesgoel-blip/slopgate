@@ -124,5 +124,12 @@ func Default() *Registry {
 	r.Register(SLP118{})
 	r.Register(SLP119{})
 	r.Register(SLP120{})
+	r.Register(SLP121{})
+	r.Register(SLP122{})
+	r.Register(SLP123{})
+	r.Register(SLP124{})
+	r.Register(SLP125{})
+	r.Register(SLP126{})
+	r.Register(SLP127{})
 	return r
 }
