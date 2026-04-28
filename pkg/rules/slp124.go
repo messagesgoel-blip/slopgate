@@ -19,7 +19,7 @@ func (SLP124) Description() string {
 
 var slp124ExternalCallRe = regexp.MustCompile(`(?i)(fetch\s*\(|axios\.\w+\s*\(|http\.(?:Post|Do|NewRequest)\s*\(|client\.Do\s*\(|litellm|chat\.completions\.create|openai\.\w+\s*\()`)
 var slp124InputPayloadRe = regexp.MustCompile(`(?i)(req\.(?:body|query|params)|\binput\b|\bpayload\b|\bprompt\b|\bmessages?\b|\bbody\b|\bquery\b|\bparams\b)`)
-var slp124ValidationRe = regexp.MustCompile(`(?i)(\bvalidate\b|\bschema\.parse\b|\bzod\b|\bjoi\b|if\s*(?:\(\s*)?len\(|if\s*\(\s*!|if\s*\(\s*[^)]*==\s*["']\s*["']|if\s*![A-Za-z_0-9]|if\s+not\s+\w+|trim\(\)|\brequired\b|\bensure\b|\bguard\b)`)
+var slp124ValidationRe = regexp.MustCompile(`(?i)(\bvalidate\b|\bschema\.parse\b|\bzod\b|\bjoi\b|if\s*(?:\(\s*)?len\(|if\s*\(\s*!|if\s*\(\s*[^)]*==\s*["']\s*["']|if\s+[A-Za-z_0-9]+\s*==\s*["']\s*["']|if\s*![A-Za-z_0-9]|if\s+not\s+\w+|trim\(\)|\brequired\b|\bensure\b|\bguard\b)`)
 
 func (r SLP124) Check(d *diff.Diff) []Finding {
 	var out []Finding

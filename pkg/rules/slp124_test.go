@@ -29,6 +29,23 @@ func TestSLP124_NoFireWhenValidationExists(t *testing.T) {
 	}
 }
 
+// TestSLP124_NoFireWhenValidationExists_EmptyStringComparison verifies that
+// an unparenthesized empty string comparison (if field == "") is recognized
+// as a valid validation guard.
+func TestSLP124_NoFireWhenValidationExists_EmptyStringComparison(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/services/aiRouter.js b/api/src/services/aiRouter.js
+--- a/api/src/services/aiRouter.js
++++ b/api/src/services/aiRouter.js
+@@ -1,1 +1,3 @@
++if (req.body.api_key == "") return res.status(400).json({ error: "missing" })
++const response = await openai.ChatCompletion.create({ api_key: req.body.api_key })
+`)
+	got := SLP124{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for unparenthesized empty string comparison guard, got %d", len(got))
+	}
+}
+
 func TestSLP124_Description(t *testing.T) {
 	r := SLP124{}
 	if r.ID() != "SLP124" {
