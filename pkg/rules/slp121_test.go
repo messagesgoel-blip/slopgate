@@ -37,11 +37,12 @@ func TestSLP121_NoFireWithAccessGuard(t *testing.T) {
 
 func TestSLP121_WordBoundary_NoFalsePositiveOnSubstringIds(t *testing.T) {
 	// tenant_id, member_id, access_token etc should NOT trigger — they're not standalone keywords
+	// This test exercises the sensitive-mutation regex path by including a mutation verb
 	d := parseDiff(t, `diff --git a/api/src/models/user.go b/api/src/models/user.go
 --- a/api/src/models/user.go
 +++ b/api/src/models/user.go
 @@ -1,1 +1,3 @@
-+	tenant_id = db.StringColumn("tenant_id")
++	await db.update('tenant_id', payload)
 `)
 	got := SLP121{}.Check(d)
 	if len(got) != 0 {

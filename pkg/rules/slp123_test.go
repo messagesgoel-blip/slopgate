@@ -29,10 +29,12 @@ func TestSLP123_NoFireWithCursorKeysetSignal(t *testing.T) {
 }
 
 func TestSLP123_NoFalsePositive_JSOrderByChainWithId(t *testing.T) {
+	// Include an offset clause to trigger the offset check, then verify tiebreaker prevents firing
 	d := parseDiff(t, `diff --git a/app/src/lib/files.ts b/app/src/lib/files.ts
 --- a/app/src/lib/files.ts
 +++ b/app/src/lib/files.ts
 @@ -1,1 +1,3 @@
++query = query.offset(10)
 +files = files.orderBy('created_at', 'desc').orderBy('id', 'desc')
 `)
 	got := SLP123{}.Check(d)
@@ -42,8 +44,15 @@ func TestSLP123_NoFalsePositive_JSOrderByChainWithId(t *testing.T) {
 }
 
 func TestSLP123_NoFalsePositive_MultilineSqlOrderById(t *testing.T) {
-	// Test that ORDER BY with id on separate line is still recognized (using \n in string)
-	d := parseDiff(t, "diff --git a/api/src/routes/activity.js b/api/src/routes/activity.js\n--- a/api/src/routes/activity.js\n+++ b/api/src/routes/activity.js\n@@ -1,1 +1,3 @@\n+const query = \"ORDER BY created_at DESC, id DESC\"\n")
+	// Simulate multiline SQL with OFFSET and split ORDER BY across lines to test tiebreaker detection
+	d := parseDiff(t, `diff --git a/api/src/routes/activity.js b/api/src/routes/activity.js
+--- a/api/src/routes/activity.js
++++ b/api/src/routes/activity.js
+@@ -1,1 +1,4 @@
++const offset = 10
++const query = "ORDER BY created_at DESC, " +
++              "id DESC OFFSET $1"
+`)
 	got := SLP123{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings for SQL with id tiebreaker on same line, got %d", len(got))
