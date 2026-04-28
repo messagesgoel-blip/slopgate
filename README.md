@@ -58,7 +58,7 @@ slopgate runs automatically in CI on every push to main and on pull requests. Th
 
 For a complete CI setup example, see `.github/workflows/ci.yml`.
 
-## Rules (v0.0.12)
+## Rules (v0.0.13)
 
 | ID | Description | Default | Languages |
 |---|---|---|---|
@@ -116,8 +116,30 @@ For a complete CI setup example, see `.github/workflows/ci.yml`.
 | SLP110 | Duplicate file (>60% identical imports/declarations) | warn | all |
 | SLP111 | Binary/executable committed without .gitignore | block | all |
 | SLP112 | Generated file committed without corresponding source | warn | Go, JS/TS, protobuf |
+| SLP113 | Source file changed without corresponding test update | warn | Go, JS/TS, Python, Java, Kotlin |
+| SLP114 | Error-returning function called as statement — check the error return | warn | Go |
+| SLP115 | Narrow extension check — add broader extension coverage | info | Go, JS/TS, Python |
+| SLP116 | Regex contains nested quantifiers — potential ReDoS vulnerability | warn | Go, JS/TS, Python |
+| SLP117 | Unanchored regex — add anchor to prevent unintended substring matches | info | Go, JS/TS |
+| SLP118 | Numeric index access without length guard — may panic on empty collection | block | Go, JS/TS, Python |
+| SLP119 | TrimSuffix/TrimPrefix result used without checking if suffix/prefix was present | warn | Go, JS/TS, Python |
+| SLP120 | Value discarded with `_ = expr` — consider using the value | warn | Go |
 
 \* SLP020 escalates to **warn** when security-context keywords (password, token, secret, key, session, nonce, salt, credential, auth) appear nearby.
+
+### v0.0.13 Changes
+
+- **SLP113-SLP120**: 8 new AI-slop detection rules:
+  - SLP113: Source file changed without test update
+  - SLP114: Error-returning function called as statement
+  - SLP115: Narrow extension check (e.g., `.js` without `.mjs`/`.cjs`)
+  - SLP116: Nested quantifier regex (ReDoS vulnerability)
+  - SLP117: Unanchored regex (missing `^`/`$`/`\b`)
+  - SLP118: Index access without length guard (panic risk)
+  - SLP119: TrimSuffix/TrimPrefix without presence check
+  - SLP120: Value discarded with `_ = expr`
+
+Total: 116 rules
 
 ### v0.0.12 Changes
 
