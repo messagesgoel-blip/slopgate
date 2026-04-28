@@ -18,9 +18,9 @@ func (SLP118) Description() string {
 
 var slp118IndexRe = regexp.MustCompile(`(?:[A-Za-z0-9_]|[\)\]\}])\s*\[\d+\]`)
 var slp118IndexNumRe = regexp.MustCompile(`\[(\d+)\]`)
-var slp118GoGuardRe = regexp.MustCompile(`if len\((.+?)\)\s*>\s*(\d+)|if len\((.+?)\)\s*>=\s*(\d+)`)
-var slp118JSGuardRe = regexp.MustCompile(`if\s*\(\s*(.+?)\.length\s*>\s*(\d+)\)|if\s*\(\s*(.+?)\.length\s*>=\s*(\d+)\)`)
-var slp118PyGuardRe = regexp.MustCompile(`if len\((.+?)\)\s*>\s*(\d+)|if len\((.+?)\)\s*>=\s*(\d+)`)
+var slp118GoGuardRe = regexp.MustCompile(`len\((.+?)\)\s*>\s*(\d+)|len\((.+?)\)\s*>=\s*(\d+)`)
+var slp118JSGuardRe = regexp.MustCompile(`([A-Za-z_$][A-Za-z0-9_$]*)\.length\s*>\s*(\d+)|([A-Za-z_$][A-Za-z0-9_$]*)\.length\s*>=\s*(\d+)`)
+var slp118PyGuardRe = regexp.MustCompile(`len\((.+?)\)\s*>\s*(\d+)|len\((.+?)\)\s*>=\s*(\d+)`)
 
 type slp118Guard struct {
 	collection  string
@@ -46,103 +46,128 @@ func slp118LeadingSpaces(s string) int {
 	return n
 }
 
-func slp118ExtractGoGuard(line string) *slp118Guard {
-	m := slp118GoGuardRe.FindStringSubmatch(line)
-	if m == nil {
-		return nil
+func slp118ExtractGoGuards(line string) []*slp118Guard {
+	var guards []*slp118Guard
+	matches := slp118GoGuardRe.FindAllStringSubmatch(line, -1)
+	for _, m := range matches {
+		if m[1] != "" {
+			guards = append(guards, &slp118Guard{collection: m[1], bound: atoiSafe(m[2]), op: ">"})
+		} else if m[3] != "" {
+			guards = append(guards, &slp118Guard{collection: m[3], bound: atoiSafe(m[4]), op: ">="})
+		}
 	}
-	if m[1] != "" {
-		return &slp118Guard{collection: m[1], bound: atoiSafe(m[2]), op: ">"}
-	}
-	if m[3] != "" {
-		return &slp118Guard{collection: m[3], bound: atoiSafe(m[4]), op: ">="}
-	}
-	return nil
+	return guards
 }
 
-func slp118ExtractJSGuard(line string) *slp118Guard {
-	m := slp118JSGuardRe.FindStringSubmatch(line)
-	if m == nil {
-		return nil
+func slp118ExtractJSGuards(line string) []*slp118Guard {
+	var guards []*slp118Guard
+	matches := slp118JSGuardRe.FindAllStringSubmatch(line, -1)
+	for _, m := range matches {
+		if m[1] != "" {
+			guards = append(guards, &slp118Guard{collection: strings.TrimSpace(m[1]), bound: atoiSafe(m[2]), op: ">"})
+		} else if m[3] != "" {
+			guards = append(guards, &slp118Guard{collection: strings.TrimSpace(m[3]), bound: atoiSafe(m[4]), op: ">="})
+		}
 	}
-	if m[1] != "" {
-		return &slp118Guard{collection: m[1], bound: atoiSafe(m[2]), op: ">"}
-	}
-	if m[3] != "" {
-		return &slp118Guard{collection: m[3], bound: atoiSafe(m[4]), op: ">="}
-	}
-	return nil
+	return guards
 }
 
-func slp118ExtractPyGuard(line string) *slp118Guard {
-	m := slp118PyGuardRe.FindStringSubmatch(line)
-	if m == nil {
-		return nil
+func slp118ExtractPyGuards(line string) []*slp118Guard {
+	var guards []*slp118Guard
+	matches := slp118PyGuardRe.FindAllStringSubmatch(line, -1)
+	for _, m := range matches {
+		if m[1] != "" {
+			guards = append(guards, &slp118Guard{collection: m[1], bound: atoiSafe(m[2]), op: ">"})
+		} else if m[3] != "" {
+			guards = append(guards, &slp118Guard{collection: m[3], bound: atoiSafe(m[4]), op: ">="})
+		}
 	}
-	if m[1] != "" {
-		return &slp118Guard{collection: m[1], bound: atoiSafe(m[2]), op: ">"}
-	}
-	if m[3] != "" {
-		return &slp118Guard{collection: m[3], bound: atoiSafe(m[4]), op: ">="}
-	}
-	return nil
+	return guards
 }
 
-func slp118ExtractGuard(line string, filePath string) *slp118Guard {
+func slp118ExtractGuards(line string, filePath string) []*slp118Guard {
 	if isGoFile(filePath) {
-		return slp118ExtractGoGuard(line)
+		return slp118ExtractGoGuards(line)
 	}
 	if isJSOrTSFile(filePath) {
-		return slp118ExtractJSGuard(line)
+		return slp118ExtractJSGuards(line)
 	}
 	if isPythonFile(filePath) {
-		return slp118ExtractPyGuard(line)
+		return slp118ExtractPyGuards(line)
 	}
 	return nil
 }
 
-func slp118CollectionRe(guard *slp118Guard) *regexp.Regexp {
-	if guard == nil {
-		return nil
-	}
-	pattern := `\b` + regexp.QuoteMeta(guard.collection) + `(?:\b|\s*\[|\s*\.)`
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return nil
-	}
-	return re
-}
-
-func slp118AllIndicesGuarded(guard *slp118Guard, content string) bool {
-	if guard == nil {
-		return false
-	}
-	re := slp118CollectionRe(guard)
-	if re == nil || !re.MatchString(content) {
-		return false
-	}
-	matches := slp118IndexNumRe.FindAllStringSubmatch(content, -1)
-	if len(matches) == 0 {
+func slp118IsIndexSafeForGuard(guard *slp118Guard, idx int) bool {
+	switch guard.op {
+	case ">":
+		return idx <= guard.bound
+	case ">=":
+		return idx < guard.bound
+	default:
 		return true
 	}
-	allSafe := true
-	for _, m := range matches {
-		idx := atoiSafe(m[1])
-		var safe bool
-		switch guard.op {
-		case ">":
-			safe = idx <= guard.bound
-		case ">=":
-			safe = idx < guard.bound
-		default:
-			safe = true
-		}
-		if !safe {
-			allSafe = false
+}
+
+func slp118CollectionOfAccess(content string, matchLoc []int) string {
+	start := matchLoc[0]
+	scanStart := start
+	for scanStart > 0 {
+		c := content[scanStart-1]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' {
+			scanStart--
+		} else {
 			break
 		}
 	}
-	return allSafe
+	collectionEnd := start + 1
+	for collectionEnd < len(content) {
+		c := content[collectionEnd]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' {
+			collectionEnd++
+		} else {
+			break
+		}
+	}
+	if scanStart < collectionEnd && collectionEnd <= len(content) {
+		return content[scanStart:collectionEnd]
+	}
+	return ""
+}
+
+func slp118AllIndicesGuarded(guards []*slp118Guard, content string) bool {
+	if len(guards) == 0 {
+		return false
+	}
+
+	locs := slp118IndexRe.FindAllStringIndex(content, -1)
+	for _, loc := range locs {
+		end := loc[1]
+		if end < len(content) && isAlpha(content[end]) {
+			continue
+		}
+
+		collection := slp118CollectionOfAccess(content, loc)
+
+		segment := content[loc[0]:]
+		idxMatch := slp118IndexNumRe.FindStringSubmatch(segment)
+		if idxMatch == nil {
+			continue
+		}
+		idx := atoiSafe(idxMatch[1])
+
+		guarded := false
+		for _, guard := range guards {
+			if guard.collection == collection && slp118IsIndexSafeForGuard(guard, idx) {
+				guarded = true
+				break
+			}
+		}
+		if !guarded {
+			return false
+		}
+	}
+	return true
 }
 
 func slp118IsBlockEnd(content string) bool {
@@ -166,14 +191,20 @@ func isAlpha(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
-func slp118CheckAccess(content string, currentGuard *slp118Guard) bool {
+func slp118CheckAccess(content string, guards []*slp118Guard) bool {
 	if !slp118IsIndexAccess(content) {
 		return false
 	}
-	if currentGuard != nil && slp118AllIndicesGuarded(currentGuard, content) {
+	if len(guards) > 0 && slp118AllIndicesGuarded(guards, content) {
 		return false
 	}
 	return true
+}
+
+func slp118IsCommentLine(content string) bool {
+	return content == "" || strings.HasPrefix(content, "//") ||
+		strings.HasPrefix(content, "/*") || strings.HasPrefix(content, "*") ||
+		strings.HasPrefix(content, "#")
 }
 
 func (r SLP118) Check(d *diff.Diff) []Finding {
@@ -187,37 +218,43 @@ func (r SLP118) Check(d *diff.Diff) []Finding {
 		}
 
 		for _, h := range f.Hunks {
-			var currentGuard *slp118Guard
+			var currentGuards []*slp118Guard
 			for _, ln := range h.Lines {
 				rawIndent := slp118LeadingSpaces(ln.Content)
-
-				if ln.Kind != diff.LineAdd {
+				stripped := stripCommentAndStrings(ln.Content)
+				stripped = strings.TrimSpace(stripped)
+				if stripped == "" {
 					continue
 				}
 
-				content := stripCommentAndStrings(ln.Content)
-				content = strings.TrimSpace(content)
-				if content == "" {
-					continue
-				}
-
-				if slp118IsBlockEnd(content) || (currentGuard != nil && rawIndent <= currentGuard.startIndent) {
-					currentGuard = nil
-					if slp118IsBlockEnd(content) {
+				if ln.Kind == diff.LineAdd {
+					if slp118IsBlockEnd(stripped) {
+						if len(currentGuards) > 0 && rawIndent <= currentGuards[0].startIndent {
+							currentGuards = nil
+						}
 						continue
 					}
-				}
 
-				guard := slp118ExtractGuard(content, f.Path)
-				if guard != nil {
-					guard.startIndent = rawIndent
-					currentGuard = guard
-				}
+					if len(currentGuards) > 0 && rawIndent <= currentGuards[0].startIndent {
+						guards := slp118ExtractGuards(stripped, f.Path)
+						if len(guards) == 0 {
+							currentGuards = nil
+						}
+					}
 
-				if strings.HasPrefix(content, "if ") || strings.HasPrefix(content, "for ") ||
-					strings.HasPrefix(content, "while ") || strings.HasPrefix(content, "//") ||
-					strings.HasPrefix(content, "/*") || strings.HasPrefix(content, "*") {
-					if guard == nil && slp118CheckAccess(content, currentGuard) {
+					guards := slp118ExtractGuards(stripped, f.Path)
+					if len(guards) > 0 {
+						for _, g := range guards {
+							g.startIndent = rawIndent
+						}
+						currentGuards = guards
+					}
+
+					if slp118IsCommentLine(stripped) {
+						continue
+					}
+
+					if slp118CheckAccess(stripped, currentGuards) {
 						out = append(out, Finding{
 							RuleID:   r.ID(),
 							Severity: r.DefaultSeverity(),
@@ -227,18 +264,14 @@ func (r SLP118) Check(d *diff.Diff) []Finding {
 							Snippet:  ln.Content,
 						})
 					}
-					continue
-				}
-
-				if slp118CheckAccess(content, currentGuard) {
-					out = append(out, Finding{
-						RuleID:   r.ID(),
-						Severity: r.DefaultSeverity(),
-						File:     f.Path,
-						Line:     ln.NewLineNo,
-						Message:  "direct index access without length guard — may panic on empty collection",
-						Snippet:  ln.Content,
-					})
+				} else {
+					guards := slp118ExtractGuards(stripped, f.Path)
+					if len(guards) > 0 {
+						for _, g := range guards {
+							g.startIndent = rawIndent
+						}
+						currentGuards = guards
+					}
 				}
 			}
 		}

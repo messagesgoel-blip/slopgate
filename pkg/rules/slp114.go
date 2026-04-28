@@ -51,6 +51,14 @@ func (r SLP114) Check(d *diff.Diff) []Finding {
 				if strings.HasPrefix(stripped, "if ") {
 					braceIdx := indexOutsideQuotes(stripped, "{")
 					if braceIdx >= 0 && braceIdx < len(stripped) {
+						initSegment := stripped[3:braceIdx]
+						semiIdx := indexOutsideQuotes(initSegment, ";")
+						if semiIdx >= 0 {
+							initPart := strings.TrimSpace(initSegment[:semiIdx])
+							if !slp114ErrGuardRe.MatchString("if " + initPart) {
+								out = append(out, r.slp114ScanCalls(initPart, f.Path, ln.NewLineNo, content)...)
+							}
+						}
 						body = stripped[braceIdx+1:]
 						closeIdx := strings.LastIndex(body, "}")
 						if closeIdx > 0 {

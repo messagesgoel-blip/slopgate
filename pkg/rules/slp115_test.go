@@ -32,6 +32,42 @@ func TestSLP115_NoFireOnBroaderExtensionCheck(t *testing.T) {
 	}
 }
 
+func TestSLP115_IsExtBorder(t *testing.T) {
+	borderChars := []byte{' ', '\t', '/', '"', '\'', '(', ')'}
+	for _, c := range borderChars {
+		if !slp115IsExtBorder(c) {
+			t.Errorf("expected %q to be an extension border", c)
+		}
+	}
+	nonBorderChars := []byte{'a', 'Z', '0', '9', '_', '.'}
+	for _, c := range nonBorderChars {
+		if slp115IsExtBorder(c) {
+			t.Errorf("expected %q to NOT be an extension border", c)
+		}
+	}
+}
+
+func TestSLP115_ContainsExtTokenNoMatchOnMapSuffix(t *testing.T) {
+	if slp115ContainsExtToken(".js.map", ".js") {
+		t.Error("expected .js NOT to match inside .js.map")
+	}
+	if slp115ContainsExtToken(".css.map", ".css") {
+		t.Error("expected .css NOT to match inside .css.map")
+	}
+}
+
+func TestSLP115_ContainsExtTokenMatchOnPlain(t *testing.T) {
+	if !slp115ContainsExtToken(".js", ".js") {
+		t.Error("expected .js to match plain .js")
+	}
+	if !slp115ContainsExtToken(".css", ".css") {
+		t.Error("expected .css to match plain .css")
+	}
+	if !slp115ContainsExtToken("path \".js\"", ".js") {
+		t.Error("expected .js to match when in quotes")
+	}
+}
+
 func TestSLP115_Description(t *testing.T) {
 	r := SLP115{}
 	if r.ID() != "SLP115" {

@@ -68,8 +68,19 @@ func slp113HasTestFile(sourcePath string, allFiles map[string]bool) bool {
 
 	testDir := filepath.ToSlash(filepath.Join(dir, "testdata"))
 	for f := range allFiles {
-		if strings.HasPrefix(f, testDir+"/") && strings.HasPrefix(filepath.Base(f), base) {
+		if !strings.HasPrefix(f, testDir+"/") {
+			continue
+		}
+		fileBase := filepath.Base(f)
+		stem := strings.TrimSuffix(fileBase, filepath.Ext(fileBase))
+		if stem == base {
 			return true
+		}
+		if strings.HasPrefix(stem, base) && len(stem) > len(base) {
+			delim := stem[len(base)]
+			if delim == '.' || delim == '-' || delim == '_' {
+				return true
+			}
 		}
 	}
 

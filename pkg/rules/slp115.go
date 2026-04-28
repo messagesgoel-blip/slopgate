@@ -25,7 +25,48 @@ var slp115ExtensionGroups = []struct {
 }
 
 func slp115IsExtBorder(b byte) bool {
-	return !((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_')
+	return !((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_' || b == '.')
+}
+
+func slp115StripCommentsPreservingStrings(s string) string {
+	var b strings.Builder
+	var quote byte
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if quote != 0 {
+			b.WriteByte(c)
+			if quote != '`' && c == '\\' && i+1 < len(s) {
+				i++
+				b.WriteByte(s[i])
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch {
+		case c == '"' || c == '\'' || c == '`':
+			quote = c
+			b.WriteByte(c)
+		case c == '/' && i+1 < len(s) && s[i+1] == '/':
+			return b.String()
+		case c == '/' && i+1 < len(s) && s[i+1] == '*':
+			i += 2
+			for i < len(s)-1 {
+				if s[i] == '*' && s[i+1] == '/' {
+					i++
+					break
+				}
+				i++
+			}
+		case c == '#':
+			return b.String()
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }
 
 func slp115ContainsExtToken(s string, ext string) bool {
@@ -85,15 +126,15 @@ func (r SLP115) Check(d *diff.Diff) []Finding {
 				}
 				content := cleaned
 				contentLower := strings.ToLower(content)
-				rawLower := strings.ToLower(raw)
+				commentStripped := strings.ToLower(strings.TrimSpace(slp115StripCommentsPreservingStrings(ln.Content)))
 
 				for _, group := range slp115ExtensionGroups {
 					groupContent := contentLower
 					if !slp115ContainsExtToken(groupContent, group.narrow) {
-						if !slp115ContainsExtToken(rawLower, group.narrow) {
+						if !slp115ContainsExtToken(commentStripped, group.narrow) {
 							continue
 						}
-						groupContent = rawLower
+						groupContent = commentStripped
 					}
 
 					hasNarrow := false

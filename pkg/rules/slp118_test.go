@@ -162,6 +162,71 @@ func TestSLP118_FiresOnChainedIndexAfterCall(t *testing.T) {
 	}
 }
 
+func TestSLP118_CompoundGuardCoversBothCollections(t *testing.T) {
+	d := parseDiff(t, `diff --git a/process.go b/process.go
+--- a/process.go
++++ b/process.go
+@@ -1,1 +1,4 @@
+ package main
++
++if len(a) > 0 && len(b) > 0 {
++    x = a[0]
++}
+`)
+	got := SLP118{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for compound guard covering a[0], got %d", len(got))
+	}
+}
+
+func TestSLP118_CompoundGuardDoesNotCoverOtherCollection(t *testing.T) {
+	d := parseDiff(t, `diff --git a/process.go b/process.go
+--- a/process.go
++++ b/process.go
+@@ -1,1 +1,4 @@
+ package main
++
++if len(a) > 0 && len(b) > 0 {
++    x = c[0]
++}
+`)
+	got := SLP118{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for unguarded c[0] with compound guard on a,b")
+	}
+}
+
+func TestSLP118_InlineAccessOnGuardLine(t *testing.T) {
+	d := parseDiff(t, `diff --git a/process.go b/process.go
+--- a/process.go
++++ b/process.go
+@@ -1,1 +1,3 @@
+ package main
++
++if len(items) > 0 { use(other[0]) }
+`)
+	got := SLP118{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected findings for other[0] on same line as guard for items")
+	}
+}
+
+func TestSLP118_ContextLineGuardHonored(t *testing.T) {
+	d := parseDiff(t, `diff --git a/process.go b/process.go
+--- a/process.go
++++ b/process.go
+@@ -1,2 +1,3 @@
+ if len(items) > 0 {
+-    x = items[0]
++    y = items[0]
+ }
+`)
+	got := SLP118{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when guard is on context line, got %d", len(got))
+	}
+}
+
 func TestSLP118_Description(t *testing.T) {
 	r := SLP118{}
 	if r.ID() != "SLP118" {

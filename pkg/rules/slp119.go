@@ -16,10 +16,11 @@ func (SLP119) Description() string {
 }
 
 var slp119EmptyStrRe = regexp.MustCompile(`(?:==|!=)\s*""|(?:==|!=)\s*''`)
+var slp119SafetyCallRe = regexp.MustCompile(`\b(?:HasSuffix|HasPrefix|hasSuffix|hasPrefix)\s*\(`)
+var slp119TrimCallRe = regexp.MustCompile(`\b(?:TrimSuffix|TrimPrefix|trimSuffix|trimPrefix)\s*\(`)
 
 func slp119HasSafetyCheck(text string) bool {
-	if strings.Contains(text, "HasSuffix") || strings.Contains(text, "HasPrefix") ||
-		strings.Contains(text, "hasSuffix") || strings.Contains(text, "hasPrefix") {
+	if slp119SafetyCallRe.MatchString(text) {
 		return true
 	}
 	return slp119EmptyStrRe.MatchString(text)
@@ -47,8 +48,7 @@ func (r SLP119) Check(d *diff.Diff) []Finding {
 					continue
 				}
 
-				if strings.Contains(content, "TrimSuffix") || strings.Contains(content, "TrimPrefix") ||
-					strings.Contains(content, "trimSuffix") || strings.Contains(content, "trimPrefix") {
+				if slp119TrimCallRe.MatchString(content) {
 
 					window := stripCommentAndStrings(ln.Content)
 					for j := 1; j <= 2; j++ {
