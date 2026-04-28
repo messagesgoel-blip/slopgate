@@ -13,7 +13,7 @@ type SLP118 struct{}
 func (SLP118) ID() string                { return "SLP118" }
 func (SLP118) DefaultSeverity() Severity { return SeverityBlock }
 func (SLP118) Description() string {
-	return "slice or index access without length guard — may panic on empty collection"
+	return "numeric index access without length guard — may panic on empty collection (only detects numeric-literal index forms)"
 }
 
 var slp118IndexRe = regexp.MustCompile(`(?:[A-Za-z0-9_]|[\)\]\}])\s*\[\d+\]`)
@@ -23,13 +23,26 @@ var slp118JSGuardRe = regexp.MustCompile(`if\s*\(\s*(.+?)\.length\s*>\s*(\d+)\)|
 var slp118PyGuardRe = regexp.MustCompile(`if len\((.+?)\)\s*>\s*(\d+)|if len\((.+?)\)\s*>=\s*(\d+)`)
 
 type slp118Guard struct {
-	collection string
-	bound      int
-	op         string
+	collection  string
+	bound       int
+	op          string
+	startIndent int
 }
 
 func atoiSafe(s string) int {
 	n, _ := strconv.Atoi(s)
+	return n
+}
+
+func slp118LeadingSpaces(s string) int {
+	n := 0
+	for _, c := range s {
+		if c == ' ' || c == '\t' {
+			n++
+		} else {
+			break
+		}
+	}
 	return n
 }
 
@@ -100,15 +113,7 @@ func slp118CollectionRe(guard *slp118Guard) *regexp.Regexp {
 	return re
 }
 
-func slp118ExtractIndex(content string) int {
-	m := slp118IndexNumRe.FindStringSubmatch(content)
-	if m == nil {
-		return -1
-	}
-	return atoiSafe(m[1])
-}
-
-func slp118IsGuardedBy(guard *slp118Guard, content string) bool {
+func slp118AllIndicesGuarded(guard *slp118Guard, content string) bool {
 	if guard == nil {
 		return false
 	}
@@ -116,18 +121,28 @@ func slp118IsGuardedBy(guard *slp118Guard, content string) bool {
 	if re == nil || !re.MatchString(content) {
 		return false
 	}
-	idx := slp118ExtractIndex(content)
-	if idx < 0 {
+	matches := slp118IndexNumRe.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
 		return true
 	}
-	switch guard.op {
-	case ">":
-		return idx <= guard.bound
-	case ">=":
-		return idx < guard.bound
-	default:
-		return true
+	allSafe := true
+	for _, m := range matches {
+		idx := atoiSafe(m[1])
+		var safe bool
+		switch guard.op {
+		case ">":
+			safe = idx <= guard.bound
+		case ">=":
+			safe = idx < guard.bound
+		default:
+			safe = true
+		}
+		if !safe {
+			allSafe = false
+			break
+		}
 	}
+	return allSafe
 }
 
 func slp118IsBlockEnd(content string) bool {
@@ -151,6 +166,16 @@ func isAlpha(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
+func slp118CheckAccess(content string, currentGuard *slp118Guard) bool {
+	if !slp118IsIndexAccess(content) {
+		return false
+	}
+	if currentGuard != nil && slp118AllIndicesGuarded(currentGuard, content) {
+		return false
+	}
+	return true
+}
+
 func (r SLP118) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -164,37 +189,48 @@ func (r SLP118) Check(d *diff.Diff) []Finding {
 		for _, h := range f.Hunks {
 			var currentGuard *slp118Guard
 			for _, ln := range h.Lines {
+				rawIndent := slp118LeadingSpaces(ln.Content)
+
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
+
 				content := stripCommentAndStrings(ln.Content)
 				content = strings.TrimSpace(content)
 				if content == "" {
 					continue
 				}
 
-				if slp118IsBlockEnd(content) {
+				if slp118IsBlockEnd(content) || (currentGuard != nil && rawIndent <= currentGuard.startIndent) {
 					currentGuard = nil
-					continue
+					if slp118IsBlockEnd(content) {
+						continue
+					}
 				}
 
 				guard := slp118ExtractGuard(content, f.Path)
 				if guard != nil {
+					guard.startIndent = rawIndent
 					currentGuard = guard
-					continue
 				}
 
 				if strings.HasPrefix(content, "if ") || strings.HasPrefix(content, "for ") ||
 					strings.HasPrefix(content, "while ") || strings.HasPrefix(content, "//") ||
 					strings.HasPrefix(content, "/*") || strings.HasPrefix(content, "*") {
+					if guard == nil && slp118CheckAccess(content, currentGuard) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  "direct index access without length guard — may panic on empty collection",
+							Snippet:  ln.Content,
+						})
+					}
 					continue
 				}
 
-				if slp118IsGuardedBy(currentGuard, content) {
-					continue
-				}
-
-				if slp118IsIndexAccess(content) {
+				if slp118CheckAccess(content, currentGuard) {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),

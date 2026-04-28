@@ -15,7 +15,7 @@ func (SLP119) Description() string {
 	return "TrimSuffix/TrimPrefix result used without checking if the suffix/prefix was present"
 }
 
-var slp119EmptyStrRe = regexp.MustCompile(`(?:==|!=)\s*['"][\s']*['"]`)
+var slp119EmptyStrRe = regexp.MustCompile(`(?:==|!=)\s*""|(?:==|!=)\s*''`)
 
 func slp119HasSafetyCheck(text string) bool {
 	if strings.Contains(text, "HasSuffix") || strings.Contains(text, "HasPrefix") ||
@@ -44,10 +44,6 @@ func (r SLP119) Check(d *diff.Diff) []Finding {
 				content := stripCommentAndStrings(ln.Content)
 				content = strings.TrimSpace(content)
 				if content == "" {
-					continue
-				}
-
-				if strings.HasPrefix(content, "//") || strings.HasPrefix(content, "/*") {
 					continue
 				}
 

@@ -15,6 +15,9 @@ func (SLP114) Description() string {
 	return "error-returning function called as statement — check the error return"
 }
 
+// slp114ErrGuardRe matches common Go error-check if forms.
+// Known limitations: does not match named error identifiers other than "err"
+// (e.g., dbErr) and does not cover positive "err == nil" branches.
 var slp114ErrGuardRe = regexp.MustCompile(`^if\s+err\s*:=|^if\s+[^;]+;\s*err\s*!=`)
 
 func (r SLP114) Check(d *diff.Diff) []Finding {
@@ -122,7 +125,6 @@ var slp114ErrorReturnNames = map[string]bool{
 
 var slp114ErrorReturnPrefixes = []string{
 	"err", "Err", "Error", "errors.",
-	"New", "new",
 }
 
 func isErrorReturningFunc(name string) bool {

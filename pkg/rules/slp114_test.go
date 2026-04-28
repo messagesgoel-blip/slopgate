@@ -139,6 +139,20 @@ func TestSLP114_FiresOnInlineIfBody(t *testing.T) {
 	}
 }
 
+func TestSLP114_NoFireOnNewReader(t *testing.T) {
+	d := parseDiff(t, `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,1 +1,3 @@
+ package main
++NewReader(data)
+`)
+	got := SLP114{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for NewReader (non-error constructor), got %d", len(got))
+	}
+}
+
 func TestSLP114_Description(t *testing.T) {
 	r := SLP114{}
 	if r.ID() != "SLP114" {

@@ -37,7 +37,8 @@ func slp113IsTestFile(path string) bool {
 		return true
 	}
 	normalized := filepath.ToSlash(path)
-	if strings.Contains(normalized, "/testdata/") || strings.HasSuffix(normalized, "/testdata") {
+	if strings.Contains(normalized, "/testdata/") || strings.HasSuffix(normalized, "/testdata") ||
+		strings.HasPrefix(normalized, "testdata/") || normalized == "testdata" {
 		return true
 	}
 	return false

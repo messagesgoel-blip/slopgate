@@ -24,6 +24,42 @@ var slp115ExtensionGroups = []struct {
 	{narrow: ".css", broader: []string{".css", ".scss", ".less", ".sass"}},
 }
 
+func slp115IsExtBorder(b byte) bool {
+	return !((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_')
+}
+
+func slp115ContainsExtToken(s string, ext string) bool {
+	idx := strings.Index(s, ext)
+	for idx >= 0 {
+		beforeOK := idx == 0 || slp115IsExtBorder(s[idx-1])
+		afterIdx := idx + len(ext)
+		afterOK := afterIdx >= len(s) || slp115IsExtBorder(s[afterIdx])
+		if beforeOK && afterOK {
+			return true
+		}
+		remaining := s[idx+1:]
+		next := strings.Index(remaining, ext)
+		if next < 0 {
+			break
+		}
+		idx = idx + 1 + next
+	}
+	return false
+}
+
+func slp115AdditionalExts(group struct {
+	narrow  string
+	broader []string
+}) []string {
+	var additional []string
+	for _, ext := range group.broader {
+		if ext != group.narrow {
+			additional = append(additional, ext)
+		}
+	}
+	return additional
+}
+
 func (r SLP115) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -48,16 +84,13 @@ func (r SLP115) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				content := cleaned
-				if content == "" {
-					content = raw
-				}
 				contentLower := strings.ToLower(content)
 				rawLower := strings.ToLower(raw)
 
 				for _, group := range slp115ExtensionGroups {
 					groupContent := contentLower
-					if !strings.Contains(groupContent, group.narrow) {
-						if !strings.Contains(rawLower, group.narrow) {
+					if !slp115ContainsExtToken(groupContent, group.narrow) {
+						if !slp115ContainsExtToken(rawLower, group.narrow) {
 							continue
 						}
 						groupContent = rawLower
@@ -65,7 +98,7 @@ func (r SLP115) Check(d *diff.Diff) []Finding {
 
 					hasNarrow := false
 					for _, ext := range group.broader {
-						if strings.Contains(groupContent, ext) && ext == group.narrow {
+						if slp115ContainsExtToken(groupContent, ext) && ext == group.narrow {
 							hasNarrow = true
 							break
 						}
@@ -73,7 +106,7 @@ func (r SLP115) Check(d *diff.Diff) []Finding {
 
 					hasAnyBroader := false
 					for _, ext := range group.broader {
-						if ext != group.narrow && strings.Contains(groupContent, ext) {
+						if ext != group.narrow && slp115ContainsExtToken(groupContent, ext) {
 							hasAnyBroader = true
 							break
 						}
@@ -81,12 +114,13 @@ func (r SLP115) Check(d *diff.Diff) []Finding {
 
 					if hasNarrow && !hasAnyBroader {
 						narrowExt := strings.TrimPrefix(group.narrow, ".")
+						additional := slp115AdditionalExts(group)
 						out = append(out, Finding{
 							RuleID:   r.ID(),
 							Severity: r.DefaultSeverity(),
 							File:     f.Path,
 							Line:     ln.NewLineNo,
-							Message:  "narrow extension check for ." + narrowExt + " — consider including " + strings.Join(group.broader, ", "),
+							Message:  "narrow extension check for ." + narrowExt + " — consider including " + strings.Join(additional, ", "),
 							Snippet:  ln.Content,
 						})
 						break
