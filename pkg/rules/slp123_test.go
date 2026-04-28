@@ -74,7 +74,7 @@ func TestSLP123_NoFalsePositive_MultilineSqlOrderById(t *testing.T) {
 `)
 	got := SLP123{}.Check(d)
 	if len(got) != 0 {
-		t.Fatalf("expected 0 findings for SQL with id tiebreaker on same line, got %d", len(got))
+		t.Fatalf("expected 0 findings for SQL with id tiebreaker across multiple lines, got %d", len(got))
 	}
 }
 

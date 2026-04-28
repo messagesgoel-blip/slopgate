@@ -46,7 +46,7 @@ func TestSLP121_WordBoundary_NoFalsePositiveOnSubstringIds(t *testing.T) {
 `)
 	got := SLP121{}.Check(d)
 	if len(got) != 0 {
-		t.Fatalf("expected 0 findings for tenant_id column definition, got %d", len(got))
+		t.Fatalf("expected 0 findings for tenant_id update mutation, got %d", len(got))
 	}
 }
 
