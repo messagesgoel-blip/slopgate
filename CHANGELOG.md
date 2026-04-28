@@ -31,7 +31,7 @@ Total: 116 rules
 
 ## v0.0.12 (2026-04-26)
 
-18 new rules:
+21 new rules:
 
 - **SLP091-SLP093**: Test/mock/fixture quality (hardcoded dates, mock envelope mismatches, mock without assertion)
 - **SLP094-SLP096**: Silent failure detection (shell `|| true`, empty catch handlers, missing `set -e`)
@@ -51,7 +51,7 @@ Total: 108 rules
 
 ## v0.0.10 (2026-04-24)
 
-52 new rules:
+55 new rules:
 
 - **SLP036-SLP045**: Semantic rules for CodeRabbit parity (query methods, transaction scoping, webhook patterns)
 - **SLP046-SLP070**: 25 AI-slop detection rules (file cohesion, redundant comments, SQL injection, hardcoded secrets, dynamic code execution, concurrent maps, resource leaks)

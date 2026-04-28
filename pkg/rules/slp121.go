@@ -17,7 +17,7 @@ func (SLP121) Description() string {
 	return "sensitive access mutation may be missing tenant/membership authorization guard"
 }
 
-var slp121SensitiveMutationRe = regexp.MustCompile(`(?i)(grant|revoke|share|permission|role|member|tenant|access)`)
+var slp121SensitiveMutationRe = regexp.MustCompile(`(?i)\b(?:grants?|revokes?|shares?|permissions?|roles?|members?|tenants?|access(?:es)?)\b`)
 var slp121MutationVerbRe = regexp.MustCompile(`(?i)\b(insert|update|delete|upsert|patch|post|put|remove|set)\b`)
 var slp121RouteMutationRe = regexp.MustCompile(`(?i)\b(?:router|app)\.(?:post|put|patch|delete)\s*\(`)
 var slp121GuardRe = regexp.MustCompile(`(?i)(require(?:Auth|Role|Permission|Tenant|[A-Za-z]*Access)|check(?:Permission|Role|Tenant|Membership)|has(?:Permission|Role|Tenant|Access)|is(?:Admin|Owner|Member)|authorize|authz|tenant.*member|member.*tenant)`)

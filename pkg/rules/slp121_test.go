@@ -8,7 +8,7 @@ func TestSLP121_FiresWithoutAccessGuard(t *testing.T) {
 +++ b/api/src/routes/providers.js
 @@ -1,1 +1,5 @@
  router.patch('/providers/:id/share', async (req, res) => {
-+  await db.update('vps_connection_shares', payload)
++  await db.update('shares', payload)
 +  return res.json({ ok: true })
  })
 `)
@@ -32,6 +32,37 @@ func TestSLP121_NoFireWithAccessGuard(t *testing.T) {
 	got := SLP121{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings when access guard is present, got %d", len(got))
+	}
+}
+
+func TestSLP121_WordBoundary_NoFalsePositiveOnSubstringIds(t *testing.T) {
+	// tenant_id, member_id, access_token etc should NOT trigger — they're not standalone keywords
+	d := parseDiff(t, `diff --git a/api/src/models/user.go b/api/src/models/user.go
+--- a/api/src/models/user.go
++++ b/api/src/models/user.go
+@@ -1,1 +1,3 @@
++	tenant_id = db.StringColumn("tenant_id")
+`)
+	got := SLP121{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for tenant_id column definition, got %d", len(got))
+	}
+}
+
+func TestSLP121_WordBoundary_FiresOnStandaloneKeywords(t *testing.T) {
+	// standalone "tenant" in a mutation context SHOULD trigger
+	d := parseDiff(t, `diff --git a/api/src/routes/tenant.go b/api/src/routes/tenant.go
+--- a/api/src/routes/tenant.go
++++ b/api/src/routes/tenant.go
+@@ -1,1 +1,5 @@
+ router.patch('/tenant/:id', async (req, res) => {
++  await db.update('tenants', payload)
++  return res.json({ ok: true })
+ })
+`)
+	got := SLP121{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for standalone 'tenant' keyword without guard")
 	}
 }
 

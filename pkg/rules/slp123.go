@@ -19,8 +19,8 @@ func (SLP123) Description() string {
 
 var slp123OffsetRe = regexp.MustCompile(`(?i)(\boffset\b|\.offset\s*\()`)
 var slp123TimeOrderRe = regexp.MustCompile(`(?is)(order\s+by[^\n]*(created_at|updated_at|timestamp|time)|orderBy\s*\([^\n]*(createdAt|updatedAt|timestamp|time)|sort\s*:\s*["']?(createdAt|updatedAt|timestamp|time))`)
-var slp123StableTieBreakerRe = regexp.MustCompile(`(?is)order\s+by[^\n]*\bid\b`)
-var slp123CursorSignalRe = regexp.MustCompile(`(?i)(cursor|nextCursor|starting_after|ending_before|\bid\s*[<>]|\bcreated_at\s*[<>]|\bupdated_at\s*[<>])`)
+var slp123StableTieBreakerRe = regexp.MustCompile(`(?is)(?:order\s+by|orderBy)\b[\s\S]{0,200}?\b(?:id|'id'|"id")\b`)
+var slp123CursorSignalRe = regexp.MustCompile(`(?i)(cursor|nextCursor|starting_after|ending_before|startingAfter|endingBefore|\b(?:created_at|updated_at|createdAt|updatedAt)\s*[<>]|\bid\s*[<>])`)
 
 func (r SLP123) Check(d *diff.Diff) []Finding {
 	var out []Finding
