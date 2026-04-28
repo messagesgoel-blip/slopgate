@@ -25,7 +25,7 @@ func TestSLP121_NoFireWithAccessGuard(t *testing.T) {
 @@ -1,1 +1,6 @@
  router.patch('/providers/:id/share', async (req, res) => {
 +  await requireVpsAccess(req, res, 'admin')
-+  await db.update('vps_connection_shares', payload)
++  await db.update('shares', payload)
 +  return res.json({ ok: true })
  })
 `)

@@ -28,14 +28,33 @@ func TestSLP123_NoFireWithCursorKeysetSignal(t *testing.T) {
 	}
 }
 
+// TestSLP123_NoFireWithCursorSignalOnly verifies that a cursor predicate
+// (e.g., WHERE created_at < $1) combined with OFFSET but WITHOUT an id
+// tiebreaker in the ORDER BY still suppresses findings — the cursor signal
+// itself is a valid keyset approach even without an explicit id tiebreaker.
+func TestSLP123_NoFireWithCursorSignalOnly(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/routes/family.js b/api/src/routes/family.js
+--- a/api/src/routes/family.js
++++ b/api/src/routes/family.js
+@@ -1,1 +1,4 @@
++const cursor = "2025-01-01T00:00:00Z"
++const q = "SELECT * FROM family_activity WHERE updated_at < $1 ORDER BY updated_at DESC LIMIT $2 OFFSET $3"
+`)
+	got := SLP123{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings with cursor signal and offset but no id tiebreaker, got %d", len(got))
+	}
+}
+
 func TestSLP123_NoFalsePositive_JSOrderByChainWithId(t *testing.T) {
-	// Include an offset clause to trigger the offset check, then verify tiebreaker prevents firing
+	// Include an offset clause to trigger the offset check, use camelCase createdAt
+	// so slp123TimeOrderRe matches; the id tiebreaker then suppresses findings
 	d := parseDiff(t, `diff --git a/app/src/lib/files.ts b/app/src/lib/files.ts
 --- a/app/src/lib/files.ts
 +++ b/app/src/lib/files.ts
 @@ -1,1 +1,3 @@
 +query = query.offset(10)
-+files = files.orderBy('created_at', 'desc').orderBy('id', 'desc')
++files = files.orderBy('createdAt', 'desc').orderBy('id', 'desc')
 `)
 	got := SLP123{}.Check(d)
 	if len(got) != 0 {

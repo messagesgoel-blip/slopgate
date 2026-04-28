@@ -47,11 +47,8 @@ func (r SLP124) Check(d *diff.Diff) []Finding {
 				}
 
 				hasValidation := false
-				start := i - 6
-				if start < 0 {
-					start = 0
-				}
-				for j := start; j <= i; j++ {
+				count := 0
+				for j := i - 1; j >= 0 && count < 6; j-- {
 					if h.Lines[j].Kind == diff.LineDelete {
 						continue
 					}
@@ -63,6 +60,7 @@ func (r SLP124) Check(d *diff.Diff) []Finding {
 						hasValidation = true
 						break
 					}
+					count++
 				}
 				if hasValidation {
 					continue
