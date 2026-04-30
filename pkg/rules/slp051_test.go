@@ -167,10 +167,10 @@ func TestSLP051_IgnoresPackageLocalHelpers(t *testing.T) {
 			t.Fatalf("restore cwd: %v", err)
 		}
 	})
-	if err := os.MkdirAll("a", 0o755); err != nil {
+	if err := os.MkdirAll("a", 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile("a/helpers.go", []byte("package a\n\nfunc helper() {}\n"), 0o644); err != nil {
+	if err := os.WriteFile("a/helpers.go", []byte("package a\n\nfunc helper() {}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
@@ -203,10 +203,10 @@ func TestSLP051_DoesNotUseTestOnlyPackageHelpers(t *testing.T) {
 			t.Fatalf("restore cwd: %v", err)
 		}
 	})
-	if err := os.MkdirAll("a", 0o755); err != nil {
+	if err := os.MkdirAll("a", 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile("a/helpers_test.go", []byte("package a\n\nfunc testOnlyHelper() {}\n"), 0o644); err != nil {
+	if err := os.WriteFile("a/helpers_test.go", []byte("package a\n\nfunc testOnlyHelper() {}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go

@@ -204,7 +204,7 @@ func slp051PackageSymbols(d *diff.Diff) map[string]map[string]bool {
 					if strings.HasSuffix(strings.ToLower(match), "_test.go") {
 						continue
 					}
-					content, readErr := os.ReadFile(match)
+					content, readErr := os.ReadFile(match) // #nosec G304 -- match is constrained to a repo-relative package dir above.
 					if readErr == nil {
 						slp051CollectSymbolsFromText(symbols, string(content))
 					}
