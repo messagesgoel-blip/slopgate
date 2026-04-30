@@ -141,18 +141,21 @@ func (r SLP129) Check(d *diff.Diff) []Finding {
 			if match == nil {
 				continue
 			}
-			value := strings.Trim(strings.TrimSpace(match[2]), `"'`)
-			if slp129LooksPlaceholder(value) {
-				continue
+			if len(match) >= 3 {
+				key := match[1]
+				value := strings.Trim(strings.TrimSpace(match[2]), `"'`)
+				if slp129LooksPlaceholder(value) {
+					continue
+				}
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
+					File:     f.Path,
+					Line:     ln.NewLineNo,
+					Message:  fmt.Sprintf("%s in tracked .env looks live; move it to secrets and commit only placeholders", key),
+					Snippet:  strings.TrimSpace(ln.Content),
+				})
 			}
-			out = append(out, Finding{
-				RuleID:   r.ID(),
-				Severity: r.DefaultSeverity(),
-				File:     f.Path,
-				Line:     ln.NewLineNo,
-				Message:  fmt.Sprintf("%s in tracked .env looks live; move it to secrets and commit only placeholders", match[1]),
-				Snippet:  strings.TrimSpace(ln.Content),
-			})
 		}
 	}
 	return out

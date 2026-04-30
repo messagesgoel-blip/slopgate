@@ -196,6 +196,25 @@ func TestSLP118_CompoundGuardDoesNotCoverOtherCollection(t *testing.T) {
 	}
 }
 
+func TestSLP118_NoFireOnGuardedSubmatchAccess(t *testing.T) {
+	d := parseDiff(t, `diff --git a/process.go b/process.go
+--- a/process.go
++++ b/process.go
+@@ -1,1 +1,6 @@
+ package main
+
++if len(match) >= 3 {
++    key := match[1]
++    value := match[2]
++    use(key, value)
++}
+`)
+	got := SLP118{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for guarded submatch access, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP118_InlineAccessOnGuardLine(t *testing.T) {
 	d := parseDiff(t, `diff --git a/process.go b/process.go
 --- a/process.go

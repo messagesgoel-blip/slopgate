@@ -1,6 +1,9 @@
 package rules
 
 import (
+	"os"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -24,6 +27,7 @@ var goKeywords = map[string]bool{
 	"if": true, "for": true, "switch": true, "select": true,
 	"return": true, "defer": true, "go": true, "panic": true,
 	"recover": true, "print": true, "println": true,
+	"import": true, "var": true, "const": true, "type": true,
 	"new": true, "make": true, "len": true, "cap": true,
 	"append": true, "copy": true, "delete": true, "close": true,
 	"complex": true, "real": true, "imag": true,
@@ -42,11 +46,15 @@ var undefinedCallPattern = regexp.MustCompile(`\b([a-zA-Z_]\w*)\s*\(`)
 
 func (r SLP051) Check(d *diff.Diff) []Finding {
 	var out []Finding
+	packageSymbols := slp051PackageSymbols(d)
 	for _, f := range d.Files {
 		if f.IsDelete || !isGoFile(f.Path) {
 			continue
 		}
 		localFuncs := slp051LocalSymbols(f)
+		for name := range packageSymbols[slp051PackageDir(f.Path)] {
+			localFuncs[name] = true
+		}
 		for _, h := range f.Hunks {
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
@@ -90,6 +98,25 @@ var funcDefPattern = regexp.MustCompile(`^func\s+(?:\([^)]+\)\s+)?([a-zA-Z_]\w*)
 
 var typeDefPattern = regexp.MustCompile(`^type\s+([a-zA-Z_]\w*)\b`)
 
+func slp051PackageDir(filePath string) string {
+	normalized := strings.ReplaceAll(filePath, "\\", "/")
+	dir := path.Dir(normalized)
+	if dir == "." {
+		return ""
+	}
+	return dir
+}
+
+func slp051AddSymbolFromLine(localSymbols map[string]bool, line string) {
+	trimmed := strings.TrimSpace(line)
+	if m := funcDefPattern.FindStringSubmatch(trimmed); m != nil {
+		localSymbols[m[1]] = true
+	}
+	if m := typeDefPattern.FindStringSubmatch(trimmed); m != nil {
+		localSymbols[m[1]] = true
+	}
+}
+
 func slp051LocalSymbols(f diff.File) map[string]bool {
 	localSymbols := make(map[string]bool)
 	for _, h := range f.Hunks {
@@ -97,13 +124,51 @@ func slp051LocalSymbols(f diff.File) map[string]bool {
 			if ln.Kind == diff.LineDelete {
 				continue
 			}
-			if m := funcDefPattern.FindStringSubmatch(strings.TrimSpace(ln.Content)); m != nil {
-				localSymbols[m[1]] = true
-			}
-			if m := typeDefPattern.FindStringSubmatch(strings.TrimSpace(ln.Content)); m != nil {
-				localSymbols[m[1]] = true
-			}
+			slp051AddSymbolFromLine(localSymbols, ln.Content)
 		}
 	}
 	return localSymbols
+}
+
+func slp051CollectSymbolsFromText(localSymbols map[string]bool, content string) {
+	for _, line := range strings.Split(content, "\n") {
+		slp051AddSymbolFromLine(localSymbols, line)
+	}
+}
+
+func slp051PackageSymbols(d *diff.Diff) map[string]map[string]bool {
+	dirs := make(map[string]bool)
+	for _, f := range d.Files {
+		if !f.IsDelete && isGoFile(f.Path) {
+			dirs[slp051PackageDir(f.Path)] = true
+		}
+	}
+
+	out := make(map[string]map[string]bool, len(dirs))
+	for dir := range dirs {
+		symbols := make(map[string]bool)
+		for _, f := range d.Files {
+			if !f.IsDelete && isGoFile(f.Path) && slp051PackageDir(f.Path) == dir {
+				for name := range slp051LocalSymbols(f) {
+					symbols[name] = true
+				}
+			}
+		}
+
+		globDir := "."
+		if dir != "" {
+			globDir = filepath.FromSlash(dir)
+		}
+		matches, err := filepath.Glob(filepath.Join(globDir, "*.go"))
+		if err == nil {
+			for _, match := range matches {
+				content, readErr := os.ReadFile(match)
+				if readErr == nil {
+					slp051CollectSymbolsFromText(symbols, string(content))
+				}
+			}
+		}
+		out[dir] = symbols
+	}
+	return out
 }

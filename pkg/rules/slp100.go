@@ -21,11 +21,15 @@ func (SLP100) Description() string {
 var slp100FuncStart = regexp.MustCompile(`(?i)(?:func\s+(?:\([^)]*\)\s+)?|function\s+|def\s+|(?:public|private|protected)\s+(?:static\s+)?(?:final\s+)?(?:\w+\s+)?|fn\s+)\w+\s*\(`)
 
 var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return(?:\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None))?\s*[;]?\s*$`)
+var slp100NonEmptyStringReturn = regexp.MustCompile(`^\s*return\s+(?:"(?:[^"\\]|\\.)+"|'(?:[^'\\]|\\.)+')\s*;?\s*$`)
 
 func hasSideEffect(line string) bool {
 	stripped := stripCommentAndStrings(line)
 	trimmed := strings.TrimSpace(stripped)
 	if strings.HasPrefix(trimmed, "return") {
+		if slp100NonEmptyStringReturn.MatchString(strings.TrimSpace(line)) {
+			return true
+		}
 		return !slp100ZeroReturn.MatchString(trimmed)
 	}
 	if trimmed == "" || trimmed == "{" || trimmed == "}" {

@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -148,6 +149,62 @@ func TestSLP051_IgnoresLocalTypeConversions(t *testing.T) {
 	got := SLP051{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings for local type conversion, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP051_IgnoresPackageLocalHelpers(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(cwd); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+	if err := os.MkdirAll("a", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("a/helpers.go", []byte("package a\n\nfunc helper() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,2 +1,5 @@
+ package a
+
++func Run() {
++	helper()
++}
+`)
+	got := SLP051{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for package-local helper, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP051_IgnoresGoDeclarations(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,2 +1,7 @@
+ package a
+
++import (
++	"fmt"
++)
++var (
++	value = fmt.Sprintf("%s", "ok")
++)
+`)
+	got := SLP051{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for Go declarations, got %d: %+v", len(got), got)
 	}
 }
 
