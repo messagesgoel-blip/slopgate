@@ -22,6 +22,20 @@ go install github.com/messagesgoel-blip/slopgate/cmd/slopgate@latest
 
 Requires Go **1.22+**.
 
+### Local binary rebuild
+
+This repo keeps a local `./slopgate` binary for shared hook infrastructure. After rule changes, rebuild it from the repo root:
+
+```bash
+go build -buildvcs=false -o slopgate ./cmd/slopgate
+```
+
+After merge, refresh the shared install used by workspace hooks:
+
+```bash
+install -m 0755 slopgate /srv/storage/shared/tools/bin/slopgate
+```
+
 ---
 
 ## Quick start
