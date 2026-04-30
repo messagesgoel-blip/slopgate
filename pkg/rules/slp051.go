@@ -136,6 +136,44 @@ func slp051CollectSymbolsFromText(localSymbols map[string]bool, content string) 
 	}
 }
 
+func slp051RepoRoot() (string, bool) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", false
+	}
+	root, err := filepath.Abs(wd)
+	if err != nil {
+		return "", false
+	}
+	return filepath.Clean(root), true
+}
+
+func slp051ResolvePackageDir(repoRoot, dir string) (string, bool) {
+	if repoRoot == "" {
+		return "", false
+	}
+	if filepath.IsAbs(filepath.FromSlash(dir)) {
+		return "", false
+	}
+	cleanSlash := path.Clean(strings.ReplaceAll(dir, "\\", "/"))
+	if cleanSlash == "." {
+		cleanSlash = ""
+	}
+	if cleanSlash == ".." || strings.HasPrefix(cleanSlash, "../") {
+		return "", false
+	}
+	target := filepath.Join(repoRoot, filepath.FromSlash(cleanSlash))
+	targetAbs, err := filepath.Abs(target)
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(repoRoot, targetAbs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return targetAbs, true
+}
+
 func slp051PackageSymbols(d *diff.Diff) map[string]map[string]bool {
 	dirs := make(map[string]bool)
 	for _, f := range d.Files {
@@ -155,16 +193,21 @@ func slp051PackageSymbols(d *diff.Diff) map[string]map[string]bool {
 			}
 		}
 
-		globDir := "."
-		if dir != "" {
-			globDir = filepath.FromSlash(dir)
-		}
-		matches, err := filepath.Glob(filepath.Join(globDir, "*.go"))
-		if err == nil {
-			for _, match := range matches {
-				content, readErr := os.ReadFile(match)
-				if readErr == nil {
-					slp051CollectSymbolsFromText(symbols, string(content))
+		if repoRoot, ok := slp051RepoRoot(); ok {
+			if globDir, ok := slp051ResolvePackageDir(repoRoot, dir); ok {
+				matches, err := filepath.Glob(filepath.Join(globDir, "*.go"))
+				if err != nil {
+					out[dir] = symbols
+					continue
+				}
+				for _, match := range matches {
+					if strings.HasSuffix(strings.ToLower(match), "_test.go") {
+						continue
+					}
+					content, readErr := os.ReadFile(match)
+					if readErr == nil {
+						slp051CollectSymbolsFromText(symbols, string(content))
+					}
 				}
 			}
 		}

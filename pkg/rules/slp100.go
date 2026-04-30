@@ -23,11 +23,38 @@ var slp100FuncStart = regexp.MustCompile(`(?i)(?:func\s+(?:\([^)]*\)\s+)?|functi
 var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return(?:\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None))?\s*[;]?\s*$`)
 var slp100NonEmptyStringReturn = regexp.MustCompile(`^\s*return\s+(?:"(?:[^"\\]|\\.)+"|'(?:[^'\\]|\\.)+')\s*;?\s*$`)
 
+func slp100CodeBeforeTrailingComment(line string) string {
+	var quote byte
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		if quote != 0 {
+			if quote != '`' && c == '\\' && i+1 < len(line) {
+				i++
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch {
+		case c == '"' || c == '\'' || c == '`':
+			quote = c
+		case c == '/' && i+1 < len(line) && line[i+1] == '/':
+			return line[:i]
+		case c == '#':
+			return line[:i]
+		}
+	}
+	return line
+}
+
 func hasSideEffect(line string) bool {
 	stripped := stripCommentAndStrings(line)
 	trimmed := strings.TrimSpace(stripped)
 	if strings.HasPrefix(trimmed, "return") {
-		if slp100NonEmptyStringReturn.MatchString(strings.TrimSpace(line)) {
+		returnLine := strings.TrimSpace(slp100CodeBeforeTrailingComment(line))
+		if slp100NonEmptyStringReturn.MatchString(returnLine) {
 			return true
 		}
 		return !slp100ZeroReturn.MatchString(trimmed)
