@@ -93,7 +93,7 @@ func TestSLP035(t *testing.T) {
 						Hunks: []diff.Hunk{
 							{
 								Lines: []diff.Line{
-									{Kind: diff.LineAdd, NewLineNo: 1, Content: "const reallyLongVariableNameThatExceedsTheRecommendedLengthLimitForCodeQualityAndReadability = getValue();"},
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "const reallyLongVariableNameThatExceedsTheRecommendedLengthLimitForCodeQualityAndReadabilityAndWouldBeHardToReviewInADiffBecauseItKeepsGoing = getValue();"},
 								},
 							},
 						},
@@ -113,6 +113,24 @@ func TestSLP035(t *testing.T) {
 								Lines: []diff.Line{
 									{Kind: diff.LineAdd, NewLineNo: 1, Content: "const value = getValue();"},
 									{Kind: diff.LineAdd, NewLineNo: 2, Content: "return <div>{value}</div>;"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
+		},
+		{
+			name: "Long docs line ignored",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "docs/plan.md",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "This is a long planning paragraph that intentionally exceeds one hundred characters because prose is wrapped by editors and should not be treated as code quality slop."},
 								},
 							},
 						},

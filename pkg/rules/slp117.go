@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -18,6 +19,19 @@ func slp117HasAnchor(s string) bool {
 	return strings.Contains(s, `^`) || strings.Contains(s, `$`) ||
 		strings.Contains(s, `\b`) || strings.Contains(s, `\A`) ||
 		strings.Contains(s, `\z`) || strings.Contains(s, `\Z`)
+}
+
+var (
+	slp117JSRegExpCtor   = regexp.MustCompile(`(?:^|[^A-Za-z0-9_$])(?:new\s+)?RegExp\s*\(`)
+	slp117JSRegexLiteral = regexp.MustCompile(`(?:=|return|\(|:|,)\s*/(?:\\.|[^/\\\n])+/[a-zA-Z]*`)
+)
+
+func slp117LooksLikeRegex(cleaned string) bool {
+	if strings.Contains(cleaned, "regexp.") ||
+		slp117JSRegExpCtor.MatchString(cleaned) {
+		return true
+	}
+	return slp117JSRegexLiteral.MatchString(cleaned)
 }
 
 func (r SLP117) Check(d *diff.Diff) []Finding {
@@ -47,18 +61,8 @@ func (r SLP117) Check(d *diff.Diff) []Finding {
 				if indicatorSource == "" {
 					indicatorSource = raw
 				}
-				indicatorLower := strings.ToLower(indicatorSource)
 
-				hasIndicator := strings.Contains(indicatorSource, "/") ||
-					strings.Contains(indicatorLower, "regex") ||
-					strings.Contains(indicatorSource, "re.") ||
-					strings.Contains(indicatorLower, "pattern") ||
-					strings.Contains(indicatorSource, `\d`) || strings.Contains(indicatorSource, `\w`) ||
-					strings.Contains(indicatorSource, `\s`) || strings.Contains(indicatorSource, "[") ||
-					strings.Contains(indicatorSource, "]") || strings.Contains(indicatorSource, "+") ||
-					strings.Contains(indicatorSource, "*") || strings.Contains(indicatorSource, "?") ||
-					strings.Contains(indicatorSource, "{")
-				if !hasIndicator {
+				if !slp117LooksLikeRegex(indicatorSource) {
 					continue
 				}
 

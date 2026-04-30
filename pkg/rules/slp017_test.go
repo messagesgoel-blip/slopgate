@@ -219,9 +219,21 @@ func TestSLP017_MagicNumber(t *testing.T) {
 +++ b/tax.js
 @@ -1,2 +1,3 @@
 +const taxRate = 86.9;  // not ALL_CAPS, should flag
- return total * rate;
+return total * rate;
 `,
 			want: 1,
+		},
+		{
+			name: "roadmap yaml not flagged",
+			diff: `diff --git a/docs/roadmap.yml b/docs/roadmap.yml
+--- a/docs/roadmap.yml
++++ b/docs/roadmap.yml
+@@ -1,2 +1,5 @@
++milestone: 10
++target_days: 45
++phase: 3
+`,
+			want: 0,
 		},
 	}
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.0.15 (2026-04-30)
+
+Noise tuning plus 8 new mechanical CodeRabbit parity rules:
+
+- Tuned **SLP017**, **SLP035**, **SLP068**, and **SLP117** to avoid broad docs/config/string false positives.
+- **SLP128**: Interactive bot queue job uses positive BullMQ priority
+- **SLP129**: Tracked `.env` file contains live-looking secret or service binding
+- **SLP130**: Hardcoded external origin in browser navigation
+- **SLP131**: Nested Link/anchor elements create invalid interactive markup
+- **SLP132**: Global keyboard shortcut does not ignore editable controls
+- **SLP133**: Express router attaches body parser inline; verify it is not duplicated at app mount
+- **SLP134**: Runtime metadata persists full transfer arrays instead of bounded summaries
+- **SLP135**: Raw `err.message` persisted into user-visible summary or audit metadata
+
+Total: 131 rules
+
 ## v0.0.14 (2026-04-28)
 
 7 new AI-slop detection rules:

@@ -32,6 +32,75 @@ func TestSLP117_NoFireOnAnchoredRegex(t *testing.T) {
 	}
 }
 
+func TestSLP117_NoFireOnPlainArrayOrClassNameString(t *testing.T) {
+	d := parseDiff(t, `diff --git a/Component.tsx b/Component.tsx
+--- a/Component.tsx
++++ b/Component.tsx
+@@ -1,1 +1,4 @@
+ export function Component() {
++  const classes = ["grid", "gap-4", "md:grid-cols-2"].join(" ")
++  return <div className={classes}>ok</div>
+ }
+`)
+	got := SLP117{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for non-regex strings, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP117_FiresOnUnanchoredJSRegExp(t *testing.T) {
+	d := parseDiff(t, `diff --git a/validate.ts b/validate.ts
+--- a/validate.ts
++++ b/validate.ts
+@@ -1,1 +1,3 @@
++const slugPattern = new RegExp("[a-z0-9-]+")
++const escapedSlashPattern = /foo\/bar/
+`)
+	got := SLP117{}.Check(d)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 findings for unanchored RegExp forms, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP117_NoFireOnPlainPatternIdentifier(t *testing.T) {
+	d := parseDiff(t, `diff --git a/ui.ts b/ui.ts
+--- a/ui.ts
++++ b/ui.ts
+@@ -1,1 +1,3 @@
++const pattern = "foo"
+`)
+	got := SLP117{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for plain pattern string, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP117_NoFireOnRegExpNamedIdentifier(t *testing.T) {
+	d := parseDiff(t, `diff --git a/ui.ts b/ui.ts
+--- a/ui.ts
++++ b/ui.ts
+@@ -1,1 +1,3 @@
++const ok = isRegExp(value)
+`)
+	got := SLP117{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for RegExp suffix identifier, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP117_NoFireOnRegexMarkerInsidePlainString(t *testing.T) {
+	d := parseDiff(t, `diff --git a/ui.ts b/ui.ts
+--- a/ui.ts
++++ b/ui.ts
+@@ -1,1 +1,3 @@
++const msg = "use regexp.MustCompile for Go validators"
+`)
+	got := SLP117{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for regex marker inside plain string, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP117_Description(t *testing.T) {
 	r := SLP117{}
 	if r.ID() != "SLP117" {

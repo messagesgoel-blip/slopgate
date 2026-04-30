@@ -33,6 +33,24 @@ func isRustFile(path string) bool {
 	return strings.ToLower(filepath.Ext(path)) == ".rs"
 }
 
+// isSourceLikeFile reports whether a path is source/config that should be
+// scanned by broad code-quality rules. It intentionally excludes prose and
+// generic data files where style heuristics create too much noise.
+func isSourceLikeFile(path string) bool {
+	lower := strings.ToLower(path)
+	ext := strings.ToLower(filepath.Ext(lower))
+	if isGoFile(lower) || isJSOrTSFile(lower) || isPythonFile(lower) ||
+		isJavaFile(lower) || isRustFile(lower) || isShellLikeFile(lower) {
+		return true
+	}
+	switch ext {
+	case ".css", ".scss", ".sass", ".less", ".sql":
+		return true
+	default:
+		return false
+	}
+}
+
 // isJavaTestFile reports whether path is a Java test file.
 // Convention: file name contains "Test" (JUnit) or file lives under
 // src/test/ (Maven/Gradle convention).

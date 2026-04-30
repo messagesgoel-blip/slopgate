@@ -45,6 +45,7 @@ func isSourcePath(path string) bool {
 func (r SLP052) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	var prodDeleteCount int
+	var prodAddCount int
 	var testTouched bool
 	for _, f := range d.Files {
 		lowerPath := strings.ToLower(f.Path)
@@ -54,13 +55,16 @@ func (r SLP052) Check(d *diff.Diff) []Finding {
 				if ln.Kind == diff.LineDelete && !isTest && isSourcePath(lowerPath) {
 					prodDeleteCount++
 				}
+				if ln.Kind == diff.LineAdd && !isTest && isSourcePath(lowerPath) {
+					prodAddCount++
+				}
 				if isTest && (ln.Kind == diff.LineAdd || ln.Kind == diff.LineDelete) {
 					testTouched = true
 				}
 			}
 		}
 	}
-	if prodDeleteCount >= 3 && testTouched {
+	if prodDeleteCount >= 3 && testTouched && prodAddCount < prodDeleteCount {
 		out = append(out, Finding{
 			RuleID:   r.ID(),
 			Severity: r.DefaultSeverity(),

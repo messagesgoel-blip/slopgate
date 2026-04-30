@@ -16,6 +16,13 @@ func parseDiff(t *testing.T, s string) *diff.Diff {
 	return d
 }
 
+func parseDiffWithRoot(t *testing.T, root, s string) *diff.Diff {
+	t.Helper()
+	d := parseDiff(t, s)
+	d.RepoRoot = root
+	return d
+}
+
 func TestSLP012_FiresOnNewTODO(t *testing.T) {
 	d := parseDiff(t, `diff --git a/a.go b/a.go
 --- a/a.go

@@ -35,7 +35,8 @@ const (
 
 // Diff is the top-level parsed representation of a unified diff.
 type Diff struct {
-	Files []File
+	Files    []File
+	RepoRoot string // optional absolute worktree root for rules that inspect files
 }
 
 // File represents a single file's changes within a diff.

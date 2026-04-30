@@ -31,7 +31,7 @@ var consolePattern = regexp.MustCompile(`(?i)console\.(log|debug|info|warn|error
 var debuggerPattern = regexp.MustCompile(`(?i)\bdebugger\b`)
 var todoPattern = regexp.MustCompile(`(?i)(TODO|FIXME|HACK|XXX)`)
 var trailingWhitespacePattern = regexp.MustCompile(`\s+$`)
-var longLinePattern = regexp.MustCompile(`^.{101,}$`)
+var longLinePattern = regexp.MustCompile(`^.{141,}$`)
 
 func (r SLP035) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -39,8 +39,9 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 		if f.IsDelete {
 			continue
 		}
+		isDoc := isDocFile(f.Path)
+		checkLongLine := !isDoc && isSourceLikeFile(f.Path)
 
-		// Check all file types
 		for _, h := range f.Hunks {
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
@@ -64,6 +65,9 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 				if content == "" {
 					continue
 				}
+				if isDoc {
+					continue
+				}
 
 				// Check for console.log statements using direct pattern check
 				if consolePattern.MatchString(content) {
@@ -85,7 +89,7 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 				}
 
 				// Check for very long lines using direct pattern check
-				if longLinePattern.MatchString(ln.Content) {
+				if checkLongLine && longLinePattern.MatchString(ln.Content) {
 					appendFinding(&out, r, f.Path, ln.NewLineNo, "line is too long ("+strconv.Itoa(len(ln.Content))+" chars) - consider breaking into multiple lines", ln.Content)
 				}
 			}

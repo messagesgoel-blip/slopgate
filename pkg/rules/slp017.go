@@ -64,6 +64,9 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || isDocFile(f.Path) {
 			continue
 		}
+		if !isSourceLikeFile(f.Path) {
+			continue
+		}
 		isTest := isGoTestFile(f.Path) || isJavaTestFile(f.Path) ||
 			isPythonTestFile(f.Path) || isJSTestFile(f.Path) || isRustTestFile(f.Path)
 		if isTest {

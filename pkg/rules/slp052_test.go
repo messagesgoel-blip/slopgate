@@ -99,6 +99,36 @@ diff --git a/a/foo_test.go b/a/foo_test.go
 	}
 }
 
+func TestSLP052_IgnoresProductionRefactorWithReplacement(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,6 +1,6 @@
+ package a
+
+-func OldFeature() {
+-	return 42
+-}
++func NewFeature() {
++	return 43
++}
+
+diff --git a/a/foo_test.go b/a/foo_test.go
+--- a/a/foo_test.go
++++ b/a/foo_test.go
+@@ -1,2 +1,5 @@
+ package a
+
++func TestNewThing(t *testing.T) {
++	NewFeature()
++}
+`)
+	got := SLP052{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when production deletion is replaced, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP052_IgnoresDocsDeletionWithTestChanges(t *testing.T) {
 	d := parseDiff(t, `diff --git a/docs/guide.md b/docs/guide.md
 --- a/docs/guide.md

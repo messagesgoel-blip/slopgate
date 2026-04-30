@@ -21,12 +21,55 @@ func (SLP100) Description() string {
 var slp100FuncStart = regexp.MustCompile(`(?i)(?:func\s+(?:\([^)]*\)\s+)?|function\s+|def\s+|(?:public|private|protected)\s+(?:static\s+)?(?:final\s+)?(?:\w+\s+)?|fn\s+)\w+\s*\(`)
 
 var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return(?:\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None))?\s*[;]?\s*$`)
+var slp100NonEmptyStringReturn = regexp.MustCompile(`^\s*return\s+(?:"(?:[^"\\]|\\.)+"|'(?:[^'\\]|\\.)+')\s*;?\s*$`)
+
+func slp100CodeBeforeTrailingComment(line string) string {
+	var quote byte
+	var b strings.Builder
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		if quote != 0 {
+			b.WriteByte(c)
+			if quote != '`' && c == '\\' && i+1 < len(line) {
+				b.WriteByte(line[i+1])
+				i++
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch {
+		case c == '"' || c == '\'' || c == '`':
+			quote = c
+			b.WriteByte(c)
+		case c == '/' && i+1 < len(line) && line[i+1] == '*':
+			end := strings.Index(line[i+2:], "*/")
+			if end < 0 {
+				return b.String()
+			}
+			i += end + 3
+		case c == '/' && i+1 < len(line) && line[i+1] == '/':
+			return b.String()
+		case c == '#':
+			return b.String()
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
+}
 
 func hasSideEffect(line string) bool {
 	stripped := stripCommentAndStrings(line)
 	trimmed := strings.TrimSpace(stripped)
 	if strings.HasPrefix(trimmed, "return") {
-		return !slp100ZeroReturn.MatchString(trimmed)
+		returnLine := strings.TrimSpace(slp100CodeBeforeTrailingComment(line))
+		if slp100NonEmptyStringReturn.MatchString(returnLine) {
+			return true
+		}
+		return !slp100ZeroReturn.MatchString(returnLine)
 	}
 	if trimmed == "" || trimmed == "{" || trimmed == "}" {
 		return false

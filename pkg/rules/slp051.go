@@ -1,6 +1,9 @@
 package rules
 
 import (
+	"os"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -24,6 +27,7 @@ var goKeywords = map[string]bool{
 	"if": true, "for": true, "switch": true, "select": true,
 	"return": true, "defer": true, "go": true, "panic": true,
 	"recover": true, "print": true, "println": true,
+	"import": true, "var": true, "const": true, "type": true,
 	"new": true, "make": true, "len": true, "cap": true,
 	"append": true, "copy": true, "delete": true, "close": true,
 	"complex": true, "real": true, "imag": true,
@@ -42,11 +46,15 @@ var undefinedCallPattern = regexp.MustCompile(`\b([a-zA-Z_]\w*)\s*\(`)
 
 func (r SLP051) Check(d *diff.Diff) []Finding {
 	var out []Finding
+	packageSymbols := slp051PackageSymbols(d)
 	for _, f := range d.Files {
 		if f.IsDelete || !isGoFile(f.Path) {
 			continue
 		}
 		localFuncs := slp051LocalSymbols(f)
+		for name := range packageSymbols[slp051PackageDir(f.Path)] {
+			localFuncs[name] = true
+		}
 		for _, h := range f.Hunks {
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
@@ -89,21 +97,225 @@ func (r SLP051) Check(d *diff.Diff) []Finding {
 var funcDefPattern = regexp.MustCompile(`^func\s+(?:\([^)]+\)\s+)?([a-zA-Z_]\w*)(?:\s*\[[^\]]+\])?\s*\(`)
 
 var typeDefPattern = regexp.MustCompile(`^type\s+([a-zA-Z_]\w*)\b`)
+var typeBlockStartPattern = regexp.MustCompile(`^type\s*\(`)
+var typeBlockSymbolPattern = regexp.MustCompile(`^([a-zA-Z_]\w*)\b`)
+
+func slp051PackageDir(filePath string) string {
+	normalized := strings.ReplaceAll(filePath, "\\", "/")
+	dir := path.Dir(normalized)
+	if dir == "." {
+		return ""
+	}
+	return dir
+}
+
+func slp051AddSymbolFromLine(localSymbols map[string]bool, line string) {
+	trimmed := strings.TrimSpace(line)
+	if m := funcDefPattern.FindStringSubmatch(trimmed); len(m) > 1 {
+		localSymbols[m[1]] = true
+	}
+	if m := typeDefPattern.FindStringSubmatch(trimmed); len(m) > 1 {
+		localSymbols[m[1]] = true
+	}
+}
 
 func slp051LocalSymbols(f diff.File) map[string]bool {
 	localSymbols := make(map[string]bool)
 	for _, h := range f.Hunks {
+		var lines []string
 		for _, ln := range h.Lines {
 			if ln.Kind == diff.LineDelete {
 				continue
 			}
-			if m := funcDefPattern.FindStringSubmatch(strings.TrimSpace(ln.Content)); m != nil {
-				localSymbols[m[1]] = true
+			lines = append(lines, ln.Content)
+		}
+		slp051CollectSymbolsFromLines(localSymbols, lines)
+	}
+	return localSymbols
+}
+
+func slp051CollectSymbolsFromText(localSymbols map[string]bool, content string) {
+	slp051CollectSymbolsFromLines(localSymbols, strings.Split(content, "\n"))
+}
+
+func slp051CollectSymbolsFromLines(localSymbols map[string]bool, lines []string) {
+	inTypeBlock := false
+	braceDepth := 0
+	parenDepth := 0
+	bracketDepth := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if inTypeBlock {
+			if braceDepth+parenDepth+bracketDepth == 0 && strings.HasPrefix(trimmed, ")") {
+				inTypeBlock = false
+				continue
 			}
-			if m := typeDefPattern.FindStringSubmatch(strings.TrimSpace(ln.Content)); m != nil {
-				localSymbols[m[1]] = true
+			if braceDepth+parenDepth+bracketDepth == 0 {
+				if m := typeBlockSymbolPattern.FindStringSubmatch(trimmed); len(m) > 1 {
+					localSymbols[m[1]] = true
+				}
+			}
+			slp051UpdateTypeBlockDepth(stripCommentAndStrings(trimmed), &braceDepth, &parenDepth, &bracketDepth)
+			continue
+		}
+		slp051AddSymbolFromLine(localSymbols, line)
+		if typeBlockStartPattern.MatchString(trimmed) {
+			inTypeBlock = true
+			braceDepth = 0
+			parenDepth = 0
+			bracketDepth = 0
+		}
+	}
+}
+
+func slp051UpdateTypeBlockDepth(line string, braceDepth, parenDepth, bracketDepth *int) {
+	for _, r := range line {
+		switch r {
+		case '{':
+			*braceDepth = *braceDepth + 1
+		case '}':
+			*braceDepth = *braceDepth - 1
+		case '(':
+			*parenDepth = *parenDepth + 1
+		case ')':
+			*parenDepth = *parenDepth - 1
+		case '[':
+			*bracketDepth = *bracketDepth + 1
+		case ']':
+			*bracketDepth = *bracketDepth - 1
+		}
+	}
+	if *braceDepth < 0 {
+		*braceDepth = 0
+	}
+	if *parenDepth < 0 {
+		*parenDepth = 0
+	}
+	if *bracketDepth < 0 {
+		*bracketDepth = 0
+	}
+}
+
+func slp051IsProductionGoFile(path string) bool {
+	return isGoFile(path) && !isTestFile(path)
+}
+
+func slp051AddDiffLocalSymbols(symbols map[string]bool, d *diff.Diff, dir string) {
+	for _, f := range d.Files {
+		if !f.IsDelete && slp051IsProductionGoFile(f.Path) && slp051PackageDir(f.Path) == dir {
+			for name := range slp051LocalSymbols(f) {
+				symbols[name] = true
 			}
 		}
 	}
-	return localSymbols
+}
+
+func slp051RepoRoot() (string, bool) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", false
+	}
+	root, err := filepath.Abs(wd)
+	if err != nil {
+		return "", false
+	}
+	evaluatedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", false
+	}
+	return filepath.Clean(evaluatedRoot), true
+}
+
+func slp051RepoRootForDiff(d *diff.Diff) (string, bool) {
+	if d != nil && d.RepoRoot != "" {
+		return slp051ResolveExistingPathInRepo(d.RepoRoot, d.RepoRoot)
+	}
+	return slp051RepoRoot()
+}
+
+func slp051ResolvePackageDir(repoRoot, dir string) (string, bool) {
+	if repoRoot == "" {
+		return "", false
+	}
+	evaluatedRoot, ok := slp051ResolveExistingPathInRepo(repoRoot, repoRoot)
+	if !ok {
+		return "", false
+	}
+	if filepath.IsAbs(filepath.FromSlash(dir)) {
+		return "", false
+	}
+	cleanSlash := path.Clean(strings.ReplaceAll(dir, "\\", "/"))
+	if cleanSlash == "." {
+		cleanSlash = ""
+	}
+	if cleanSlash == ".." || strings.HasPrefix(cleanSlash, "../") {
+		return "", false
+	}
+	target := filepath.Join(evaluatedRoot, filepath.FromSlash(cleanSlash))
+	return slp051ResolveExistingPathInRepo(evaluatedRoot, target)
+}
+
+func slp051ResolveExistingPathInRepo(repoRoot, target string) (string, bool) {
+	rootAbs, err := filepath.Abs(repoRoot)
+	if err != nil {
+		return "", false
+	}
+	evaluatedRoot, err := filepath.EvalSymlinks(rootAbs)
+	if err != nil {
+		return "", false
+	}
+	targetAbs, err := filepath.Abs(target)
+	if err != nil {
+		return "", false
+	}
+	evaluatedTarget, err := filepath.EvalSymlinks(targetAbs)
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(evaluatedRoot, evaluatedTarget)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return filepath.Clean(evaluatedTarget), true
+}
+
+func slp051PackageSymbols(d *diff.Diff) map[string]map[string]bool {
+	dirs := make(map[string]bool)
+	for _, f := range d.Files {
+		if !f.IsDelete && slp051IsProductionGoFile(f.Path) {
+			dirs[slp051PackageDir(f.Path)] = true
+		}
+	}
+
+	out := make(map[string]map[string]bool, len(dirs))
+	for dir := range dirs {
+		symbols := make(map[string]bool)
+		slp051AddDiffLocalSymbols(symbols, d, dir)
+
+		if repoRoot, ok := slp051RepoRootForDiff(d); ok {
+			if globDir, ok := slp051ResolvePackageDir(repoRoot, dir); ok {
+				matches, err := filepath.Glob(filepath.Join(globDir, "*.go"))
+				if err != nil {
+					out[dir] = symbols
+					continue
+				}
+				for _, match := range matches {
+					evaluatedMatch, ok := slp051ResolveExistingPathInRepo(repoRoot, match)
+					if !ok {
+						continue
+					}
+					if strings.HasSuffix(strings.ToLower(match), "_test.go") ||
+						strings.HasSuffix(strings.ToLower(evaluatedMatch), "_test.go") {
+						continue
+					}
+					content, readErr := os.ReadFile(evaluatedMatch) // #nosec G304 -- evaluated symlink target is constrained to repo root above.
+					if readErr == nil {
+						slp051CollectSymbolsFromText(symbols, string(content))
+					}
+				}
+			}
+		}
+		out[dir] = symbols
+	}
+	return out
 }
