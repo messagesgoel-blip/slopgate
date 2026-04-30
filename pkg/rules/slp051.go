@@ -109,10 +109,10 @@ func slp051PackageDir(filePath string) string {
 
 func slp051AddSymbolFromLine(localSymbols map[string]bool, line string) {
 	trimmed := strings.TrimSpace(line)
-	if m := funcDefPattern.FindStringSubmatch(trimmed); m != nil {
+	if m := funcDefPattern.FindStringSubmatch(trimmed); len(m) > 1 {
 		localSymbols[m[1]] = true
 	}
-	if m := typeDefPattern.FindStringSubmatch(trimmed); m != nil {
+	if m := typeDefPattern.FindStringSubmatch(trimmed); len(m) > 1 {
 		localSymbols[m[1]] = true
 	}
 }
