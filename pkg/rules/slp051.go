@@ -155,7 +155,7 @@ func slp051CollectSymbolsFromLines(localSymbols map[string]bool, lines []string)
 					localSymbols[m[1]] = true
 				}
 			}
-			slp051UpdateTypeBlockDepth(trimmed, &braceDepth, &parenDepth, &bracketDepth)
+			slp051UpdateTypeBlockDepth(stripCommentAndStrings(trimmed), &braceDepth, &parenDepth, &bracketDepth)
 			continue
 		}
 		slp051AddSymbolFromLine(localSymbols, line)

@@ -245,6 +245,29 @@ func TestSLP051_DoesNotTreatGroupedFunctionTypeParamsAsSymbols(t *testing.T) {
 	}
 }
 
+func TestSLP051_GroupedTypeWithTagDelimiters(t *testing.T) {
+	d := parseDiff(t, "diff --git a/a/foo.go b/a/foo.go\n"+
+		"--- a/a/foo.go\n"+
+		"+++ b/a/foo.go\n"+
+		"@@ -1,2 +1,14 @@\n"+
+		" package a\n"+
+		"\n"+
+		"+type (\n"+
+		"+\tTagged struct {\n"+
+		"+\t\tField string `json:\"(\"` // comment with [ and {\n"+
+		"+\t}\n"+
+		"+\tLater string\n"+
+		"+)\n"+
+		"+\n"+
+		"+func Run(v string) {\n"+
+		"+\t_ = Later(v)\n"+
+		"+}\n")
+	got := SLP051{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for grouped type after tag delimiters, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP051_IgnoresPackageLocalHelpers(t *testing.T) {
 	tmp := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(tmp, "a"), 0o750); err != nil {
