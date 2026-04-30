@@ -59,7 +59,7 @@ func hasSideEffect(line string) bool {
 		if slp100NonEmptyStringReturn.MatchString(returnLine) {
 			return true
 		}
-		return !slp100ZeroReturn.MatchString(trimmed)
+		return !slp100ZeroReturn.MatchString(returnLine)
 	}
 	if trimmed == "" || trimmed == "{" || trimmed == "}" {
 		return false

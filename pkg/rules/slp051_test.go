@@ -177,6 +177,31 @@ func TestSLP051_IgnoresPackageGroupedTypeConversions(t *testing.T) {
 	}
 }
 
+func TestSLP051_DoesNotTreatGroupedTypeMembersAsSymbols(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "a"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "a", "types.go"), []byte("package a\n\ntype (\n\tPayload struct {\n\t\tField string\n\t}\n\tReader interface {\n\t\tRead() error\n\t}\n)\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d := parseDiffWithRoot(t, tmp, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,2 +1,6 @@
+ package a
+
++func Run(v string) {
++	_ = Field(v)
++	_ = Read()
++}
+`)
+	got := SLP051{}.Check(d)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 findings for grouped type members, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP051_IgnoresPackageLocalHelpers(t *testing.T) {
 	tmp := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(tmp, "a"), 0o750); err != nil {
@@ -198,6 +223,34 @@ func TestSLP051_IgnoresPackageLocalHelpers(t *testing.T) {
 	got := SLP051{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings for package-local helper, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP051_DoesNotUseDiffTestOnlyPackageHelpers(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmp, "a"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	d := parseDiffWithRoot(t, tmp, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,2 +1,5 @@
+ package a
+
++func Run() {
++	testOnlyHelper()
++}
+diff --git a/a/helpers_test.go b/a/helpers_test.go
+--- a/a/helpers_test.go
++++ b/a/helpers_test.go
+@@ -1,2 +1,4 @@
+ package a
+
++func testOnlyHelper() {}
+`)
+	got := SLP051{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for diff test-only helper, got %d: %+v", len(got), got)
 	}
 }
 

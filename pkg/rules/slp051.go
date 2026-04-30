@@ -140,21 +140,43 @@ func slp051CollectSymbolsFromText(localSymbols map[string]bool, content string) 
 
 func slp051CollectSymbolsFromLines(localSymbols map[string]bool, lines []string) {
 	inTypeBlock := false
+	typeBlockBraceDepth := 0
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if inTypeBlock {
-			if strings.HasPrefix(trimmed, ")") {
+			if typeBlockBraceDepth == 0 && strings.HasPrefix(trimmed, ")") {
 				inTypeBlock = false
 				continue
 			}
-			if m := typeBlockSymbolPattern.FindStringSubmatch(trimmed); len(m) > 1 {
-				localSymbols[m[1]] = true
+			if typeBlockBraceDepth == 0 {
+				if m := typeBlockSymbolPattern.FindStringSubmatch(trimmed); len(m) > 1 {
+					localSymbols[m[1]] = true
+				}
+			}
+			typeBlockBraceDepth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
+			if typeBlockBraceDepth < 0 {
+				typeBlockBraceDepth = 0
 			}
 			continue
 		}
 		slp051AddSymbolFromLine(localSymbols, line)
 		if typeBlockStartPattern.MatchString(trimmed) {
 			inTypeBlock = true
+			typeBlockBraceDepth = 0
+		}
+	}
+}
+
+func slp051IsProductionGoFile(path string) bool {
+	return isGoFile(path) && !isTestFile(path)
+}
+
+func slp051AddDiffLocalSymbols(symbols map[string]bool, d *diff.Diff, dir string) {
+	for _, f := range d.Files {
+		if !f.IsDelete && slp051IsProductionGoFile(f.Path) && slp051PackageDir(f.Path) == dir {
+			for name := range slp051LocalSymbols(f) {
+				symbols[name] = true
+			}
 		}
 	}
 }
@@ -231,7 +253,7 @@ func slp051ResolveExistingPathInRepo(repoRoot, target string) (string, bool) {
 func slp051PackageSymbols(d *diff.Diff) map[string]map[string]bool {
 	dirs := make(map[string]bool)
 	for _, f := range d.Files {
-		if !f.IsDelete && isGoFile(f.Path) {
+		if !f.IsDelete && slp051IsProductionGoFile(f.Path) {
 			dirs[slp051PackageDir(f.Path)] = true
 		}
 	}
@@ -239,13 +261,7 @@ func slp051PackageSymbols(d *diff.Diff) map[string]map[string]bool {
 	out := make(map[string]map[string]bool, len(dirs))
 	for dir := range dirs {
 		symbols := make(map[string]bool)
-		for _, f := range d.Files {
-			if !f.IsDelete && isGoFile(f.Path) && slp051PackageDir(f.Path) == dir {
-				for name := range slp051LocalSymbols(f) {
-					symbols[name] = true
-				}
-			}
-		}
+		slp051AddDiffLocalSymbols(symbols, d, dir)
 
 		if repoRoot, ok := slp051RepoRootForDiff(d); ok {
 			if globDir, ok := slp051ResolvePackageDir(repoRoot, dir); ok {

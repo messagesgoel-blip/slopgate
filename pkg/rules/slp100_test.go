@@ -93,6 +93,36 @@ func TestSLP100_NoFireOnNonEmptyStringReturnWithTrailingBlockComment(t *testing.
 	}
 }
 
+func TestSLP100_FiresOnEmptyStringReturnWithTrailingComment(t *testing.T) {
+	d := parseDiff(t, `diff --git a/rule.go b/rule.go
+--- a/rule.go
++++ b/rule.go
+@@ -1,1 +1,5 @@
++func (Rule) Description() string {
++    return "" // documented rule metadata
++}
+`)
+	got := SLP100{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for empty string return with trailing comment")
+	}
+}
+
+func TestSLP100_FiresOnEmptyStringReturnWithTrailingBlockComment(t *testing.T) {
+	d := parseDiff(t, `diff --git a/rule.go b/rule.go
+--- a/rule.go
++++ b/rule.go
+@@ -1,1 +1,5 @@
++func (Rule) Description() string {
++    return "" /* documented rule metadata */
++}
+`)
+	got := SLP100{}.Check(d)
+	if len(got) == 0 {
+		t.Fatal("expected finding for empty string return with trailing block comment")
+	}
+}
+
 func TestSLP100_IgnoresDocFiles(t *testing.T) {
 	d := parseDiff(t, `diff --git a/README.md b/README.md
 --- a/README.md
