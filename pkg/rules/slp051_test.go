@@ -154,26 +154,14 @@ func TestSLP051_IgnoresLocalTypeConversions(t *testing.T) {
 }
 
 func TestSLP051_IgnoresPackageGroupedTypeConversions(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
 	tmp := t.TempDir()
-	if err := os.Chdir(tmp); err != nil {
+	if err := os.MkdirAll(filepath.Join(tmp, "a"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Fatalf("restore cwd: %v", err)
-		}
-	})
-	if err := os.MkdirAll("a", 0o750); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "a", "types.go"), []byte("package a\n\ntype (\n\tStatus string\n\tCode int\n)\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile("a/types.go", []byte("package a\n\ntype (\n\tStatus string\n\tCode int\n)\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+	d := parseDiffWithRoot(t, tmp, `diff --git a/a/foo.go b/a/foo.go
 --- a/a/foo.go
 +++ b/a/foo.go
 @@ -1,2 +1,5 @@
@@ -190,26 +178,14 @@ func TestSLP051_IgnoresPackageGroupedTypeConversions(t *testing.T) {
 }
 
 func TestSLP051_IgnoresPackageLocalHelpers(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
 	tmp := t.TempDir()
-	if err := os.Chdir(tmp); err != nil {
+	if err := os.MkdirAll(filepath.Join(tmp, "a"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Fatalf("restore cwd: %v", err)
-		}
-	})
-	if err := os.MkdirAll("a", 0o750); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "a", "helpers.go"), []byte("package a\n\nfunc helper() {}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile("a/helpers.go", []byte("package a\n\nfunc helper() {}\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+	d := parseDiffWithRoot(t, tmp, `diff --git a/a/foo.go b/a/foo.go
 --- a/a/foo.go
 +++ b/a/foo.go
 @@ -1,2 +1,5 @@
@@ -226,20 +202,8 @@ func TestSLP051_IgnoresPackageLocalHelpers(t *testing.T) {
 }
 
 func TestSLP051_DoesNotUseSymlinkedHelpersOutsideRepo(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
 	tmp := t.TempDir()
-	if err := os.Chdir(tmp); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Fatalf("restore cwd: %v", err)
-		}
-	})
-	if err := os.MkdirAll("a", 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Join(tmp, "a"), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	outside := t.TempDir()
@@ -247,10 +211,10 @@ func TestSLP051_DoesNotUseSymlinkedHelpersOutsideRepo(t *testing.T) {
 	if err := os.WriteFile(outsideFile, []byte("package a\n\nfunc externalHelper() {}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(outsideFile, filepath.Join("a", "helpers.go")); err != nil {
+	if err := os.Symlink(outsideFile, filepath.Join(tmp, "a", "helpers.go")); err != nil {
 		t.Skipf("symlink unavailable: %v", err)
 	}
-	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+	d := parseDiffWithRoot(t, tmp, `diff --git a/a/foo.go b/a/foo.go
 --- a/a/foo.go
 +++ b/a/foo.go
 @@ -1,2 +1,5 @@
@@ -267,26 +231,14 @@ func TestSLP051_DoesNotUseSymlinkedHelpersOutsideRepo(t *testing.T) {
 }
 
 func TestSLP051_DoesNotUseTestOnlyPackageHelpers(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
 	tmp := t.TempDir()
-	if err := os.Chdir(tmp); err != nil {
+	if err := os.MkdirAll(filepath.Join(tmp, "a"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Fatalf("restore cwd: %v", err)
-		}
-	})
-	if err := os.MkdirAll("a", 0o750); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "a", "helpers_test.go"), []byte("package a\n\nfunc testOnlyHelper() {}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile("a/helpers_test.go", []byte("package a\n\nfunc testOnlyHelper() {}\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+	d := parseDiffWithRoot(t, tmp, `diff --git a/a/foo.go b/a/foo.go
 --- a/a/foo.go
 +++ b/a/foo.go
 @@ -1,2 +1,5 @@

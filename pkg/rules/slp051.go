@@ -175,6 +175,13 @@ func slp051RepoRoot() (string, bool) {
 	return filepath.Clean(evaluatedRoot), true
 }
 
+func slp051RepoRootForDiff(d *diff.Diff) (string, bool) {
+	if d != nil && d.RepoRoot != "" {
+		return slp051ResolveExistingPathInRepo(d.RepoRoot, d.RepoRoot)
+	}
+	return slp051RepoRoot()
+}
+
 func slp051ResolvePackageDir(repoRoot, dir string) (string, bool) {
 	if repoRoot == "" {
 		return "", false
@@ -240,7 +247,7 @@ func slp051PackageSymbols(d *diff.Diff) map[string]map[string]bool {
 			}
 		}
 
-		if repoRoot, ok := slp051RepoRoot(); ok {
+		if repoRoot, ok := slp051RepoRootForDiff(d); ok {
 			if globDir, ok := slp051ResolvePackageDir(repoRoot, dir); ok {
 				matches, err := filepath.Glob(filepath.Join(globDir, "*.go"))
 				if err != nil {

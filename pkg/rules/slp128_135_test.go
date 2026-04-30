@@ -195,6 +195,23 @@ func TestSLP132_FiresWhenInputIsMentionedWithoutTargetGuard(t *testing.T) {
 	assertFindings(t, SLP132{}.Check(d), 1, "SLP132", SeverityWarn)
 }
 
+func TestSLP132_IgnoresLocalElementKeyDown(t *testing.T) {
+	d := parseDiff(t, `diff --git a/src/blog/components/SearchInput.tsx b/src/blog/components/SearchInput.tsx
+--- a/src/blog/components/SearchInput.tsx
++++ b/src/blog/components/SearchInput.tsx
+@@ -1,3 +1,10 @@
+ export function SearchInput() {
++  const handleKeyDown = (event) => {
++    if ((event.metaKey || event.ctrlKey) && event.key === "k") {
++      setOpen(true)
++    }
++  }
++  return <input onKeyDown={handleKeyDown} />
+ }
+`)
+	assertFindings(t, SLP132{}.Check(d), 0, "SLP132", SeverityWarn)
+}
+
 func TestSLP133_FiresOnInlineExpressRawParser(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api/src/routes/discordBot.js b/api/src/routes/discordBot.js
 --- a/api/src/routes/discordBot.js
@@ -205,6 +222,18 @@ func TestSLP133_FiresOnInlineExpressRawParser(t *testing.T) {
 +})
 `)
 	assertFindings(t, SLP133{}.Check(d), 1, "SLP133", SeverityWarn)
+}
+
+func TestSLP133_IgnoresParserNotPassedToRouter(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/routes/discordBot.js b/api/src/routes/discordBot.js
+--- a/api/src/routes/discordBot.js
++++ b/api/src/routes/discordBot.js
+@@ -1,3 +1,7 @@
++const parser = express.json()
++router.get('/health', health)
++app.use(parser)
+`)
+	assertFindings(t, SLP133{}.Check(d), 0, "SLP133", SeverityWarn)
 }
 
 func TestSLP134_FiresOnPersistedTransferArrays(t *testing.T) {
@@ -221,6 +250,32 @@ func TestSLP134_FiresOnPersistedTransferArrays(t *testing.T) {
 `)
 	got := SLP134{}.Check(d)
 	assertFindings(t, got, 2, "SLP134", SeverityWarn)
+}
+
+func TestSLP134_FiresOnStringifiedSummaryWithTransferArrays(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/services/structuralAutomationRunService.js b/api/src/services/structuralAutomationRunService.js
+--- a/api/src/services/structuralAutomationRunService.js
++++ b/api/src/services/structuralAutomationRunService.js
+@@ -1,3 +1,7 @@
+ function record(ids) {
++  const summary = { transferIds: ids, status: 'completed' }
++  audit_logs.insert({ metadata: JSON.stringify(summary) })
+ }
+`)
+	assertFindings(t, SLP134{}.Check(d), 1, "SLP134", SeverityWarn)
+}
+
+func TestSLP134_IgnoresStringifiedBoundedSummary(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/services/structuralAutomationRunService.js b/api/src/services/structuralAutomationRunService.js
+--- a/api/src/services/structuralAutomationRunService.js
++++ b/api/src/services/structuralAutomationRunService.js
+@@ -1,3 +1,7 @@
+ function record(count) {
++  const summary = { transferCount: count, status: 'completed' }
++  metadata.lastRun = JSON.stringify(summary)
+ }
+`)
+	assertFindings(t, SLP134{}.Check(d), 0, "SLP134", SeverityWarn)
 }
 
 func TestSLP134_IgnoresIntermediateTransferArrays(t *testing.T) {

@@ -90,8 +90,10 @@ var (
 	slp129EnvAssign        = regexp.MustCompile(`^\s*([A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|SUPABASE|ANON|URL)[A-Z0-9_]*)\s*=\s*(.+?)\s*$`)
 	slp130Navigation       = regexp.MustCompile(`\b(?:window\.)?(?:location\.(?:assign|replace)|window\.open)\s*\(\s*["'\x60]https?://|\b(?:window\.)?location\.href\s*=\s*["'\x60]https?://`)
 	slp133InlineParser     = regexp.MustCompile(`\bexpress\.(?:raw|json|urlencoded)\s*\(`)
+	slp133RouterParserCall = regexp.MustCompile(`(?s)\brouter\.\w+\s*\([^;]*\bexpress\.(?:raw|json|urlencoded)\s*\(`)
 	slp134ArrayField       = regexp.MustCompile(`\b(?:transferIds|skippedTransfers|deleteFailures)\s*:`)
 	slp135RawErrMessage    = regexp.MustCompile(`\b(?:error|message)\s*:\s*(?:err|error|e)\.message\b`)
+	slp132GlobalShortcut   = regexp.MustCompile(`(?i)\b(?:window|document)\s*\.\s*(?:addEventListener|onkeydown|onkeyup|onkeypress)\b`)
 )
 
 func (r SLP128) Check(d *diff.Diff) []Finding {
@@ -265,7 +267,7 @@ func (r SLP133) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				window := slpWindowText(h.Lines, i, 4, 4)
-				if !strings.Contains(window, "router.") {
+				if !slp133RouterParserCall.MatchString(window) {
 					continue
 				}
 				out = append(out, Finding{
@@ -300,7 +302,9 @@ func (r SLP134) Check(d *diff.Diff) []Finding {
 					out = append(out, slp134Finding(r, f.Path, ln))
 					continue
 				}
-				if strings.Contains(ln.Content, "JSON.stringify(summary)") && slp134MetadataContext(window) {
+				if strings.Contains(ln.Content, "JSON.stringify(summary)") &&
+					slp134MetadataContext(window) &&
+					slp134SummaryArrayEvidence(window) {
 					out = append(out, slp134Finding(r, f.Path, ln))
 				}
 			}
@@ -480,11 +484,10 @@ func slp132ShortcutEntryLine(line string) bool {
 
 func slp132LooksLikeShortcut(window string) bool {
 	lower := strings.ToLower(window)
-	return (strings.Contains(window, "metaKey") || strings.Contains(window, "ctrlKey") ||
+	hasKeyCombo := strings.Contains(lower, "metakey") || strings.Contains(lower, "ctrlkey") ||
 		strings.Contains(lower, "escape") || strings.Contains(lower, "event.key") ||
-		strings.Contains(lower, ".key")) &&
-		(strings.Contains(window, "addEventListener") || strings.Contains(window, "onKeyDown") ||
-			strings.Contains(window, "handleKeyDown"))
+		strings.Contains(lower, ".key")
+	return hasKeyCombo && slp132GlobalShortcut.MatchString(window)
 }
 
 func slp132HasEditableGuard(window string) bool {
@@ -524,6 +527,13 @@ func slp134MetadataContext(window string) bool {
 	lower := strings.ToLower(window)
 	return strings.Contains(lower, "metadata") || strings.Contains(lower, "audit_logs") ||
 		strings.Contains(lower, "lastrun") || strings.Contains(lower, "recentruns")
+}
+
+func slp134SummaryArrayEvidence(window string) bool {
+	lower := strings.ToLower(window)
+	return strings.Contains(lower, "transferids") ||
+		strings.Contains(lower, "skippedtransfers") ||
+		strings.Contains(lower, "deletefailures")
 }
 
 func slp135PersistenceContext(window string) bool {
