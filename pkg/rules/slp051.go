@@ -97,6 +97,8 @@ func (r SLP051) Check(d *diff.Diff) []Finding {
 var funcDefPattern = regexp.MustCompile(`^func\s+(?:\([^)]+\)\s+)?([a-zA-Z_]\w*)(?:\s*\[[^\]]+\])?\s*\(`)
 
 var typeDefPattern = regexp.MustCompile(`^type\s+([a-zA-Z_]\w*)\b`)
+var typeBlockStartPattern = regexp.MustCompile(`^type\s*\(`)
+var typeBlockSymbolPattern = regexp.MustCompile(`^([a-zA-Z_]\w*)\b`)
 
 func slp051PackageDir(filePath string) string {
 	normalized := strings.ReplaceAll(filePath, "\\", "/")
@@ -119,20 +121,41 @@ func slp051AddSymbolFromLine(localSymbols map[string]bool, line string) {
 
 func slp051LocalSymbols(f diff.File) map[string]bool {
 	localSymbols := make(map[string]bool)
+	var lines []string
 	for _, h := range f.Hunks {
 		for _, ln := range h.Lines {
 			if ln.Kind == diff.LineDelete {
 				continue
 			}
-			slp051AddSymbolFromLine(localSymbols, ln.Content)
+			lines = append(lines, ln.Content)
 		}
 	}
+	slp051CollectSymbolsFromLines(localSymbols, lines)
 	return localSymbols
 }
 
 func slp051CollectSymbolsFromText(localSymbols map[string]bool, content string) {
-	for _, line := range strings.Split(content, "\n") {
+	slp051CollectSymbolsFromLines(localSymbols, strings.Split(content, "\n"))
+}
+
+func slp051CollectSymbolsFromLines(localSymbols map[string]bool, lines []string) {
+	inTypeBlock := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if inTypeBlock {
+			if strings.HasPrefix(trimmed, ")") {
+				inTypeBlock = false
+				continue
+			}
+			if m := typeBlockSymbolPattern.FindStringSubmatch(trimmed); len(m) > 1 {
+				localSymbols[m[1]] = true
+			}
+			continue
+		}
 		slp051AddSymbolFromLine(localSymbols, line)
+		if typeBlockStartPattern.MatchString(trimmed) {
+			inTypeBlock = true
+		}
 	}
 }
 
@@ -145,11 +168,19 @@ func slp051RepoRoot() (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	return filepath.Clean(root), true
+	evaluatedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", false
+	}
+	return filepath.Clean(evaluatedRoot), true
 }
 
 func slp051ResolvePackageDir(repoRoot, dir string) (string, bool) {
 	if repoRoot == "" {
+		return "", false
+	}
+	evaluatedRoot, ok := slp051ResolveExistingPathInRepo(repoRoot, repoRoot)
+	if !ok {
 		return "", false
 	}
 	if filepath.IsAbs(filepath.FromSlash(dir)) {
@@ -162,16 +193,32 @@ func slp051ResolvePackageDir(repoRoot, dir string) (string, bool) {
 	if cleanSlash == ".." || strings.HasPrefix(cleanSlash, "../") {
 		return "", false
 	}
-	target := filepath.Join(repoRoot, filepath.FromSlash(cleanSlash))
+	target := filepath.Join(evaluatedRoot, filepath.FromSlash(cleanSlash))
+	return slp051ResolveExistingPathInRepo(evaluatedRoot, target)
+}
+
+func slp051ResolveExistingPathInRepo(repoRoot, target string) (string, bool) {
+	rootAbs, err := filepath.Abs(repoRoot)
+	if err != nil {
+		return "", false
+	}
+	evaluatedRoot, err := filepath.EvalSymlinks(rootAbs)
+	if err != nil {
+		return "", false
+	}
 	targetAbs, err := filepath.Abs(target)
 	if err != nil {
 		return "", false
 	}
-	rel, err := filepath.Rel(repoRoot, targetAbs)
+	evaluatedTarget, err := filepath.EvalSymlinks(targetAbs)
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(evaluatedRoot, evaluatedTarget)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", false
 	}
-	return targetAbs, true
+	return filepath.Clean(evaluatedTarget), true
 }
 
 func slp051PackageSymbols(d *diff.Diff) map[string]map[string]bool {
@@ -201,10 +248,15 @@ func slp051PackageSymbols(d *diff.Diff) map[string]map[string]bool {
 					continue
 				}
 				for _, match := range matches {
-					if strings.HasSuffix(strings.ToLower(match), "_test.go") {
+					evaluatedMatch, ok := slp051ResolveExistingPathInRepo(repoRoot, match)
+					if !ok {
 						continue
 					}
-					content, readErr := os.ReadFile(match) // #nosec G304 -- match is constrained to a repo-relative package dir above.
+					if strings.HasSuffix(strings.ToLower(match), "_test.go") ||
+						strings.HasSuffix(strings.ToLower(evaluatedMatch), "_test.go") {
+						continue
+					}
+					content, readErr := os.ReadFile(evaluatedMatch) // #nosec G304 -- evaluated symlink target is constrained to repo root above.
 					if readErr == nil {
 						slp051CollectSymbolsFromText(symbols, string(content))
 					}

@@ -40,6 +40,8 @@ func slp100CodeBeforeTrailingComment(line string) string {
 		switch {
 		case c == '"' || c == '\'' || c == '`':
 			quote = c
+		case c == '/' && i+1 < len(line) && line[i+1] == '*':
+			return line[:i]
 		case c == '/' && i+1 < len(line) && line[i+1] == '/':
 			return line[:i]
 		case c == '#':
