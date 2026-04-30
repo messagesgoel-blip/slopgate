@@ -202,15 +202,8 @@ func (r SLP131) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				line := ln.Content
-				openLink := slpHasOpeningTag(line, "Link")
-				openAnchor := slpHasOpeningTag(line, "a")
-				if openLink && !slpHasSelfClosingTag(line, "Link") {
-					linkDepth++
-				}
-				if openAnchor && !slpHasSelfClosingTag(line, "a") {
-					anchorDepth++
-				}
-				if ln.Kind == diff.LineAdd && (openLink || openAnchor) && linkDepth+anchorDepth > 1 {
+				nested, nextLinkDepth, nextAnchorDepth := slpScanLinkAnchorDepths(line, linkDepth, anchorDepth)
+				if ln.Kind == diff.LineAdd && nested {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),
@@ -220,14 +213,8 @@ func (r SLP131) Check(d *diff.Diff) []Finding {
 						Snippet:  strings.TrimSpace(ln.Content),
 					})
 				}
-				linkDepth -= strings.Count(line, "</Link")
-				anchorDepth -= strings.Count(line, "</a>")
-				if linkDepth < 0 {
-					linkDepth = 0
-				}
-				if anchorDepth < 0 {
-					anchorDepth = 0
-				}
+				linkDepth = nextLinkDepth
+				anchorDepth = nextAnchorDepth
 			}
 		}
 	}
@@ -399,39 +386,89 @@ func slp129LooksPlaceholder(value string) bool {
 	return false
 }
 
-func slpHasOpeningTag(line, tag string) bool {
-	needle := "<" + tag
-	return strings.Contains(line, needle+" ") || strings.Contains(line, needle+">") ||
-		strings.Contains(line, needle+"\n") || strings.Contains(line, needle+"\t")
+func slpScanLinkAnchorDepths(line string, linkDepth, anchorDepth int) (bool, int, int) {
+	nested := false
+	for pos := 0; pos < len(line); {
+		next := strings.IndexByte(line[pos:], '<')
+		if next < 0 {
+			break
+		}
+		start := pos + next
+		switch {
+		case slpIsClosingTagAt(line, start, "Link"):
+			if linkDepth > 0 {
+				linkDepth--
+			}
+			pos = start + len("</Link")
+		case slpIsClosingTagAt(line, start, "a"):
+			if anchorDepth > 0 {
+				anchorDepth--
+			}
+			pos = start + len("</a")
+		case slpIsOpeningTagAt(line, start, "Link"):
+			end := strings.IndexByte(line[start:], '>')
+			if end < 0 {
+				return nested, linkDepth, anchorDepth
+			}
+			tagText := strings.TrimSpace(line[start : start+end+1])
+			if !strings.HasSuffix(tagText, "/>") {
+				if linkDepth+anchorDepth > 0 {
+					nested = true
+				}
+				linkDepth++
+			}
+			pos = start + end + 1
+		case slpIsOpeningTagAt(line, start, "a"):
+			end := strings.IndexByte(line[start:], '>')
+			if end < 0 {
+				return nested, linkDepth, anchorDepth
+			}
+			tagText := strings.TrimSpace(line[start : start+end+1])
+			if !strings.HasSuffix(tagText, "/>") {
+				if linkDepth+anchorDepth > 0 {
+					nested = true
+				}
+				anchorDepth++
+			}
+			pos = start + end + 1
+		default:
+			pos = start + 1
+		}
+	}
+	return nested, linkDepth, anchorDepth
 }
 
-func slpHasSelfClosingTag(line, tag string) bool {
+func slpIsOpeningTagAt(line string, start int, tag string) bool {
 	needle := "<" + tag
-	searchStart := 0
-	for {
-		start := strings.Index(line[searchStart:], needle)
-		if start < 0 {
-			return false
-		}
-		start += searchStart
-		afterTag := start + len(needle)
-		if afterTag < len(line) {
-			switch line[afterTag] {
-			case ' ', '>', '\n', '\t':
-			default:
-				searchStart = afterTag
-				continue
-			}
-		}
-		end := strings.IndexByte(line[start:], '>')
-		if end < 0 {
-			return false
-		}
-		tagText := strings.TrimSpace(line[start : start+end+1])
-		if strings.HasSuffix(tagText, "/>") {
-			return true
-		}
-		searchStart = start + end + 1
+	if !strings.HasPrefix(line[start:], needle) {
+		return false
+	}
+	afterTag := start + len(needle)
+	if afterTag >= len(line) {
+		return false
+	}
+	switch line[afterTag] {
+	case ' ', '>', '\n', '\t', '/':
+		return true
+	default:
+		return false
+	}
+}
+
+func slpIsClosingTagAt(line string, start int, tag string) bool {
+	needle := "</" + tag
+	if !strings.HasPrefix(line[start:], needle) {
+		return false
+	}
+	afterTag := start + len(needle)
+	if afterTag >= len(line) {
+		return false
+	}
+	switch line[afterTag] {
+	case ' ', '>', '\n', '\t':
+		return true
+	default:
+		return false
 	}
 }
 

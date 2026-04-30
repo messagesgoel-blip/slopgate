@@ -21,12 +21,14 @@ func slp117HasAnchor(s string) bool {
 		strings.Contains(s, `\z`) || strings.Contains(s, `\Z`)
 }
 
-var slp117JSRegexLiteral = regexp.MustCompile(`(?:=|return|\(|:|,)\s*/(?:\\.|[^/\\\n])+/[a-zA-Z]*`)
+var (
+	slp117JSRegExpCtor   = regexp.MustCompile(`(?:^|[^A-Za-z0-9_$])(?:new\s+)?RegExp\s*\(`)
+	slp117JSRegexLiteral = regexp.MustCompile(`(?:=|return|\(|:|,)\s*/(?:\\.|[^/\\\n])+/[a-zA-Z]*`)
+)
 
 func slp117LooksLikeRegex(cleaned string) bool {
 	if strings.Contains(cleaned, "regexp.") ||
-		strings.Contains(cleaned, "new RegExp(") ||
-		strings.Contains(cleaned, "RegExp(") {
+		slp117JSRegExpCtor.MatchString(cleaned) {
 		return true
 	}
 	return slp117JSRegexLiteral.MatchString(cleaned)

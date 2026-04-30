@@ -100,6 +100,8 @@ func TestSLP131_FiresOnSameLineNestedAnchorAndLink(t *testing.T) {
 	}{
 		{name: "link wrapping anchor", line: `+  return <Link to="/post"><a href="/category">News</a></Link>`},
 		{name: "anchor wrapping link", line: `+  return <a href="/post"><Link to="/category">News</Link></a>`},
+		{name: "link wrapping link", line: `+  return <Link to="/post"><Link to="/category">News</Link></Link>`},
+		{name: "anchor wrapping anchor", line: `+  return <a href="/post"><a href="/category">News</a></a>`},
 		{name: "link with self-closing child wrapping anchor", line: `+  return <Link to="/post"><Icon /><a href="/category">News</a></Link>`},
 	}
 	for _, tc := range cases {
@@ -126,6 +128,7 @@ func TestSLP131_IgnoresSiblingReactLinks(t *testing.T) {
 +  return <nav>
 +    <Link to="/a">A</Link>
 +    <Link to="/b">B</Link>
++    <Link to="/c">C</Link><Link to="/d">D</Link>
 +  </nav>
  }
 `)

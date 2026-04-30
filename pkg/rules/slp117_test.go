@@ -75,6 +75,19 @@ func TestSLP117_NoFireOnPlainPatternIdentifier(t *testing.T) {
 	}
 }
 
+func TestSLP117_NoFireOnRegExpNamedIdentifier(t *testing.T) {
+	d := parseDiff(t, `diff --git a/ui.ts b/ui.ts
+--- a/ui.ts
++++ b/ui.ts
+@@ -1,1 +1,3 @@
++const ok = isRegExp(value)
+`)
+	got := SLP117{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for RegExp suffix identifier, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP117_NoFireOnRegexMarkerInsidePlainString(t *testing.T) {
 	d := parseDiff(t, `diff --git a/ui.ts b/ui.ts
 --- a/ui.ts
