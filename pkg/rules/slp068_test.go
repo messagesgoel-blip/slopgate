@@ -49,6 +49,29 @@ func TestSLP068_NoFireOnShortDuplicate(t *testing.T) {
 	}
 }
 
+func TestSLP068_IgnoresDuplicateDocsBlock(t *testing.T) {
+	d := parseDiff(t, `diff --git a/docs/plan.md b/docs/plan.md
+--- a/docs/plan.md
++++ b/docs/plan.md
+@@ -1,1 +1,12 @@
+ # Plan
++This paragraph is intentionally repeated in a long design note.
++It describes a migration sequence and acceptance criteria.
++It is prose, not duplicated production logic.
++It may exceed several lines in a Markdown document.
++It should not be surfaced as a code clone.
++This paragraph is intentionally repeated in a long design note.
++It describes a migration sequence and acceptance criteria.
++It is prose, not duplicated production logic.
++It may exceed several lines in a Markdown document.
++It should not be surfaced as a code clone.
+`)
+	got := SLP068{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for duplicated docs prose, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP068_Meta(t *testing.T) {
 	r := SLP068{}
 	if r.ID() != "SLP068" {

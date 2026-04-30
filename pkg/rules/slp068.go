@@ -29,7 +29,7 @@ func windowKey(lines []diff.Line, start int) string {
 func (r SLP068) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
-		if f.IsDelete {
+		if f.IsDelete || isDocFile(f.Path) || !isSourceLikeFile(f.Path) {
 			continue
 		}
 		added := f.AddedLines()
@@ -40,6 +40,9 @@ func (r SLP068) Check(d *diff.Diff) []Finding {
 		flagged := make(map[int]bool)
 		for i := 0; i <= len(added)-5; i++ {
 			key := windowKey(added, i)
+			if len(strings.TrimSpace(key)) < 20 {
+				continue
+			}
 			if seen[key] {
 				lineNo := added[i].NewLineNo
 				if !flagged[lineNo] {

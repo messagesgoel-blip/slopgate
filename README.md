@@ -133,8 +133,8 @@ When using shallow clones, fetch full history (`fetch-depth: 0`) so base refs re
 
 Current rule set:
 
-- **123 total rules**
-- **29 block**, **77 warn**, **17 info**
+- **131 total rules**
+- **30 block**, **84 warn**, **17 info**
 - **10 AST-aware Go rules** (`SLP071`–`SLP080`)
 
 Reserved IDs: **SLP004, SLP028, SLP029, SLP105**
@@ -145,7 +145,7 @@ Reserved IDs: **SLP004, SLP028, SLP029, SLP105**
 |---|---|---|
 | Core diff slop checks | `SLP001`–`SLP070` | test quality, code hygiene, safety, API/data smells |
 | AST semantic checks | `SLP071`–`SLP080` | Go semantic hazards (nil, SQLi, races, ignored errors) |
-| Extended parity checks | `SLP081`–`SLP127` | React/API/auth/audit/pagination/concurrency and newer overlap-driven checks |
+| Extended parity checks | `SLP081`–`SLP135` | React/API/auth/audit/pagination/concurrency and newer overlap-driven checks |
 
 For the complete authoritative list (ID + severity + description), run:
 
@@ -168,4 +168,3 @@ slopgate --list-rules
 ## License
 
 MIT
-
