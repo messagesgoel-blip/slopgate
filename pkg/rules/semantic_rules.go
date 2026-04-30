@@ -373,6 +373,9 @@ func (r SLP077) Check(a *diff.AnalysisResult) []Finding {
 		if fa.Error != nil {
 			continue
 		}
+		if slp077IsRuleDefinitionPath(fa.Path) {
+			continue
+		}
 		if detectHardcodedCreds(fa.AST) {
 			out = append(out, Finding{
 				RuleID:   r.ID(),
@@ -383,6 +386,10 @@ func (r SLP077) Check(a *diff.AnalysisResult) []Finding {
 		}
 	}
 	return out
+}
+
+func slp077IsRuleDefinitionPath(path string) bool {
+	return contains(path, "pkg/rules/") || contains(path, `pkg\rules\`)
 }
 
 // SLP078 detects select statements on closed channels,

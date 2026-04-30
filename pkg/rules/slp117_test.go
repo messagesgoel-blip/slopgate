@@ -61,6 +61,19 @@ func TestSLP117_FiresOnUnanchoredJSRegExp(t *testing.T) {
 	}
 }
 
+func TestSLP117_NoFireOnPlainPatternIdentifier(t *testing.T) {
+	d := parseDiff(t, `diff --git a/ui.ts b/ui.ts
+--- a/ui.ts
++++ b/ui.ts
+@@ -1,1 +1,3 @@
++const pattern = "foo"
+`)
+	got := SLP117{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for plain pattern string, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP117_Description(t *testing.T) {
 	r := SLP117{}
 	if r.ID() != "SLP117" {

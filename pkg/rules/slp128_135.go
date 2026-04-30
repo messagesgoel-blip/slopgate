@@ -201,7 +201,13 @@ func (r SLP131) Check(d *diff.Diff) []Finding {
 				line := ln.Content
 				openLink := slpHasOpeningTag(line, "Link")
 				openAnchor := slpHasOpeningTag(line, "a")
-				if ln.Kind == diff.LineAdd && (linkDepth > 0 && (openLink || openAnchor) || anchorDepth > 0 && openAnchor) {
+				if openLink && !strings.Contains(line, "/>") {
+					linkDepth++
+				}
+				if openAnchor && !strings.Contains(line, "/>") {
+					anchorDepth++
+				}
+				if ln.Kind == diff.LineAdd && (openLink || openAnchor) && linkDepth+anchorDepth > 1 {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),
@@ -210,12 +216,6 @@ func (r SLP131) Check(d *diff.Diff) []Finding {
 						Message:  "nested Link/anchor detected; use a non-anchor wrapper or move child link outside",
 						Snippet:  strings.TrimSpace(ln.Content),
 					})
-				}
-				if openLink && !strings.Contains(line, "/>") {
-					linkDepth++
-				}
-				if openAnchor && !strings.Contains(line, "/>") {
-					anchorDepth++
 				}
 				linkDepth -= strings.Count(line, "</Link")
 				anchorDepth -= strings.Count(line, "</a>")
@@ -417,8 +417,19 @@ func slp132LooksLikeShortcut(window string) bool {
 
 func slp132HasEditableGuard(window string) bool {
 	lower := strings.ToLower(window)
-	guards := []string{"activeelement", "event.target", "e.target", "target.tagname", "iscontenteditable", "closest(", "input", "textarea", "select", "contenteditable"}
-	for _, guard := range guards {
+	targetGuards := []string{"activeelement", "event.target", "e.target", "target.tagname", "closest(", "iscontenteditable"}
+	selectorGuards := []string{"input", "textarea", "select", "contenteditable"}
+	hasTargetGuard := false
+	for _, guard := range targetGuards {
+		if strings.Contains(lower, guard) {
+			hasTargetGuard = true
+			break
+		}
+	}
+	if !hasTargetGuard {
+		return false
+	}
+	for _, guard := range selectorGuards {
 		if strings.Contains(lower, guard) {
 			return true
 		}

@@ -95,6 +95,29 @@ func TestSLP131_FiresOnNestedReactLink(t *testing.T) {
 	assertFindings(t, SLP131{}.Check(d), 1, "SLP131", SeverityWarn)
 }
 
+func TestSLP131_FiresOnSameLineNestedAnchorAndLink(t *testing.T) {
+	cases := []struct {
+		name string
+		line string
+	}{
+		{name: "link wrapping anchor", line: `+  return <Link to="/post"><a href="/category">News</a></Link>`},
+		{name: "anchor wrapping link", line: `+  return <a href="/post"><Link to="/category">News</Link></a>`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d := parseDiff(t, `diff --git a/src/blog/components/BlogCard.tsx b/src/blog/components/BlogCard.tsx
+--- a/src/blog/components/BlogCard.tsx
++++ b/src/blog/components/BlogCard.tsx
+@@ -1,3 +1,5 @@
+ export function BlogCard() {
+`+tc.line+`
+ }
+`)
+			assertFindings(t, SLP131{}.Check(d), 1, "SLP131", SeverityWarn)
+		})
+	}
+}
+
 func TestSLP131_IgnoresSiblingReactLinks(t *testing.T) {
 	d := parseDiff(t, `diff --git a/src/Nav.tsx b/src/Nav.tsx
 --- a/src/Nav.tsx
@@ -148,6 +171,26 @@ func TestSLP132_IgnoresShortcutWithEditableGuard(t *testing.T) {
  }
 `)
 	assertFindings(t, SLP132{}.Check(d), 0, "SLP132", SeverityWarn)
+}
+
+func TestSLP132_FiresWhenInputIsMentionedWithoutTargetGuard(t *testing.T) {
+	d := parseDiff(t, `diff --git a/src/blog/components/SearchBar.tsx b/src/blog/components/SearchBar.tsx
+--- a/src/blog/components/SearchBar.tsx
++++ b/src/blog/components/SearchBar.tsx
+@@ -1,3 +1,13 @@
+ export function SearchBar() {
++  React.useEffect(() => {
++    const handler = (event) => {
++      const inputHint = "input shortcut"
++      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
++        setOpen(inputHint)
++      }
++    }
++    window.addEventListener("keydown", handler)
++  }, [])
+ }
+`)
+	assertFindings(t, SLP132{}.Check(d), 1, "SLP132", SeverityWarn)
 }
 
 func TestSLP133_FiresOnInlineExpressRawParser(t *testing.T) {
