@@ -54,10 +54,11 @@ func TestSLP117_FiresOnUnanchoredJSRegExp(t *testing.T) {
 +++ b/validate.ts
 @@ -1,1 +1,3 @@
 +const slugPattern = new RegExp("[a-z0-9-]+")
++const escapedSlashPattern = /foo\/bar/
 `)
 	got := SLP117{}.Check(d)
-	if len(got) == 0 {
-		t.Fatal("expected finding for unanchored RegExp")
+	if len(got) != 2 {
+		t.Fatalf("expected 2 findings for unanchored RegExp forms, got %d: %+v", len(got), got)
 	}
 }
 
@@ -71,6 +72,19 @@ func TestSLP117_NoFireOnPlainPatternIdentifier(t *testing.T) {
 	got := SLP117{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings for plain pattern string, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP117_NoFireOnRegexMarkerInsidePlainString(t *testing.T) {
+	d := parseDiff(t, `diff --git a/ui.ts b/ui.ts
+--- a/ui.ts
++++ b/ui.ts
+@@ -1,1 +1,3 @@
++const msg = "use regexp.MustCompile for Go validators"
+`)
+	got := SLP117{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for regex marker inside plain string, got %d: %+v", len(got), got)
 	}
 }
 

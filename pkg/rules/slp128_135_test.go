@@ -39,9 +39,7 @@ func TestSLP129_FiresOnTrackedLiveEnv(t *testing.T) {
 +VITE_SUPABASE_ANON_KEY=prodAnonKeyValue123456789
 `)
 	got := SLP129{}.Check(d)
-	if len(got) != 2 {
-		t.Fatalf("expected 2 findings for live .env bindings, got %d: %+v", len(got), got)
-	}
+	assertFindings(t, got, 2, "SLP129", SeverityBlock)
 }
 
 func TestSLP129_IgnoresEnvExamplePlaceholders(t *testing.T) {
@@ -102,6 +100,7 @@ func TestSLP131_FiresOnSameLineNestedAnchorAndLink(t *testing.T) {
 	}{
 		{name: "link wrapping anchor", line: `+  return <Link to="/post"><a href="/category">News</a></Link>`},
 		{name: "anchor wrapping link", line: `+  return <a href="/post"><Link to="/category">News</Link></a>`},
+		{name: "link with self-closing child wrapping anchor", line: `+  return <Link to="/post"><Icon /><a href="/category">News</a></Link>`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -218,9 +217,22 @@ func TestSLP134_FiresOnPersistedTransferArrays(t *testing.T) {
 +metadata.structuralRuntime.lastRun = completedSummary
 `)
 	got := SLP134{}.Check(d)
-	if len(got) != 2 {
-		t.Fatalf("expected 2 persisted array findings, got %d: %+v", len(got), got)
-	}
+	assertFindings(t, got, 2, "SLP134", SeverityWarn)
+}
+
+func TestSLP134_IgnoresIntermediateTransferArrays(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/services/run.js b/api/src/services/run.js
+--- a/api/src/services/run.js
++++ b/api/src/services/run.js
+@@ -1,3 +1,7 @@
+ function build(summary) {
++  const transient = {
++    transferIds: summary.transferIds,
++    skippedTransfers: summary.skippedTransfers,
++  }
+ }
+`)
+	assertFindings(t, SLP134{}.Check(d), 0, "SLP134", SeverityWarn)
 }
 
 func TestSLP135_FiresOnRawErrMessageInSummary(t *testing.T) {

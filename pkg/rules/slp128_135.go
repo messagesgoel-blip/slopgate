@@ -204,10 +204,10 @@ func (r SLP131) Check(d *diff.Diff) []Finding {
 				line := ln.Content
 				openLink := slpHasOpeningTag(line, "Link")
 				openAnchor := slpHasOpeningTag(line, "a")
-				if openLink && !strings.Contains(line, "/>") {
+				if openLink && !slpHasSelfClosingTag(line, "Link") {
 					linkDepth++
 				}
-				if openAnchor && !strings.Contains(line, "/>") {
+				if openAnchor && !slpHasSelfClosingTag(line, "a") {
 					anchorDepth++
 				}
 				if ln.Kind == diff.LineAdd && (openLink || openAnchor) && linkDepth+anchorDepth > 1 {
@@ -307,7 +307,9 @@ func (r SLP134) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				window := slpWindowText(h.Lines, i, 6, 6)
-				if slp134ArrayField.MatchString(ln.Content) && strings.Contains(ln.Content, "summary.") {
+				if slp134ArrayField.MatchString(ln.Content) &&
+					strings.Contains(ln.Content, "summary.") &&
+					slp134MetadataContext(window) {
 					out = append(out, slp134Finding(r, f.Path, ln))
 					continue
 				}
@@ -401,6 +403,36 @@ func slpHasOpeningTag(line, tag string) bool {
 	needle := "<" + tag
 	return strings.Contains(line, needle+" ") || strings.Contains(line, needle+">") ||
 		strings.Contains(line, needle+"\n") || strings.Contains(line, needle+"\t")
+}
+
+func slpHasSelfClosingTag(line, tag string) bool {
+	needle := "<" + tag
+	searchStart := 0
+	for {
+		start := strings.Index(line[searchStart:], needle)
+		if start < 0 {
+			return false
+		}
+		start += searchStart
+		afterTag := start + len(needle)
+		if afterTag < len(line) {
+			switch line[afterTag] {
+			case ' ', '>', '\n', '\t':
+			default:
+				searchStart = afterTag
+				continue
+			}
+		}
+		end := strings.IndexByte(line[start:], '>')
+		if end < 0 {
+			return false
+		}
+		tagText := strings.TrimSpace(line[start : start+end+1])
+		if strings.HasSuffix(tagText, "/>") {
+			return true
+		}
+		searchStart = start + end + 1
+	}
 }
 
 func slp132ShortcutEntryLine(line string) bool {

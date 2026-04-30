@@ -21,20 +21,15 @@ func slp117HasAnchor(s string) bool {
 		strings.Contains(s, `\z`) || strings.Contains(s, `\Z`)
 }
 
-var slp117JSRegexLiteral = regexp.MustCompile(`(?:=|return|\(|:|,)\s*/[^/\n]+/[a-zA-Z]*`)
+var slp117JSRegexLiteral = regexp.MustCompile(`(?:=|return|\(|:|,)\s*/(?:\\.|[^/\\\n])+/[a-zA-Z]*`)
 
-func slp117LooksLikeRegex(raw, cleaned string) bool {
-	if strings.Contains(raw, "regexp.") ||
-		strings.Contains(raw, "new RegExp(") ||
-		strings.Contains(raw, "RegExp(") {
-		return true
-	}
+func slp117LooksLikeRegex(cleaned string) bool {
 	if strings.Contains(cleaned, "regexp.") ||
 		strings.Contains(cleaned, "new RegExp(") ||
 		strings.Contains(cleaned, "RegExp(") {
 		return true
 	}
-	return slp117JSRegexLiteral.MatchString(raw)
+	return slp117JSRegexLiteral.MatchString(cleaned)
 }
 
 func (r SLP117) Check(d *diff.Diff) []Finding {
@@ -65,7 +60,7 @@ func (r SLP117) Check(d *diff.Diff) []Finding {
 					indicatorSource = raw
 				}
 
-				if !slp117LooksLikeRegex(raw, indicatorSource) {
+				if !slp117LooksLikeRegex(indicatorSource) {
 					continue
 				}
 
