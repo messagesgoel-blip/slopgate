@@ -123,6 +123,21 @@ func TestSLP100_FiresOnEmptyStringReturnWithTrailingBlockComment(t *testing.T) {
 	}
 }
 
+func TestSLP100_NoFireOnReturnExpressionAfterBlockComment(t *testing.T) {
+	d := parseDiff(t, `diff --git a/rule.go b/rule.go
+--- a/rule.go
++++ b/rule.go
+@@ -1,1 +1,5 @@
++func (Rule) Value() string {
++    return /* documented rule metadata */ value
++}
+`)
+	got := SLP100{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for return expression after block comment, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP100_IgnoresDocFiles(t *testing.T) {
 	d := parseDiff(t, `diff --git a/README.md b/README.md
 --- a/README.md

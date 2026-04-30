@@ -202,6 +202,49 @@ func TestSLP051_DoesNotTreatGroupedTypeMembersAsSymbols(t *testing.T) {
 	}
 }
 
+func TestSLP051_DoesNotCarryTypeBlockStateAcrossHunks(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,3 +1,6 @@
+ package a
+
++type (
++	Status string
+@@ -20,3 +23,6 @@
+ func Run(v string) {
++	_ = Later(v)
+ }
+`)
+	got := SLP051{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when type block hunk is incomplete, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP051_DoesNotTreatGroupedFunctionTypeParamsAsSymbols(t *testing.T) {
+	d := parseDiff(t, `diff --git a/a/foo.go b/a/foo.go
+--- a/a/foo.go
++++ b/a/foo.go
+@@ -1,2 +1,12 @@
+ package a
+
++type (
++	Handler func(
++		Request
++	) error
++)
++
++func Run(v string) {
++	_ = Request(v)
++}
+`)
+	got := SLP051{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for function type parameter name, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP051_IgnoresPackageLocalHelpers(t *testing.T) {
 	tmp := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(tmp, "a"), 0o750); err != nil {

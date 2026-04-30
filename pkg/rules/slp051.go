@@ -121,16 +121,16 @@ func slp051AddSymbolFromLine(localSymbols map[string]bool, line string) {
 
 func slp051LocalSymbols(f diff.File) map[string]bool {
 	localSymbols := make(map[string]bool)
-	var lines []string
 	for _, h := range f.Hunks {
+		var lines []string
 		for _, ln := range h.Lines {
 			if ln.Kind == diff.LineDelete {
 				continue
 			}
 			lines = append(lines, ln.Content)
 		}
+		slp051CollectSymbolsFromLines(localSymbols, lines)
 	}
-	slp051CollectSymbolsFromLines(localSymbols, lines)
 	return localSymbols
 }
 
@@ -140,30 +140,59 @@ func slp051CollectSymbolsFromText(localSymbols map[string]bool, content string) 
 
 func slp051CollectSymbolsFromLines(localSymbols map[string]bool, lines []string) {
 	inTypeBlock := false
-	typeBlockBraceDepth := 0
+	braceDepth := 0
+	parenDepth := 0
+	bracketDepth := 0
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if inTypeBlock {
-			if typeBlockBraceDepth == 0 && strings.HasPrefix(trimmed, ")") {
+			if braceDepth+parenDepth+bracketDepth == 0 && strings.HasPrefix(trimmed, ")") {
 				inTypeBlock = false
 				continue
 			}
-			if typeBlockBraceDepth == 0 {
+			if braceDepth+parenDepth+bracketDepth == 0 {
 				if m := typeBlockSymbolPattern.FindStringSubmatch(trimmed); len(m) > 1 {
 					localSymbols[m[1]] = true
 				}
 			}
-			typeBlockBraceDepth += strings.Count(trimmed, "{") - strings.Count(trimmed, "}")
-			if typeBlockBraceDepth < 0 {
-				typeBlockBraceDepth = 0
-			}
+			slp051UpdateTypeBlockDepth(trimmed, &braceDepth, &parenDepth, &bracketDepth)
 			continue
 		}
 		slp051AddSymbolFromLine(localSymbols, line)
 		if typeBlockStartPattern.MatchString(trimmed) {
 			inTypeBlock = true
-			typeBlockBraceDepth = 0
+			braceDepth = 0
+			parenDepth = 0
+			bracketDepth = 0
 		}
+	}
+}
+
+func slp051UpdateTypeBlockDepth(line string, braceDepth, parenDepth, bracketDepth *int) {
+	for _, r := range line {
+		switch r {
+		case '{':
+			*braceDepth = *braceDepth + 1
+		case '}':
+			*braceDepth = *braceDepth - 1
+		case '(':
+			*parenDepth = *parenDepth + 1
+		case ')':
+			*parenDepth = *parenDepth - 1
+		case '[':
+			*bracketDepth = *bracketDepth + 1
+		case ']':
+			*bracketDepth = *bracketDepth - 1
+		}
+	}
+	if *braceDepth < 0 {
+		*braceDepth = 0
+	}
+	if *parenDepth < 0 {
+		*parenDepth = 0
+	}
+	if *bracketDepth < 0 {
+		*bracketDepth = 0
 	}
 }
 

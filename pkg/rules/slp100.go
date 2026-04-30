@@ -25,10 +25,13 @@ var slp100NonEmptyStringReturn = regexp.MustCompile(`^\s*return\s+(?:"(?:[^"\\]|
 
 func slp100CodeBeforeTrailingComment(line string) string {
 	var quote byte
+	var b strings.Builder
 	for i := 0; i < len(line); i++ {
 		c := line[i]
 		if quote != 0 {
+			b.WriteByte(c)
 			if quote != '`' && c == '\\' && i+1 < len(line) {
+				b.WriteByte(line[i+1])
 				i++
 				continue
 			}
@@ -40,15 +43,22 @@ func slp100CodeBeforeTrailingComment(line string) string {
 		switch {
 		case c == '"' || c == '\'' || c == '`':
 			quote = c
+			b.WriteByte(c)
 		case c == '/' && i+1 < len(line) && line[i+1] == '*':
-			return line[:i]
+			end := strings.Index(line[i+2:], "*/")
+			if end < 0 {
+				return b.String()
+			}
+			i += end + 3
 		case c == '/' && i+1 < len(line) && line[i+1] == '/':
-			return line[:i]
+			return b.String()
 		case c == '#':
-			return line[:i]
+			return b.String()
+		default:
+			b.WriteByte(c)
 		}
 	}
-	return line
+	return b.String()
 }
 
 func hasSideEffect(line string) bool {
