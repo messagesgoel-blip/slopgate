@@ -374,9 +374,6 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 						content = bodyText
 						trimmed = strings.TrimSpace(bodyText)
 						observedErrUse = false
-						if slp136MentionsCaughtError(trimmed, errName) {
-							observedErrUse = true
-						}
 						if trimmed == "" {
 							if catchDepth <= 0 {
 								inCatch = false

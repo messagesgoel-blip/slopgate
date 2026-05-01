@@ -447,7 +447,9 @@ def normalize_repo_path(raw_path: str, repo_files: list[str]) -> str | None:
     return max(matches, key=len)
 
 
-def iter_frame_candidates(node: Any) -> list[tuple[str, int]]:
+def iter_frame_candidates(node: Any, depth: int = 0) -> list[tuple[str, int]]:
+    if depth > 20:
+        return []
     candidates: list[tuple[str, int]] = []
     if isinstance(node, dict):
         filename = node.get("filename") or node.get("abs_path")
@@ -458,10 +460,10 @@ def iter_frame_candidates(node: Any) -> list[tuple[str, int]]:
             except (TypeError, ValueError):
                 pass
         for value in node.values():
-            candidates.extend(iter_frame_candidates(value))
+            candidates.extend(iter_frame_candidates(value, depth + 1))
     elif isinstance(node, list):
         for item in node:
-            candidates.extend(iter_frame_candidates(item))
+            candidates.extend(iter_frame_candidates(item, depth + 1))
     return candidates
 
 
