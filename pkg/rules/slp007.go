@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,9 +9,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
+
+const slp007GitShowTimeout = 2 * time.Second
 
 // SLP007 flags imports that are added in a diff but never referenced in any
 // other added line of the same file. This catches the classic AI "just in
@@ -498,7 +502,9 @@ func slp007FileContent(d *diff.Diff, relPath string) (string, bool) {
 	}
 	switch d.SnapshotRef {
 	case ":":
-		cmd := exec.Command("git", "show")
+		ctx, cancel := context.WithTimeout(context.Background(), slp007GitShowTimeout)
+		defer context.CancelFunc(cancel)()
+		cmd := exec.CommandContext(ctx, "git", "show")
 		cmd.Dir = d.RepoRoot
 		cmd.Args = append(cmd.Args, ":"+cleanSlash)
 		out, err := cmd.Output()
@@ -507,7 +513,9 @@ func slp007FileContent(d *diff.Diff, relPath string) (string, bool) {
 		}
 		return string(out), true
 	case "HEAD":
-		cmd := exec.Command("git", "show")
+		ctx, cancel := context.WithTimeout(context.Background(), slp007GitShowTimeout)
+		defer context.CancelFunc(cancel)()
+		cmd := exec.CommandContext(ctx, "git", "show")
 		cmd.Dir = d.RepoRoot
 		cmd.Args = append(cmd.Args, "HEAD:"+cleanSlash)
 		out, err := cmd.Output()

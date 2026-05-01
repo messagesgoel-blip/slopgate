@@ -145,6 +145,56 @@ func slp136SinkUsesVariable(line, variable string) bool {
 	return false
 }
 
+func slp136AggregateSinkText(lines []diff.Line, start int, fallback string) string {
+	if start < 0 || start >= len(lines) {
+		return fallback
+	}
+
+	var b strings.Builder
+	depth := 0
+	sawOpen := false
+	for i := start; i < len(lines); i++ {
+		ln := lines[i]
+		if ln.Kind == diff.LineDelete {
+			continue
+		}
+		part := strings.TrimSpace(ln.Content)
+		if part == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(part)
+
+		if strings.Contains(part, "(") {
+			sawOpen = true
+		}
+		depth += strings.Count(part, "(")
+		depth -= strings.Count(part, ")")
+		if sawOpen && depth <= 0 {
+			break
+		}
+		if !sawOpen && (strings.Contains(part, ";") || strings.Contains(part, "}")) {
+			break
+		}
+		if !sawOpen && (strings.Contains(part, "throw") || strings.Contains(part, "return")) {
+			break
+		}
+	}
+	if b.Len() == 0 {
+		return fallback
+	}
+	return b.String()
+}
+
+func slp136SinkText(lines []diff.Line, start int, fallback string) string {
+	if !slp136ImmediateUse.MatchString(fallback) {
+		return fallback
+	}
+	return slp136AggregateSinkText(lines, start, fallback)
+}
+
 func slp136MaybeSinkWrappers(line string, wrappers map[string]*slp136PendingFinding) {
 	if !slp136ImmediateUse.MatchString(line) {
 		return
@@ -154,6 +204,49 @@ func slp136MaybeSinkWrappers(line string, wrappers map[string]*slp136PendingFind
 			continue
 		}
 		wrapper.sawSink = true
+	}
+}
+
+func slp136ObserveContextWrappers(
+	lines []diff.Line,
+	errName string,
+	observedErrUse bool,
+	causePatterns []*regexp.Regexp,
+	wrappers map[string]*slp136PendingFinding,
+	observedWrappers *[]*slp136PendingFinding,
+) {
+	if errName == "" {
+		return
+	}
+	lastAssignedVar := ""
+	for _, ln := range lines {
+		if ln.Kind != diff.LineContext {
+			continue
+		}
+		trimmed := strings.TrimSpace(ln.Content)
+		if trimmed == "" {
+			continue
+		}
+		if slp136NewAppError.MatchString(trimmed) {
+			variable := slp136AssignedWrapperVar(trimmed)
+			if variable == "" {
+				variable = lastAssignedVar
+			}
+			if variable != "" && wrappers[variable] == nil {
+				wrapper := &slp136PendingFinding{
+					line:      ln.NewLineNo,
+					snippet:   trimmed,
+					preserved: slp136PreservesCause(trimmed, causePatterns),
+					sawErrUse: observedErrUse,
+					variable:  variable,
+				}
+				slp136FinalizePending(wrapper, wrappers, observedWrappers)
+			}
+			lastAssignedVar = ""
+		} else {
+			lastAssignedVar = slp136AssignedWrapperVarPrefix(trimmed)
+		}
+		slp136MarkPreservedWrapper(trimmed, errName, wrappers)
 	}
 }
 
@@ -211,8 +304,9 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 			wrappers := map[string]*slp136PendingFinding{}
 			observedWrappers := []*slp136PendingFinding{}
 			lastAssignedVar := ""
+			catchLines := []diff.Line{}
 
-			for _, ln := range h.Lines {
+			for lineIndex, ln := range h.Lines {
 				if ln.Kind == diff.LineDelete {
 					continue
 				}
@@ -248,6 +342,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 								clear(wrappers)
 								observedWrappers = nil
 								lastAssignedVar = ""
+								catchLines = nil
 							}
 							continue
 						}
@@ -256,6 +351,14 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 						continue
 					}
 				}
+
+				catchLines = append(catchLines, diff.Line{
+					Kind:      ln.Kind,
+					Content:   content,
+					NewLineNo: ln.NewLineNo,
+					OldLineNo: ln.OldLineNo,
+				})
+				sinkText := slp136SinkText(h.Lines, lineIndex, trimmed)
 
 				mentionedErr := errName != "" && slp136MentionsCaughtError(trimmed, errName)
 				if mentionedErr {
@@ -279,12 +382,24 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					}
 				}
 
+				if pending == nil && ln.Kind == diff.LineAdd && errName != "" && !slp136NewAppError.MatchString(trimmed) && slp136InlineAppErrorSink(sinkText) {
+					pending = &slp136PendingFinding{
+						line:      ln.NewLineNo,
+						snippet:   strings.TrimSpace(sinkText),
+						preserved: slp136PreservesCause(sinkText, causePatterns),
+						sawErrUse: observedErrUse,
+						directUse: true,
+					}
+					slp136FinalizePending(pending, wrappers, &observedWrappers)
+					pending = nil
+				}
+
 				if pending == nil && ln.Kind == diff.LineAdd && errName != "" && slp136NewAppError.MatchString(trimmed) {
 					variable := slp136AssignedWrapperVar(trimmed)
 					if variable == "" {
 						variable = lastAssignedVar
 					}
-					directUse := slp136InlineAppErrorSink(trimmed) && variable == ""
+					directUse := slp136InlineAppErrorSink(sinkText) && variable == ""
 					if !directUse && variable == "" {
 						goto catchDepthUpdate
 					}
@@ -293,7 +408,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 						line:      ln.NewLineNo,
 						snippet:   strings.TrimSpace(ln.Content),
 						depth:     depth,
-						preserved: slp136PreservesCause(trimmed, causePatterns),
+						preserved: slp136PreservesCause(sinkText, causePatterns),
 						sawErrUse: observedErrUse,
 						variable:  variable,
 						directUse: directUse,
@@ -304,10 +419,13 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					}
 				}
 
+				if ln.Kind == diff.LineAdd && slp136ImmediateUse.MatchString(sinkText) {
+					slp136ObserveContextWrappers(catchLines, errName, observedErrUse, causePatterns, wrappers, &observedWrappers)
+				}
 				if errName != "" {
 					slp136MarkPreservedWrapper(trimmed, errName, wrappers)
 				}
-				slp136MaybeSinkWrappers(trimmed, wrappers)
+				slp136MaybeSinkWrappers(sinkText, wrappers)
 				if slp136NewAppError.MatchString(trimmed) {
 					lastAssignedVar = ""
 				} else {
@@ -333,6 +451,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					clear(wrappers)
 					observedWrappers = nil
 					lastAssignedVar = ""
+					catchLines = nil
 				}
 			}
 		}

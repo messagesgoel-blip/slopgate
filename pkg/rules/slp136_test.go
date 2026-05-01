@@ -236,6 +236,59 @@ func TestSLP136_DoesNotConsumeWrapperOnPropertySinkLikeUsage(t *testing.T) {
 	assertFindings(t, SLP136{}.Check(d), 1, "SLP136", SeverityWarn)
 }
 
+func TestSLP136_FiresOnMultilineInlineAppErrorSink(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/routes/files.js b/api/src/routes/files.js
+--- a/api/src/routes/files.js
++++ b/api/src/routes/files.js
+@@ -1,3 +1,10 @@
+ async function handler(req, res) {
++  } catch (err) {
++    error(
++      res,
++      new AppError(CODES.INTERNAL, "internal server error"),
++    );
++  }
+ }
+`)
+	assertFindings(t, SLP136{}.Check(d), 1, "SLP136", SeverityWarn)
+}
+
+func TestSLP136_FiresOnMultilineVariableSink(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/routes/files.js b/api/src/routes/files.js
+--- a/api/src/routes/files.js
++++ b/api/src/routes/files.js
+@@ -1,3 +1,11 @@
+ async function handler(req, res) {
++  } catch (err) {
++    const appErr = new AppError(CODES.INTERNAL, "internal server error");
++    error(
++      res,
++      appErr,
++    );
++  }
+ }
+`)
+	assertFindings(t, SLP136{}.Check(d), 1, "SLP136", SeverityWarn)
+}
+
+func TestSLP136_FiresWhenContextWrapperHitsAddedMultilineSink(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/routes/files.js b/api/src/routes/files.js
+--- a/api/src/routes/files.js
++++ b/api/src/routes/files.js
+@@ -1,6 +1,10 @@
+ async function handler(req, res) {
+   } catch (err) {
+     const appErr = new AppError(CODES.INTERNAL, "internal server error");
++    error(
++      res,
++      appErr,
++    );
+   }
+ }
+`)
+	assertFindings(t, SLP136{}.Check(d), 1, "SLP136", SeverityWarn)
+}
+
 func TestSLP136_PreservationDoesNotLeakAcrossMultipleWrappers(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api/src/routes/files.js b/api/src/routes/files.js
 --- a/api/src/routes/files.js
