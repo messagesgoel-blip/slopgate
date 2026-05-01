@@ -130,7 +130,7 @@ def parse_args() -> argparse.Namespace:
 
 def trim_body(body: str) -> str:
     lines = (body or "").splitlines()
-    first_line = lines[0].strip() if lines else ""
+    first_line = next(iter(lines), "").strip()
     return first_line[:120]
 
 
@@ -438,7 +438,7 @@ query($owner:String!,$repo:String!,$pr:Int!,$cursor:String){
 
 
 def normalize_repo_path(raw_path: str, repo_files: list[str]) -> str | None:
-    candidate = raw_path.replace("\\", "/").split("?", 1)[0]
+    candidate, _, _ = raw_path.replace("\\", "/").partition("?")
     if candidate in repo_files:
         return candidate
     matches = [path for path in repo_files if candidate.endswith(path)]
@@ -508,7 +508,9 @@ def collect_sentry_findings(
             events = decode_json_output(run_cmd(events_cmd), f"sentry events for issue {issue_id}")
             if not isinstance(events, list) or not events:
                 continue
-            first_event = events[0]
+            first_event = next(iter(events), None)
+            if not isinstance(first_event, dict):
+                continue
             event_id = str(first_event.get("id", ""))
             if not event_id:
                 continue

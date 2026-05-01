@@ -70,50 +70,47 @@ func slp136PreservesCause(line string, patterns []*regexp.Regexp) bool {
 
 func slp136AssignedWrapperVar(line string) string {
 	m := slp136VarAssign.FindStringSubmatch(line)
-	if m == nil {
-		return ""
-	}
-	if len(m) <= 1 {
-		return ""
-	}
-	if m[1] != "" {
-		return m[1]
-	}
-	if len(m) > 2 {
-		return m[2]
+	if len(m) > 1 {
+		if m[1] != "" {
+			return m[1]
+		}
+		if len(m) > 2 {
+			return m[2]
+		}
 	}
 	return ""
 }
 
 func slp136AssignedWrapperVarPrefix(line string) string {
 	m := slp136VarAssignPrefix.FindStringSubmatch(line)
-	if m == nil {
-		return ""
-	}
-	if len(m) > 1 && m[1] != "" {
-		return m[1]
-	}
-	if len(m) > 2 && m[2] != "" {
-		return m[2]
+	if len(m) > 1 {
+		if m[1] != "" {
+			return m[1]
+		}
+		if len(m) > 2 && m[2] != "" {
+			return m[2]
+		}
 	}
 	return ""
 }
 
 func slp136CatchBodyText(line string) string {
 	idx := slp136CatchHeader.FindStringIndex(line)
-	if idx == nil || len(idx) < 2 {
-		return line
+	if len(idx) >= 2 {
+		return line[idx[1]:]
 	}
-	return line[idx[1]:]
+	return line
 }
 
 func slp136MarkPreservedWrapper(line, errName string, wrappers map[string]*slp136PendingFinding) {
 	m := slp136CauseAssign.FindStringSubmatch(line)
-	if m == nil || len(m) < 3 || m[2] != errName {
-		return
-	}
-	if wrapper := wrappers[m[1]]; wrapper != nil {
-		wrapper.preserved = true
+	if len(m) >= 3 {
+		if m[2] != errName {
+			return
+		}
+		if wrapper := wrappers[m[1]]; wrapper != nil {
+			wrapper.preserved = true
+		}
 	}
 }
 
@@ -224,10 +221,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 				skipCatchDepthUpdate := false
 
 				if !inCatch {
-					if m := slp136CatchHeader.FindStringSubmatch(trimmed); m != nil {
-						if len(m) < 2 {
-							continue
-						}
+					if m := slp136CatchHeader.FindStringSubmatch(trimmed); len(m) >= 2 {
 						inCatch = true
 						errName = m[1]
 						causePatterns = buildSlp136Patterns(errName)

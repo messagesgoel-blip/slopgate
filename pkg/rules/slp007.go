@@ -498,13 +498,19 @@ func slp007FileContent(d *diff.Diff, relPath string) (string, bool) {
 	}
 	switch d.SnapshotRef {
 	case ":":
-		out, err := exec.Command("git", "-C", d.RepoRoot, "show", ":"+cleanSlash).Output()
+		cmd := exec.Command("git", "show")
+		cmd.Dir = d.RepoRoot
+		cmd.Args = append(cmd.Args, ":"+cleanSlash)
+		out, err := cmd.Output()
 		if err != nil {
 			return "", false
 		}
 		return string(out), true
 	case "HEAD":
-		out, err := exec.Command("git", "-C", d.RepoRoot, "show", "HEAD:"+cleanSlash).Output()
+		cmd := exec.Command("git", "show")
+		cmd.Dir = d.RepoRoot
+		cmd.Args = append(cmd.Args, "HEAD:"+cleanSlash)
+		out, err := cmd.Output()
 		if err != nil {
 			return "", false
 		}

@@ -18,6 +18,10 @@ def completed(stdout: str = "", returncode: int = 0, stderr: str = "") -> subpro
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)
 
 
+def call_commands(run_cmd: object) -> list[object]:
+    return [next(iter(call.args), None) for call in run_cmd.call_args_list]
+
+
 class ParseArgsTest(unittest.TestCase):
     def test_rejects_negative_fuzzy_range(self) -> None:
         argv = ["benchmark_review.py", "/repo", "20", "--fuzzy-range", "-1"]
@@ -62,10 +66,11 @@ class PrepareWorktreeTest(unittest.TestCase):
         self.assertEqual(context.target_ref, "refs/slopgate-benchmark/pr-20-4321")
         self.assertEqual(context.compare_base, "abc123")
         self.assertEqual(context.temp_ref, "refs/slopgate-benchmark/pr-20-4321")
-        calls = [call.args[0] for call in run_cmd.call_args_list]
-        self.assertEqual(calls[0], ["git", "-C", "repo-root", "fetch", "origin", "refs/pull/20/head:refs/slopgate-benchmark/pr-20-4321"])
-        self.assertEqual(calls[1], ["git", "-C", "repo-root", "rev-parse", "--verify", "feature/base"])
-        self.assertEqual(calls[2], ["git", "-C", "repo-root", "worktree", "add", "--detach", self.worktree_path, "refs/slopgate-benchmark/pr-20-4321"])
+        self.assertEqual(call_commands(run_cmd), [
+            ["git", "-C", "repo-root", "fetch", "origin", "refs/pull/20/head:refs/slopgate-benchmark/pr-20-4321"],
+            ["git", "-C", "repo-root", "rev-parse", "--verify", "feature/base"],
+            ["git", "-C", "repo-root", "worktree", "add", "--detach", self.worktree_path, "refs/slopgate-benchmark/pr-20-4321"],
+        ])
 
     def test_prepare_worktree_uses_fetch_head_for_unnamed_requested_base(self) -> None:
         pr_meta = {"base": {"ref": "main"}, "merged": False}
@@ -110,7 +115,7 @@ class PrepareWorktreeTest(unittest.TestCase):
             with self.assertRaises(benchmark_review.BenchmarkError):
                 benchmark_review.prepare_worktree(self.repo_root, pr_meta, self.pr_number, "unknown-base")
 
-        calls = [call.args[0] for call in run_cmd.call_args_list]
+        calls = call_commands(run_cmd)
         self.assertIn(["git", "-C", "repo-root", "worktree", "remove", "--force", self.worktree_path], calls)
         self.assertIn(["git", "-C", "repo-root", "update-ref", "-d", "refs/slopgate-benchmark/pr-20-4321"], calls)
         rmtree.assert_called_once_with(Path(self.worktree_path), ignore_errors=True)
@@ -134,10 +139,12 @@ class PrepareWorktreeTest(unittest.TestCase):
         self.assertEqual(context.target_ref, "merge-sha")
         self.assertEqual(context.compare_base, "parent-sha")
         self.assertIsNone(context.temp_ref)
-        calls = [call.args[0] for call in run_cmd.call_args_list]
-        self.assertEqual(calls[0], ["git", "-C", "repo-root", "fetch", "origin", "main"])
-        self.assertEqual(calls[1], ["git", "-C", "repo-root", "rev-parse", "--verify", "merge-sha"])
-        self.assertEqual(calls[2], ["git", "-C", "repo-root", "rev-parse", "merge-sha^1"])
+        self.assertEqual(call_commands(run_cmd), [
+            ["git", "-C", "repo-root", "fetch", "origin", "main"],
+            ["git", "-C", "repo-root", "rev-parse", "--verify", "merge-sha"],
+            ["git", "-C", "repo-root", "rev-parse", "merge-sha^1"],
+            ["git", "-C", "repo-root", "worktree", "add", "--detach", self.worktree_path, "merge-sha"],
+        ])
 
     def test_prepare_worktree_merged_missing_merge_sha_requires_base(self) -> None:
         pr_meta = {"base": {"ref": "main"}, "merged": True}
@@ -155,8 +162,8 @@ class PrepareWorktreeTest(unittest.TestCase):
             with self.assertRaisesRegex(benchmark_review.BenchmarkError, "missing merge_commit_sha"):
                 benchmark_review.prepare_worktree(self.repo_root, pr_meta, self.pr_number, "")
 
-        calls = [call.args[0] for call in run_cmd.call_args_list]
-        self.assertEqual(calls[0], ["git", "-C", "repo-root", "fetch", "origin", "main"])
+        calls = call_commands(run_cmd)
+        self.assertIn(["git", "-C", "repo-root", "fetch", "origin", "main"], calls)
         self.assertIn(["git", "-C", "repo-root", "worktree", "remove", "--force", self.worktree_path], calls)
         rmtree.assert_called_once_with(Path(self.worktree_path), ignore_errors=True)
 
@@ -181,11 +188,12 @@ class PrepareWorktreeTest(unittest.TestCase):
         self.assertEqual(context.compare_base, "base-sha")
         self.assertEqual(context.mode, "merged_pr_head")
         self.assertEqual(context.temp_ref, "refs/slopgate-benchmark/pr-20-4321")
-        calls = [call.args[0] for call in run_cmd.call_args_list]
-        self.assertEqual(calls[0], ["git", "-C", "repo-root", "fetch", "origin", "main"])
-        self.assertEqual(calls[1], ["git", "-C", "repo-root", "fetch", "origin", "refs/pull/20/head:refs/slopgate-benchmark/pr-20-4321"])
-        self.assertEqual(calls[2], ["git", "-C", "repo-root", "rev-parse", "--verify", "feature/base"])
-        self.assertEqual(calls[3], ["git", "-C", "repo-root", "worktree", "add", "--detach", self.worktree_path, "refs/slopgate-benchmark/pr-20-4321"])
+        self.assertEqual(call_commands(run_cmd), [
+            ["git", "-C", "repo-root", "fetch", "origin", "main"],
+            ["git", "-C", "repo-root", "fetch", "origin", "refs/pull/20/head:refs/slopgate-benchmark/pr-20-4321"],
+            ["git", "-C", "repo-root", "rev-parse", "--verify", "feature/base"],
+            ["git", "-C", "repo-root", "worktree", "add", "--detach", self.worktree_path, "refs/slopgate-benchmark/pr-20-4321"],
+        ])
 
 
 class MatchStreamTest(unittest.TestCase):
