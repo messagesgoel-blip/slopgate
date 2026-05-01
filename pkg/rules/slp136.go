@@ -101,12 +101,49 @@ func slp136MarkPreservedWrapper(line, errName string, wrappers map[string]*slp13
 	}
 }
 
+func slp136InlineAppErrorSink(line string) bool {
+	if !slp136ImmediateUse.MatchString(line) || !slp136NewAppError.MatchString(line) {
+		return false
+	}
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`\bthrow\s+new\s+AppError\s*\(`),
+		regexp.MustCompile(`\breturn\s+new\s+AppError\s*\(`),
+		regexp.MustCompile(`\bnext\s*\(\s*new\s+AppError\s*\(`),
+		regexp.MustCompile(`\berror\s*\([^)]*new\s+AppError\s*\(`),
+	}
+	for _, pattern := range patterns {
+		if pattern.MatchString(line) {
+			return true
+		}
+	}
+	return false
+}
+
+func slp136SinkUsesVariable(line, variable string) bool {
+	if variable == "" || !slp136ImmediateUse.MatchString(line) {
+		return false
+	}
+	quotedVar := regexp.QuoteMeta(variable)
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`\bthrow\s+` + quotedVar + `\s*(?:[;),}]|$)`),
+		regexp.MustCompile(`\breturn\s+` + quotedVar + `\s*(?:[;),}]|$)`),
+		regexp.MustCompile(`\bnext\s*\(\s*` + quotedVar + `\s*(?:[),}]|$)`),
+		regexp.MustCompile(`\berror\s*\([^)]*\b` + quotedVar + `\s*(?:[,);}]|$)`),
+	}
+	for _, pattern := range patterns {
+		if pattern.MatchString(line) {
+			return true
+		}
+	}
+	return false
+}
+
 func slp136MaybeSinkWrappers(line string, wrappers map[string]*slp136PendingFinding, out *[]Finding, rule SLP136, filePath string) {
 	if !slp136ImmediateUse.MatchString(line) {
 		return
 	}
 	for variable, wrapper := range wrappers {
-		if !wordInLine(line, variable) {
+		if !slp136SinkUsesVariable(line, variable) {
 			continue
 		}
 		if wrapper.sawErrUse && !wrapper.preserved {
@@ -238,7 +275,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					if variable == "" {
 						variable = lastAssignedVar
 					}
-					directUse := slp136ImmediateUse.MatchString(trimmed) && variable == ""
+					directUse := slp136InlineAppErrorSink(trimmed) && variable == ""
 					if !directUse && variable == "" {
 						goto catchDepthUpdate
 					}
@@ -261,14 +298,10 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					slp136MarkPreservedWrapper(trimmed, errName, wrappers)
 				}
 				slp136MaybeSinkWrappers(trimmed, wrappers, &out, r, f.Path)
-				if ln.Kind == diff.LineAdd {
-					if slp136NewAppError.MatchString(trimmed) {
-						lastAssignedVar = ""
-					} else {
-						lastAssignedVar = slp136AssignedWrapperVarPrefix(trimmed)
-					}
-				} else {
+				if slp136NewAppError.MatchString(trimmed) {
 					lastAssignedVar = ""
+				} else {
+					lastAssignedVar = slp136AssignedWrapperVarPrefix(trimmed)
 				}
 
 			catchDepthUpdate:

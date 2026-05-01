@@ -113,7 +113,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sentry-stats-period", default="14d", help="Sentry issue stats period, e.g. 24h/7d/14d")
     parser.add_argument("--sentry-query", default="is:unresolved", help="Sentry issue search query")
     parser.add_argument("--sentry-helper", default=DEFAULT_SENTRY_HELPER, help="Path to sentry-whimsy helper")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.fuzzy_range < 0:
+        parser.error("--fuzzy-range must be >= 0")
+    return args
 
 
 def trim_body(body: str) -> str:
@@ -184,6 +187,7 @@ def prepare_worktree(repo_root_path: Path, pr_meta: dict[str, Any], pr_number: i
     base_branch = pr_meta["base"]["ref"]
     merged = bool(pr_meta.get("merged"))
     worktree_path = Path(tempfile.mkdtemp(prefix=f"slopgate-benchmark-{pr_number}-"))
+    temp_ref: str | None = None
 
     def resolved_compare_base() -> str:
         if requested_base:
@@ -197,47 +201,59 @@ def prepare_worktree(repo_root_path: Path, pr_meta: dict[str, Any], pr_number: i
                 ["git", "-C", str(repo_root_path), "fetch", "origin", requested_base],
                 check=False,
             )
-            remote_ref = f"origin/{requested_base}"
-            remote_verify = run_cmd(
-                ["git", "-C", str(repo_root_path), "rev-parse", "--verify", remote_ref],
+            fetched_local = run_cmd(
+                ["git", "-C", str(repo_root_path), "rev-parse", "--verify", requested_base],
                 check=False,
             )
-            if fetch_proc.returncode == 0 and remote_verify.returncode == 0:
-                return remote_verify.stdout.strip()
+            fetch_head = run_cmd(
+                ["git", "-C", str(repo_root_path), "rev-parse", "--verify", "FETCH_HEAD"],
+                check=False,
+            )
+            if fetch_proc.returncode == 0:
+                if fetched_local.returncode == 0:
+                    return fetched_local.stdout.strip()
+                if fetch_head.returncode == 0:
+                    return fetch_head.stdout.strip()
             raise BenchmarkError(
                 f"requested base could not be resolved: {requested_base}\n"
                 f"fetch stderr:\n{fetch_proc.stderr}\n"
-                f"verify stderr:\n{remote_verify.stderr}"
+                f"verify stderr:\n{fetched_local.stderr or fetch_head.stderr}"
             )
         run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", base_branch])
         return run_cmd(["git", "-C", str(repo_root_path), "rev-parse", "--verify", f"origin/{base_branch}"]).stdout.strip()
 
-    if merged:
-        run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", base_branch])
-        target_ref = pr_meta["merge_commit_sha"]
-        target_verify = run_cmd(
-            ["git", "-C", str(repo_root_path), "rev-parse", "--verify", target_ref],
-            check=False,
-        )
-        if target_verify.returncode != 0:
-            raise BenchmarkError(
-                f"merged PR target ref could not be resolved locally: {target_ref}\n"
-                f"stderr:\n{target_verify.stderr}"
+    try:
+        if merged:
+            run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", base_branch])
+            target_ref = pr_meta["merge_commit_sha"]
+            target_verify = run_cmd(
+                ["git", "-C", str(repo_root_path), "rev-parse", "--verify", target_ref],
+                check=False,
             )
-        if requested_base:
-            compare_base = resolved_compare_base()
+            if target_verify.returncode != 0:
+                raise BenchmarkError(
+                    f"merged PR target ref could not be resolved locally: {target_ref}\n"
+                    f"stderr:\n{target_verify.stderr}"
+                )
+            if requested_base:
+                compare_base = resolved_compare_base()
+            else:
+                compare_base = run_cmd(["git", "-C", str(repo_root_path), "rev-parse", f"{target_ref}^1"]).stdout.strip()
+            mode = "merged_pr"
         else:
-            compare_base = run_cmd(["git", "-C", str(repo_root_path), "rev-parse", f"{target_ref}^1"]).stdout.strip()
-        mode = "merged_pr"
-        temp_ref = None
-    else:
-        temp_ref = f"refs/slopgate-benchmark/pr-{pr_number}-{os.getpid()}"
-        run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", f"refs/pull/{pr_number}/head:{temp_ref}"])
-        target_ref = temp_ref
-        compare_base = resolved_compare_base()
-        mode = "open_pr_head"
+            temp_ref = f"refs/slopgate-benchmark/pr-{pr_number}-{os.getpid()}"
+            run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", f"refs/pull/{pr_number}/head:{temp_ref}"])
+            target_ref = temp_ref
+            compare_base = resolved_compare_base()
+            mode = "open_pr_head"
 
-    run_cmd(["git", "-C", str(repo_root_path), "worktree", "add", "--detach", str(worktree_path), target_ref])
+        run_cmd(["git", "-C", str(repo_root_path), "worktree", "add", "--detach", str(worktree_path), target_ref])
+    except Exception:
+        run_cmd(["git", "-C", str(repo_root_path), "worktree", "remove", "--force", str(worktree_path)], check=False)
+        if temp_ref:
+            run_cmd(["git", "-C", str(repo_root_path), "update-ref", "-d", temp_ref], check=False)
+        shutil.rmtree(worktree_path, ignore_errors=True)
+        raise
 
     return WorktreeContext(
         repo_root=repo_root_path,
