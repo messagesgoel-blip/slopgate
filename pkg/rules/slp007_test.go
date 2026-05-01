@@ -242,20 +242,44 @@ export function SettingsPage() {
 	}
 }
 
-func TestSLP007_StagedDiffDoesNotConsultLiveFileFallback(t *testing.T) {
+func TestSLP007_StagedDiffUsesIndexSnapshot(t *testing.T) {
 	root := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v failed: %v\n%s", args, err, string(out))
+		}
+	}
+
+	runGit("init")
+	runGit("config", "user.email", "test@example.com")
+	runGit("config", "user.name", "Test User")
+
 	target := filepath.Join(root, "src", "page.tsx")
 	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	content := `import { User } from "lucide-react";
+	indexContent := `import { User } from "lucide-react";
 
 export function SettingsPage() {
   return <User className="icon" />;
 }
 `
-	if err := os.WriteFile(target, []byte(content), 0o600); err != nil {
+	if err := os.WriteFile(target, []byte(indexContent), 0o600); err != nil {
 		t.Fatalf("write file: %v", err)
+	}
+	runGit("add", "src/page.tsx")
+
+	worktreeContent := `import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return null;
+}
+`
+	if err := os.WriteFile(target, []byte(worktreeContent), 0o600); err != nil {
+		t.Fatalf("rewrite worktree file: %v", err)
 	}
 
 	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
@@ -267,9 +291,11 @@ export function SettingsPage() {
    return null;
 `)
 	d.Staged = true
+	d.SnapshotWorktree = false
+	d.SnapshotRef = ":"
 	got := SLP007{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 finding for staged diff fallback, got %d: %+v", len(got), got)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when staged snapshot still contains usage, got %d: %+v", len(got), got)
 	}
 }
 

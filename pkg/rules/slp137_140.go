@@ -227,11 +227,6 @@ func (r SLP138) Check(d *diff.Diff) []Finding {
 	return out
 }
 
-func slp139HasRawS3Sibling(d *diff.Diff, excludePath string) bool {
-	rawPaths := slp139RawS3Paths(d)
-	return slp139HasRawS3SiblingIn(rawPaths, excludePath)
-}
-
 func slp139CandidatePaths(d *diff.Diff) map[string]bool {
 	candidates := map[string]bool{}
 	if d == nil {

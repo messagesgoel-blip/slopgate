@@ -82,13 +82,16 @@ class WorktreeContext:
 
 
 def run_cmd(cmd: list[str], *, cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
-    proc = subprocess.run(
-        cmd,
-        cwd=str(cwd) if cwd else None,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(cwd) if cwd else None,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        raise BenchmarkError(f"command failed to start: {' '.join(cmd)} ({exc})") from exc
     if check and proc.returncode != 0:
         raise BenchmarkError(
             f"command failed ({proc.returncode}): {' '.join(cmd)}\n"
@@ -190,6 +193,22 @@ def prepare_worktree(repo_root_path: Path, pr_meta: dict[str, Any], pr_number: i
             )
             if verify_proc.returncode == 0:
                 return requested_base
+            fetch_proc = run_cmd(
+                ["git", "-C", str(repo_root_path), "fetch", "origin", requested_base],
+                check=False,
+            )
+            remote_ref = f"origin/{requested_base}"
+            remote_verify = run_cmd(
+                ["git", "-C", str(repo_root_path), "rev-parse", "--verify", remote_ref],
+                check=False,
+            )
+            if fetch_proc.returncode == 0 and remote_verify.returncode == 0:
+                return remote_ref
+            raise BenchmarkError(
+                f"requested base could not be resolved: {requested_base}\n"
+                f"fetch stderr:\n{fetch_proc.stderr}\n"
+                f"verify stderr:\n{remote_verify.stderr}"
+            )
         run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", base_branch])
         return f"origin/{base_branch}"
 
@@ -377,7 +396,7 @@ def collect_sentry_findings(
     projects: list[str],
     stats_period: str,
     query: str,
-    repo_root_path: Path,
+    checkout_path: Path,
 ) -> list[ReviewFinding]:
     if not projects:
         return []
@@ -386,8 +405,8 @@ def collect_sentry_findings(
         raise BenchmarkError(f"sentry helper not found: {helper_path}")
 
     repo_files = [
-        str(path.relative_to(repo_root_path)).replace("\\", "/")
-        for path in repo_root_path.rglob("*")
+        str(path.relative_to(checkout_path)).replace("\\", "/")
+        for path in checkout_path.rglob("*")
         if path.is_file()
     ]
     findings: list[ReviewFinding] = []
@@ -556,74 +575,73 @@ def main() -> int:
     context = prepare_worktree(root, pr_meta, args.pr_number, requested_base)
     try:
         report, slopgate_stderr = run_slopgate(slug, context)
-    finally:
-        context.cleanup()
+        sg_findings = [finding_to_compare_item(finding) for finding in report.get("findings", [])]
+        all_comments = collect_coderabbit_all(slug, args.pr_number)
+        actionable_comments = collect_coderabbit_actionable(slug, args.pr_number)
+        sentry_findings = collect_sentry_findings(
+            args.sentry_helper,
+            args.sentry_project,
+            args.sentry_stats_period,
+            args.sentry_query,
+            context.worktree_path,
+        )
+        combined_actionable = combine_streams_by_location(actionable_comments + sentry_findings)
 
-    sg_findings = [finding_to_compare_item(finding) for finding in report.get("findings", [])]
-    all_comments = collect_coderabbit_all(slug, args.pr_number)
-    actionable_comments = collect_coderabbit_actionable(slug, args.pr_number)
-    sentry_findings = collect_sentry_findings(
-        args.sentry_helper,
-        args.sentry_project,
-        args.sentry_stats_period,
-        args.sentry_query,
-        root,
-    )
-    combined_actionable = combine_streams_by_location(actionable_comments + sentry_findings)
+        all_result = match_stream(sg_findings, all_comments, args.fuzzy_range)
+        actionable_result = match_stream(sg_findings, actionable_comments, args.fuzzy_range)
+        sentry_result = match_stream(sg_findings, sentry_findings, args.fuzzy_range)
+        combined_result = match_stream(sg_findings, combined_actionable, args.fuzzy_range)
 
-    all_result = match_stream(sg_findings, all_comments, args.fuzzy_range)
-    actionable_result = match_stream(sg_findings, actionable_comments, args.fuzzy_range)
-    sentry_result = match_stream(sg_findings, sentry_findings, args.fuzzy_range)
-    combined_result = match_stream(sg_findings, combined_actionable, args.fuzzy_range)
-
-    result = {
-        "repo": slug,
-        "pr": args.pr_number,
-        "base": context.compare_base,
-        "requested_base": context.requested_base,
-        "base_branch": context.base_branch,
-        "merged": bool(pr_meta.get("merged")),
-        "state": pr_meta.get("state", "unknown"),
-        "benchmark_mode": context.mode,
-        "checkout_ref": context.target_ref,
-        "slopgate": report.get("summary", {}),
-        "coderabbit": {"total": len(all_comments)},
-        "coderabbit_actionable": {"total": len(actionable_comments)},
-        "sentry": {"total": len(sentry_findings)},
-        "actionable_plus_sentry": {"total": len(combined_actionable)},
-        "comparison": all_result["comparison"],
-        "scores": {
-            "overlap_all": all_result["comparison"]["overlap"],
-            "overlap_actionable": actionable_result["comparison"]["overlap"],
-            "overlap_actionable_plus_sentry": combined_result["comparison"]["overlap"],
-            "coverage_all_pct": all_result["coverage_pct"],
-            "coverage_actionable_pct": actionable_result["coverage_pct"],
-            "coverage_actionable_plus_sentry_pct": combined_result["coverage_pct"],
-            "precision_proxy_all_pct": all_result["precision_proxy_pct"],
-            "precision_proxy_actionable_pct": actionable_result["precision_proxy_pct"],
-            "precision_proxy_actionable_plus_sentry_pct": combined_result["precision_proxy_pct"],
-        },
-        "streams": {
-            "coderabbit_all": {"total": len(all_comments)},
+        result = {
+            "repo": slug,
+            "pr": args.pr_number,
+            "base": context.compare_base,
+            "requested_base": context.requested_base,
+            "base_branch": context.base_branch,
+            "merged": bool(pr_meta.get("merged")),
+            "state": pr_meta.get("state", "unknown"),
+            "benchmark_mode": context.mode,
+            "checkout_ref": context.target_ref,
+            "slopgate": report.get("summary", {}),
+            "coderabbit": {"total": len(all_comments)},
             "coderabbit_actionable": {"total": len(actionable_comments)},
             "sentry": {"total": len(sentry_findings)},
             "actionable_plus_sentry": {"total": len(combined_actionable)},
-        },
-        "comparison_streams": {
-            "coderabbit_all": all_result,
-            "coderabbit_actionable": actionable_result,
-            "sentry": sentry_result,
-            "actionable_plus_sentry": combined_result,
-        },
-        "overlap_details": all_result["overlap_details"],
-        "cr_only_details": all_result["review_only_details"],
-        "sg_only_details": all_result["sg_only_details"],
-        "actionable_overlap_details": actionable_result["overlap_details"],
-        "cr_actionable_only_details": actionable_result["review_only_details"],
-        "sentry_only_details": sentry_result["review_only_details"],
-        "actionable_plus_sentry_only_details": combined_result["review_only_details"],
-        "slopgate_stderr": slopgate_stderr,
-    }
+            "comparison": all_result["comparison"],
+            "scores": {
+                "overlap_all": all_result["comparison"]["overlap"],
+                "overlap_actionable": actionable_result["comparison"]["overlap"],
+                "overlap_actionable_plus_sentry": combined_result["comparison"]["overlap"],
+                "coverage_all_pct": all_result["coverage_pct"],
+                "coverage_actionable_pct": actionable_result["coverage_pct"],
+                "coverage_actionable_plus_sentry_pct": combined_result["coverage_pct"],
+                "precision_proxy_all_pct": all_result["precision_proxy_pct"],
+                "precision_proxy_actionable_pct": actionable_result["precision_proxy_pct"],
+                "precision_proxy_actionable_plus_sentry_pct": combined_result["precision_proxy_pct"],
+            },
+            "streams": {
+                "coderabbit_all": {"total": len(all_comments)},
+                "coderabbit_actionable": {"total": len(actionable_comments)},
+                "sentry": {"total": len(sentry_findings)},
+                "actionable_plus_sentry": {"total": len(combined_actionable)},
+            },
+            "comparison_streams": {
+                "coderabbit_all": all_result,
+                "coderabbit_actionable": actionable_result,
+                "sentry": sentry_result,
+                "actionable_plus_sentry": combined_result,
+            },
+            "overlap_details": all_result["overlap_details"],
+            "cr_only_details": all_result["review_only_details"],
+            "sg_only_details": all_result["sg_only_details"],
+            "actionable_overlap_details": actionable_result["overlap_details"],
+            "cr_actionable_only_details": actionable_result["review_only_details"],
+            "sentry_only_details": sentry_result["review_only_details"],
+            "actionable_plus_sentry_only_details": combined_result["review_only_details"],
+            "slopgate_stderr": slopgate_stderr,
+        }
+    finally:
+        context.cleanup()
 
     print(
         f"Scores: overlap_all={result['scores']['overlap_all']} "

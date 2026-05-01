@@ -496,9 +496,14 @@ func slp007FileContent(d *diff.Diff, relPath string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	spec := d.SnapshotRef + ":" + cleanSlash
-	if d.SnapshotRef == ":" {
+	spec := ""
+	switch d.SnapshotRef {
+	case ":":
 		spec = ":" + cleanSlash
+	case "HEAD":
+		spec = "HEAD:" + cleanSlash
+	default:
+		return "", false
 	}
 	out, err := exec.Command("git", "-C", d.RepoRoot, "show", spec).Output()
 	if err != nil {
@@ -616,7 +621,7 @@ func (r SLP007) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		haveFileLines := d != nil && !d.Staged
+		haveFileLines := d != nil
 		var fileLines []string
 		if haveFileLines {
 			fileLines, haveFileLines = slp007FileLines(d, f.Path)

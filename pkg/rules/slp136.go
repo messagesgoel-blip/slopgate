@@ -19,11 +19,12 @@ func (SLP136) Description() string {
 }
 
 var (
-	slp136CatchHeader  = regexp.MustCompile(`\bcatch\s*\(\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\)`)
-	slp136NewAppError  = regexp.MustCompile(`\bnew\s+AppError\s*\(`)
-	slp136ImmediateUse = regexp.MustCompile(`\b(?:error|next)\s*\(|\bthrow\b|\breturn\b`)
-	slp136VarAssign    = regexp.MustCompile(`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*new\s+AppError\s*\(|\b([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*new\s+AppError\s*\(`)
-	slp136CauseAssign  = regexp.MustCompile(`\b([A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*cause\s*=\s*([A-Za-z_$][A-Za-z0-9_$]*)\b`)
+	slp136CatchHeader     = regexp.MustCompile(`\bcatch\s*\(\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\)`)
+	slp136NewAppError     = regexp.MustCompile(`\bnew\s+AppError\s*\(`)
+	slp136ImmediateUse    = regexp.MustCompile(`\b(?:error|next)\s*\(|\bthrow\b|\breturn\b`)
+	slp136VarAssign       = regexp.MustCompile(`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*new\s+AppError\s*\(|\b([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*new\s+AppError\s*\(`)
+	slp136VarAssignPrefix = regexp.MustCompile(`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*$|\b([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*$`)
+	slp136CauseAssign     = regexp.MustCompile(`\b([A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*cause\s*=\s*([A-Za-z_$][A-Za-z0-9_$]*)\b`)
 )
 
 type slp136PendingFinding struct {
@@ -65,6 +66,25 @@ func slp136AssignedWrapperVar(line string) string {
 		return m[1]
 	}
 	return m[2]
+}
+
+func slp136AssignedWrapperVarPrefix(line string) string {
+	m := slp136VarAssignPrefix.FindStringSubmatch(line)
+	if m == nil {
+		return ""
+	}
+	if m[1] != "" {
+		return m[1]
+	}
+	return m[2]
+}
+
+func slp136CatchBodyText(line string) string {
+	idx := slp136CatchHeader.FindStringIndex(line)
+	if idx == nil {
+		return line
+	}
+	return line[idx[1]:]
 }
 
 func slp136MarkPreservedWrapper(line, errName string, wrappers map[string]*slp136PendingFinding) {
@@ -139,6 +159,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 			observedErrUse := false
 			var pending *slp136PendingFinding
 			wrappers := map[string]*slp136PendingFinding{}
+			lastAssignedVar := ""
 
 			reset := func() {
 				inCatch = false
@@ -147,6 +168,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 				observedErrUse = false
 				pending = nil
 				clear(wrappers)
+				lastAssignedVar = ""
 			}
 
 			for _, ln := range h.Lines {
@@ -169,7 +191,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 							catchDepth = 1
 						}
 						observedErrUse = false
-						if slp136MentionsCaughtError(trimmed, errName) {
+						if slp136MentionsCaughtError(slp136CatchBodyText(trimmed), errName) {
 							observedErrUse = true
 						}
 					}
@@ -194,6 +216,9 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 				if pending == nil && ln.Kind == diff.LineAdd && errName != "" && observedErrUse &&
 					slp136NewAppError.MatchString(trimmed) {
 					variable := slp136AssignedWrapperVar(trimmed)
+					if variable == "" {
+						variable = lastAssignedVar
+					}
 					directUse := slp136ImmediateUse.MatchString(trimmed) && variable == ""
 					if !directUse && variable == "" {
 						goto catchDepthUpdate
@@ -216,6 +241,15 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					slp136MarkPreservedWrapper(trimmed, errName, wrappers)
 				}
 				slp136MaybeSinkWrappers(trimmed, wrappers, &out, r, f.Path)
+				if ln.Kind == diff.LineAdd {
+					if slp136NewAppError.MatchString(trimmed) {
+						lastAssignedVar = ""
+					} else {
+						lastAssignedVar = slp136AssignedWrapperVarPrefix(trimmed)
+					}
+				} else {
+					lastAssignedVar = ""
+				}
 
 			catchDepthUpdate:
 				catchDepth += strings.Count(content, "{")
