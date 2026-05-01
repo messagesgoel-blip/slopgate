@@ -19,12 +19,18 @@ func (SLP136) Description() string {
 }
 
 var (
-	slp136CatchHeader     = regexp.MustCompile(`\bcatch\s*\(\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\)`)
-	slp136NewAppError     = regexp.MustCompile(`\bnew\s+AppError\s*\(`)
-	slp136ImmediateUse    = regexp.MustCompile(`\b(?:error|next)\s*\(|\bthrow\b|\breturn\b`)
-	slp136VarAssign       = regexp.MustCompile(`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*new\s+AppError\s*\(|\b([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*new\s+AppError\s*\(`)
-	slp136VarAssignPrefix = regexp.MustCompile(`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*$|\b([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*$`)
-	slp136CauseAssign     = regexp.MustCompile(`\b([A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*cause\s*=\s*([A-Za-z_$][A-Za-z0-9_$]*)\b`)
+	slp136CatchHeader        = regexp.MustCompile(`\bcatch\s*\(\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\)`)
+	slp136NewAppError        = regexp.MustCompile(`\bnew\s+AppError\s*\(`)
+	slp136ImmediateUse       = regexp.MustCompile(`\b(?:error|next)\s*\(|\bthrow\b|\breturn\b`)
+	slp136VarAssign          = regexp.MustCompile(`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*new\s+AppError\s*\(|\b([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*new\s+AppError\s*\(`)
+	slp136VarAssignPrefix    = regexp.MustCompile(`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*$|\b([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*$`)
+	slp136CauseAssign        = regexp.MustCompile(`\b([A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*cause\s*=\s*([A-Za-z_$][A-Za-z0-9_$]*)\b`)
+	slp136InlineSinkPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`\bthrow\s+new\s+AppError\s*\(`),
+		regexp.MustCompile(`\breturn\s+new\s+AppError\s*\(`),
+		regexp.MustCompile(`\bnext\s*\(\s*new\s+AppError\s*\(`),
+		regexp.MustCompile(`\berror\s*\([^)]*new\s+AppError\s*\(`),
+	}
 )
 
 type slp136PendingFinding struct {
@@ -64,7 +70,10 @@ func slp136PreservesCause(line string, patterns []*regexp.Regexp) bool {
 
 func slp136AssignedWrapperVar(line string) string {
 	m := slp136VarAssign.FindStringSubmatch(line)
-	if m == nil || len(m) <= 1 {
+	if m == nil {
+		return ""
+	}
+	if len(m) <= 1 {
 		return ""
 	}
 	if m[1] != "" {
@@ -78,13 +87,13 @@ func slp136AssignedWrapperVar(line string) string {
 
 func slp136AssignedWrapperVarPrefix(line string) string {
 	m := slp136VarAssignPrefix.FindStringSubmatch(line)
-	if m == nil || len(m) <= 1 {
+	if m == nil {
 		return ""
 	}
-	if m[1] != "" {
+	if len(m) > 1 && m[1] != "" {
 		return m[1]
 	}
-	if len(m) > 2 {
+	if len(m) > 2 && m[2] != "" {
 		return m[2]
 	}
 	return ""
@@ -92,7 +101,7 @@ func slp136AssignedWrapperVarPrefix(line string) string {
 
 func slp136CatchBodyText(line string) string {
 	idx := slp136CatchHeader.FindStringIndex(line)
-	if idx == nil || len(idx) <= 1 {
+	if idx == nil {
 		return line
 	}
 	return line[idx[1]:]
@@ -100,7 +109,7 @@ func slp136CatchBodyText(line string) string {
 
 func slp136MarkPreservedWrapper(line, errName string, wrappers map[string]*slp136PendingFinding) {
 	m := slp136CauseAssign.FindStringSubmatch(line)
-	if m == nil || m[2] != errName {
+	if m == nil || len(m) < 3 || m[2] != errName {
 		return
 	}
 	if wrapper := wrappers[m[1]]; wrapper != nil {
@@ -112,13 +121,7 @@ func slp136InlineAppErrorSink(line string) bool {
 	if !slp136ImmediateUse.MatchString(line) || !slp136NewAppError.MatchString(line) {
 		return false
 	}
-	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`\bthrow\s+new\s+AppError\s*\(`),
-		regexp.MustCompile(`\breturn\s+new\s+AppError\s*\(`),
-		regexp.MustCompile(`\bnext\s*\(\s*new\s+AppError\s*\(`),
-		regexp.MustCompile(`\berror\s*\([^)]*new\s+AppError\s*\(`),
-	}
-	for _, pattern := range patterns {
+	for _, pattern := range slp136InlineSinkPatterns {
 		if pattern.MatchString(line) {
 			return true
 		}

@@ -185,7 +185,7 @@ def gh_graphql_json(query: str, variables: dict[str, Any]) -> Any:
     for key, value in variables.items():
         cmd.extend(["-F", f"{key}={value}"])
     proc = run_cmd(cmd)
-    return json.loads(proc.stdout)
+    return decode_json_output(proc, "gh graphql")
 
 
 def decode_json_output(proc: subprocess.CompletedProcess[str], context: str) -> Any:
@@ -381,7 +381,10 @@ query($owner:String!,$repo:String!,$pr:Int!,$cursor:String){
     findings: list[ReviewFinding] = []
 
     while True:
-        payload = gh_graphql_json(query, {"owner": owner, "repo": repo, "pr": pr_number, "cursor": cursor or ""})
+        vars_dict: dict[str, Any] = {"owner": owner, "repo": repo, "pr": pr_number}
+        if cursor:
+            vars_dict["cursor"] = cursor
+        payload = gh_graphql_json(query, vars_dict)
         review_threads = payload["data"]["repository"]["pullRequest"]["reviewThreads"]
         for thread in review_threads["nodes"]:
             if thread.get("isResolved"):
@@ -745,4 +748,4 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except BenchmarkError as exc:
         print(f"Error: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(1) from None
