@@ -490,20 +490,47 @@ def match_stream(
                 adjacency[sg_idx].append(rv_idx)
 
     match_review: dict[int, int] = {}
-    sys.setrecursionlimit(max(sys.getrecursionlimit(), len(sg_findings) * 2 + 100))
+    match_sg: dict[int, int] = {}
 
-    def dfs(sg_idx: int, seen: set[int]) -> bool:
-        for rv_idx in adjacency[sg_idx]:
-            if rv_idx in seen:
-                continue
-            seen.add(rv_idx)
-            if rv_idx not in match_review or dfs(match_review[rv_idx], seen):
-                match_review[rv_idx] = sg_idx
+    def augment(start_sg: int) -> bool:
+        stack = [start_sg]
+        seen_sg = {start_sg}
+        seen_rv: set[int] = set()
+        parent_rv: dict[int, int] = {}
+        parent_sg: dict[int, int] = {}
+        unmatched_rv: int | None = None
+
+        while stack and unmatched_rv is None:
+            current_sg = stack.pop()
+            for rv_idx in adjacency[current_sg]:
+                if rv_idx in seen_rv:
+                    continue
+                seen_rv.add(rv_idx)
+                parent_rv[rv_idx] = current_sg
+                matched_sg = match_review.get(rv_idx)
+                if matched_sg is None:
+                    unmatched_rv = rv_idx
+                    break
+                if matched_sg in seen_sg:
+                    continue
+                seen_sg.add(matched_sg)
+                parent_sg[matched_sg] = rv_idx
+                stack.append(matched_sg)
+
+        if unmatched_rv is None:
+            return False
+
+        current_rv = unmatched_rv
+        while True:
+            current_sg = parent_rv[current_rv]
+            match_review[current_rv] = current_sg
+            match_sg[current_sg] = current_rv
+            if current_sg == start_sg:
                 return True
-        return False
+            current_rv = parent_sg[current_sg]
 
     for sg_idx in range(len(sg_findings)):
-        dfs(sg_idx, set())
+        augment(sg_idx)
 
     matched_sg = set(match_review.values())
     overlap_details = []

@@ -390,6 +390,36 @@ export function SettingsPage() {
 	}
 }
 
+func TestSLP007_DoesNotTreatImportLikeLinesAsUsageInFileFallback(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	content := `export { User } from "./icons";
+
+export function SettingsPage() {
+  return null;
+}
+`
+	if err := os.WriteFile(target, []byte(content), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return null;
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when only import-like lines mention the ident, got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP007_JSNamedImportUnused(t *testing.T) {
 	// import { useState } from 'react' with no useState usage => finding
 	d := parseDiff(t, `diff --git a/app.tsx b/app.tsx

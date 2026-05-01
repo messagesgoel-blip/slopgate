@@ -496,20 +496,22 @@ func slp007FileContent(d *diff.Diff, relPath string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	spec := ""
 	switch d.SnapshotRef {
 	case ":":
-		spec = ":" + cleanSlash
+		out, err := exec.Command("git", "-C", d.RepoRoot, "show", ":"+cleanSlash).Output()
+		if err != nil {
+			return "", false
+		}
+		return string(out), true
 	case "HEAD":
-		spec = "HEAD:" + cleanSlash
+		out, err := exec.Command("git", "-C", d.RepoRoot, "show", "HEAD:"+cleanSlash).Output()
+		if err != nil {
+			return "", false
+		}
+		return string(out), true
 	default:
 		return "", false
 	}
-	out, err := exec.Command("git", "-C", d.RepoRoot, "show", spec).Output()
-	if err != nil {
-		return "", false
-	}
-	return string(out), true
 }
 
 func slp007FileLines(d *diff.Diff, relPath string) ([]string, bool) {
@@ -540,11 +542,30 @@ func identUsedInFile(ident string, lines []string, goMode bool, skipLineN int) b
 			}
 			continue
 		}
+		if slp007IsImportLikeLine(line) {
+			continue
+		}
 		if wordInLine(line, ident) {
 			return true
 		}
 	}
 	return false
+}
+
+func slp007IsImportLikeLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	switch {
+	case strings.HasPrefix(trimmed, "import "):
+		return true
+	case strings.HasPrefix(trimmed, "from ") && strings.Contains(trimmed, " import "):
+		return true
+	case strings.HasPrefix(trimmed, "use "):
+		return true
+	case strings.HasPrefix(trimmed, "export ") && strings.Contains(trimmed, " from "):
+		return true
+	default:
+		return false
+	}
 }
 
 // wordInLine reports whether the given word appears as a whole word in the

@@ -40,15 +40,18 @@ func slp136MentionsCaughtError(line, errName string) bool {
 	return wordInLine(line, errName)
 }
 
-func slp136PreservesCause(line, errName string) bool {
+func buildSlp136Patterns(errName string) []*regexp.Regexp {
 	if errName == "" {
-		return false
+		return nil
 	}
 	quotedErrName := regexp.QuoteMeta(errName)
-	patterns := []*regexp.Regexp{
+	return []*regexp.Regexp{
 		regexp.MustCompile(`\bcause\s*:\s*` + quotedErrName + `\b`),
 		regexp.MustCompile(`\b[A-Za-z_$][A-Za-z0-9_$]*\s*\.\s*cause\s*=\s*` + quotedErrName + `\b`),
 	}
+}
+
+func slp136PreservesCause(line string, patterns []*regexp.Regexp) bool {
 	for _, pattern := range patterns {
 		if pattern.MatchString(line) {
 			return true
@@ -156,20 +159,11 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 			inCatch := false
 			catchDepth := 0
 			errName := ""
+			var causePatterns []*regexp.Regexp
 			observedErrUse := false
 			var pending *slp136PendingFinding
 			wrappers := map[string]*slp136PendingFinding{}
 			lastAssignedVar := ""
-
-			reset := func() {
-				inCatch = false
-				catchDepth = 0
-				errName = ""
-				observedErrUse = false
-				pending = nil
-				clear(wrappers)
-				lastAssignedVar = ""
-			}
 
 			for _, ln := range h.Lines {
 				if ln.Kind == diff.LineDelete {
@@ -182,6 +176,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					if m := slp136CatchHeader.FindStringSubmatch(trimmed); m != nil {
 						inCatch = true
 						errName = m[1]
+						causePatterns = buildSlp136Patterns(errName)
 						catchSub := content
 						if idx := strings.Index(strings.ToLower(content), "catch"); idx >= 0 {
 							catchSub = content[idx:]
@@ -203,7 +198,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 				}
 
 				if pending != nil {
-					if errName != "" && slp136PreservesCause(trimmed, errName) {
+					if slp136PreservesCause(trimmed, causePatterns) {
 						pending.preserved = true
 					}
 					pending.depth += slp136ExpressionDepthDelta(content)
@@ -228,7 +223,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 						line:      ln.NewLineNo,
 						snippet:   strings.TrimSpace(ln.Content),
 						depth:     depth,
-						preserved: slp136PreservesCause(trimmed, errName),
+						preserved: slp136PreservesCause(trimmed, causePatterns),
 						variable:  variable,
 						directUse: directUse,
 					}
@@ -258,7 +253,14 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					if pending != nil {
 						slp136FinalizePending(&out, r, f.Path, pending, wrappers)
 					}
-					reset()
+					inCatch = false
+					catchDepth = 0
+					errName = ""
+					causePatterns = nil
+					observedErrUse = false
+					pending = nil
+					clear(wrappers)
+					lastAssignedVar = ""
 				}
 			}
 		}
