@@ -33,6 +33,7 @@ type slp136PendingFinding struct {
 	depth     int
 	preserved bool
 	sawErrUse bool
+	sawSink   bool
 	variable  string
 	directUse bool
 }
@@ -63,29 +64,35 @@ func slp136PreservesCause(line string, patterns []*regexp.Regexp) bool {
 
 func slp136AssignedWrapperVar(line string) string {
 	m := slp136VarAssign.FindStringSubmatch(line)
-	if m == nil {
+	if m == nil || len(m) <= 1 {
 		return ""
 	}
 	if m[1] != "" {
 		return m[1]
 	}
-	return m[2]
+	if len(m) > 2 {
+		return m[2]
+	}
+	return ""
 }
 
 func slp136AssignedWrapperVarPrefix(line string) string {
 	m := slp136VarAssignPrefix.FindStringSubmatch(line)
-	if m == nil {
+	if m == nil || len(m) <= 1 {
 		return ""
 	}
 	if m[1] != "" {
 		return m[1]
 	}
-	return m[2]
+	if len(m) > 2 {
+		return m[2]
+	}
+	return ""
 }
 
 func slp136CatchBodyText(line string) string {
 	idx := slp136CatchHeader.FindStringIndex(line)
-	if idx == nil {
+	if idx == nil || len(idx) <= 1 {
 		return line
 	}
 	return line[idx[1]:]
@@ -138,7 +145,7 @@ func slp136SinkUsesVariable(line, variable string) bool {
 	return false
 }
 
-func slp136MaybeSinkWrappers(line string, wrappers map[string]*slp136PendingFinding, out *[]Finding, rule SLP136, filePath string) {
+func slp136MaybeSinkWrappers(line string, wrappers map[string]*slp136PendingFinding) {
 	if !slp136ImmediateUse.MatchString(line) {
 		return
 	}
@@ -146,40 +153,41 @@ func slp136MaybeSinkWrappers(line string, wrappers map[string]*slp136PendingFind
 		if !slp136SinkUsesVariable(line, variable) {
 			continue
 		}
-		if wrapper.sawErrUse && !wrapper.preserved {
-			*out = append(*out, Finding{
-				RuleID:   rule.ID(),
-				Severity: rule.DefaultSeverity(),
-				File:     filePath,
-				Line:     wrapper.line,
-				Message:  "caught error is wrapped in AppError without preserving cause — attach the original error for diagnostics",
-				Snippet:  wrapper.snippet,
-			})
-		}
-		delete(wrappers, variable)
+		wrapper.sawSink = true
 	}
 }
 
-func slp136FinalizePending(out *[]Finding, rule SLP136, filePath string, wrapper *slp136PendingFinding, wrappers map[string]*slp136PendingFinding) {
+func slp136AppendFinding(out *[]Finding, rule SLP136, filePath string, wrapper *slp136PendingFinding) {
+	*out = append(*out, Finding{
+		RuleID:   rule.ID(),
+		Severity: rule.DefaultSeverity(),
+		File:     filePath,
+		Line:     wrapper.line,
+		Message:  "caught error is wrapped in AppError without preserving cause — attach the original error for diagnostics",
+		Snippet:  wrapper.snippet,
+	})
+}
+
+func slp136FlushObservedWrappers(out *[]Finding, rule SLP136, filePath string, observedWrappers []*slp136PendingFinding) {
+	for _, wrapper := range observedWrappers {
+		if wrapper == nil || !wrapper.sawSink || !wrapper.sawErrUse || wrapper.preserved {
+			continue
+		}
+		slp136AppendFinding(out, rule, filePath, wrapper)
+	}
+}
+
+func slp136FinalizePending(wrapper *slp136PendingFinding, wrappers map[string]*slp136PendingFinding, observedWrappers *[]*slp136PendingFinding) {
 	if wrapper == nil {
 		return
 	}
 	if wrapper.directUse {
-		if wrapper.sawErrUse && !wrapper.preserved {
-			*out = append(*out, Finding{
-				RuleID:   rule.ID(),
-				Severity: rule.DefaultSeverity(),
-				File:     filePath,
-				Line:     wrapper.line,
-				Message:  "caught error is wrapped in AppError without preserving cause — attach the original error for diagnostics",
-				Snippet:  wrapper.snippet,
-			})
-		}
-		return
+		wrapper.sawSink = true
 	}
 	if wrapper.variable != "" {
 		wrappers[wrapper.variable] = wrapper
 	}
+	*observedWrappers = append(*observedWrappers, wrapper)
 }
 
 func slp136ExpressionDepthDelta(line string) int {
@@ -201,6 +209,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 			observedErrUse := false
 			var pending *slp136PendingFinding
 			wrappers := map[string]*slp136PendingFinding{}
+			observedWrappers := []*slp136PendingFinding{}
 			lastAssignedVar := ""
 
 			for _, ln := range h.Lines {
@@ -237,6 +246,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 								observedErrUse = false
 								pending = nil
 								clear(wrappers)
+								observedWrappers = nil
 								lastAssignedVar = ""
 							}
 							continue
@@ -253,7 +263,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					if pending != nil {
 						pending.sawErrUse = true
 					}
-					for _, wrapper := range wrappers {
+					for _, wrapper := range observedWrappers {
 						wrapper.sawErrUse = true
 					}
 				}
@@ -264,13 +274,12 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					}
 					pending.depth += slp136ExpressionDepthDelta(content)
 					if pending.depth <= 0 {
-						slp136FinalizePending(&out, r, f.Path, pending, wrappers)
+						slp136FinalizePending(pending, wrappers, &observedWrappers)
 						pending = nil
 					}
 				}
 
-				if pending == nil && ln.Kind == diff.LineAdd && errName != "" &&
-					slp136NewAppError.MatchString(trimmed) {
+				if pending == nil && ln.Kind == diff.LineAdd && errName != "" && slp136NewAppError.MatchString(trimmed) {
 					variable := slp136AssignedWrapperVar(trimmed)
 					if variable == "" {
 						variable = lastAssignedVar
@@ -290,14 +299,15 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 						directUse: directUse,
 					}
 					if pending.depth <= 0 {
-						slp136FinalizePending(&out, r, f.Path, pending, wrappers)
+						slp136FinalizePending(pending, wrappers, &observedWrappers)
 						pending = nil
 					}
 				}
+
 				if errName != "" {
 					slp136MarkPreservedWrapper(trimmed, errName, wrappers)
 				}
-				slp136MaybeSinkWrappers(trimmed, wrappers, &out, r, f.Path)
+				slp136MaybeSinkWrappers(trimmed, wrappers)
 				if slp136NewAppError.MatchString(trimmed) {
 					lastAssignedVar = ""
 				} else {
@@ -311,8 +321,9 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 				}
 				if catchDepth <= 0 {
 					if pending != nil {
-						slp136FinalizePending(&out, r, f.Path, pending, wrappers)
+						slp136FinalizePending(pending, wrappers, &observedWrappers)
 					}
+					slp136FlushObservedWrappers(&out, r, f.Path, observedWrappers)
 					inCatch = false
 					catchDepth = 0
 					errName = ""
@@ -320,6 +331,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					observedErrUse = false
 					pending = nil
 					clear(wrappers)
+					observedWrappers = nil
 					lastAssignedVar = ""
 				}
 			}

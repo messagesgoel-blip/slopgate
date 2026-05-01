@@ -81,7 +81,13 @@ class WorktreeContext:
         shutil.rmtree(self.worktree_path, ignore_errors=True)
 
 
-def run_cmd(cmd: list[str], *, cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+def run_cmd(
+    cmd: list[str],
+    *,
+    cwd: Path | None = None,
+    check: bool = True,
+    timeout: float | None = 60,
+) -> subprocess.CompletedProcess[str]:
     try:
         proc = subprocess.run(
             cmd,
@@ -89,7 +95,10 @@ def run_cmd(cmd: list[str], *, cwd: Path | None = None, check: bool = True) -> s
             capture_output=True,
             text=True,
             check=False,
+            timeout=timeout,
         )
+    except subprocess.TimeoutExpired as exc:
+        raise BenchmarkError(f"command timed out after {timeout}s: {' '.join(cmd)}") from exc
     except OSError as exc:
         raise BenchmarkError(f"command failed to start: {' '.join(cmd)} ({exc})") from exc
     if check and proc.returncode != 0:
@@ -177,6 +186,19 @@ def gh_graphql_json(query: str, variables: dict[str, Any]) -> Any:
         cmd.extend(["-F", f"{key}={value}"])
     proc = run_cmd(cmd)
     return json.loads(proc.stdout)
+
+
+def decode_json_output(proc: subprocess.CompletedProcess[str], context: str) -> Any:
+    try:
+        return json.loads(proc.stdout or "")
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise BenchmarkError(
+            f"{context} returned invalid JSON\n"
+            f"command: {proc.args}\n"
+            f"returncode: {proc.returncode}\n"
+            f"stdout:\n{proc.stdout}\n"
+            f"stderr:\n{proc.stderr}"
+        ) from exc
 
 
 def fetch_pr_meta(owner_repo_name: str, pr_number: int) -> dict[str, Any]:
@@ -290,7 +312,10 @@ def run_slopgate(slug: str, worktree: WorktreeContext) -> tuple[dict[str, Any], 
     )
     if proc.returncode not in (0, 1):
         raise BenchmarkError(f"slopgate failed with code {proc.returncode}\nstderr:\n{proc.stderr}")
-    report = json.loads(proc.stdout or '{"findings":[],"summary":{"total":0,"block":0,"warn":0,"info":0}}')
+    if proc.stdout:
+        report = decode_json_output(proc, "slopgate")
+    else:
+        report = {"findings": [], "summary": {"total": 0, "block": 0, "warn": 0, "info": 0}}
     summary = report.get("summary", {})
     print(
         f"Slopgate: {summary.get('total', 0)} findings "
@@ -438,32 +463,34 @@ def collect_sentry_findings(
     findings: list[ReviewFinding] = []
 
     for project in projects:
-        issues = json.loads(
-            run_cmd(
-                [
-                    "python3",
-                    str(helper),
-                    "issues",
-                    project,
-                    "--query",
-                    query,
-                    "--stats-period",
-                    stats_period,
-                ]
-            ).stdout
+        issues_cmd = [
+            "python3",
+            str(helper),
+            "issues",
+            project,
+            "--query",
+            query,
+            "--stats-period",
+            stats_period,
+        ]
+        issues = decode_json_output(
+            run_cmd(issues_cmd),
+            f"sentry issues for project {project}",
         )
         for issue in issues:
             issue_id = str(issue.get("id", ""))
             if not issue_id:
                 continue
-            events = json.loads(run_cmd(["python3", str(helper), "events", issue_id]).stdout)
+            events_cmd = ["python3", str(helper), "events", issue_id]
+            events = decode_json_output(run_cmd(events_cmd), f"sentry events for issue {issue_id}")
             if not isinstance(events, list) or not events:
                 continue
             first_event = events[0]
             event_id = str(first_event.get("id", ""))
             if not event_id:
                 continue
-            event = json.loads(run_cmd(["python3", str(helper), "event", issue_id, event_id]).stdout)
+            event_cmd = ["python3", str(helper), "event", issue_id, event_id]
+            event = decode_json_output(run_cmd(event_cmd), f"sentry event {event_id} for issue {issue_id}")
             location: tuple[str, int] | None = None
             for raw_path, line in iter_frame_candidates(event):
                 normalized = normalize_repo_path(raw_path, repo_files)
