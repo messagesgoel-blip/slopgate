@@ -559,7 +559,7 @@ func identUsedInFile(ident string, lines []string, goMode bool, skipLineN int) b
 		if slp007IsImportLikeLine(line) {
 			continue
 		}
-		if wordInLine(line, ident) {
+		if wordInLine(stripCommentAndStrings(line), ident) {
 			return true
 		}
 	}
@@ -656,15 +656,17 @@ func (r SLP007) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		haveFileLines := d != nil
 		var fileLines []string
-		if haveFileLines {
-			fileLines, haveFileLines = slp007FileLines(d, f.Path)
-		}
+		fileLinesLoaded := false
+		haveFileLines := false
 
 		for _, imp := range imports {
 			if identUsedInAddedLines(imp.ident, added, goMode, imp.lineNo) {
 				continue
+			}
+			if !fileLinesLoaded && d != nil {
+				fileLines, haveFileLines = slp007FileLines(d, f.Path)
+				fileLinesLoaded = true
 			}
 			if haveFileLines && identUsedInFile(imp.ident, fileLines, goMode, imp.lineNo) {
 				continue

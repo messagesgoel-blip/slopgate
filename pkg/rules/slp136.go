@@ -18,18 +18,20 @@ func (SLP136) Description() string {
 	return "caught error wrapped in AppError without preserving the original cause"
 }
 
+const slp136BareSinkPrefix = `(?:^|[^A-Za-z0-9_$\.])`
+
 var (
 	slp136CatchHeader        = regexp.MustCompile(`\bcatch\s*\(\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*\)`)
 	slp136NewAppError        = regexp.MustCompile(`\bnew\s+AppError\s*\(`)
-	slp136ImmediateUse       = regexp.MustCompile(`\b(?:error|next)\s*\(|\bthrow\b|\breturn\b`)
+	slp136ImmediateUse       = regexp.MustCompile(slp136BareSinkPrefix + `(?:error|next)\s*\(|` + slp136BareSinkPrefix + `(?:throw|return)\b`)
 	slp136VarAssign          = regexp.MustCompile(`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*new\s+AppError\s*\(|\b([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*new\s+AppError\s*\(`)
 	slp136VarAssignPrefix    = regexp.MustCompile(`\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*$|\b([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*$`)
 	slp136CauseAssign        = regexp.MustCompile(`\b([A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*cause\s*=\s*([A-Za-z_$][A-Za-z0-9_$]*)\b`)
 	slp136InlineSinkPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`\bthrow\s+new\s+AppError\s*\(`),
-		regexp.MustCompile(`\breturn\s+new\s+AppError\s*\(`),
-		regexp.MustCompile(`\bnext\s*\(\s*new\s+AppError\s*\(`),
-		regexp.MustCompile(`\berror\s*\([^)]*new\s+AppError\s*\(`),
+		regexp.MustCompile(slp136BareSinkPrefix + `throw\s+new\s+AppError\s*\(`),
+		regexp.MustCompile(slp136BareSinkPrefix + `return\s+new\s+AppError\s*\(`),
+		regexp.MustCompile(slp136BareSinkPrefix + `next\s*\(\s*new\s+AppError\s*\(`),
+		regexp.MustCompile(slp136BareSinkPrefix + `error\s*\([^)]*new\s+AppError\s*\(`),
 	}
 )
 
@@ -132,10 +134,10 @@ func slp136SinkUsesVariable(line, variable string) bool {
 	}
 	quotedVar := regexp.QuoteMeta(variable)
 	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`\bthrow\s+` + quotedVar + `\s*(?:[;),}]|$)`),
-		regexp.MustCompile(`\breturn\s+` + quotedVar + `\s*(?:[;),}]|$)`),
-		regexp.MustCompile(`\bnext\s*\(\s*` + quotedVar + `\s*(?:[),}]|$)`),
-		regexp.MustCompile(`\berror\s*\([^)]*\b` + quotedVar + `\s*(?:[,);}]|$)`),
+		regexp.MustCompile(slp136BareSinkPrefix + `throw\s+` + quotedVar + `\s*(?:[;),}]|$)`),
+		regexp.MustCompile(slp136BareSinkPrefix + `return\s+` + quotedVar + `\s*(?:[;),}]|$)`),
+		regexp.MustCompile(slp136BareSinkPrefix + `next\s*\(\s*` + quotedVar + `\s*(?:[),}]|$)`),
+		regexp.MustCompile(slp136BareSinkPrefix + `error\s*\([^)]*\b` + quotedVar + `\s*(?:[,);}]|$)`),
 	}
 	for _, pattern := range patterns {
 		if pattern.MatchString(line) {
@@ -188,11 +190,55 @@ func slp136AggregateSinkText(lines []diff.Line, start int, fallback string) stri
 	return b.String()
 }
 
-func slp136SinkText(lines []diff.Line, start int, fallback string) string {
-	if !slp136ImmediateUse.MatchString(fallback) {
-		return fallback
+func slp136OpenSinkStart(lines []diff.Line, start int) int {
+	for i := start - 1; i >= 0; i-- {
+		ln := lines[i]
+		if ln.Kind == diff.LineDelete {
+			continue
+		}
+		part := strings.TrimSpace(ln.Content)
+		if part == "" {
+			continue
+		}
+		if slp136ImmediateUse.MatchString(part) && slp136SinkOpenThrough(lines, i, start) {
+			return i
+		}
+		if strings.Contains(part, ";") || strings.Contains(part, "}") {
+			return -1
+		}
 	}
-	return slp136AggregateSinkText(lines, start, fallback)
+	return -1
+}
+
+func slp136SinkOpenThrough(lines []diff.Line, begin, through int) bool {
+	depth := 0
+	sawOpen := false
+	for i := begin; i <= through && i < len(lines); i++ {
+		ln := lines[i]
+		if ln.Kind == diff.LineDelete {
+			continue
+		}
+		part := strings.TrimSpace(ln.Content)
+		if part == "" {
+			continue
+		}
+		if strings.Contains(part, "(") {
+			sawOpen = true
+		}
+		depth += strings.Count(part, "(")
+		depth -= strings.Count(part, ")")
+	}
+	return sawOpen && depth > 0
+}
+
+func slp136SinkText(lines []diff.Line, start int, fallback string) string {
+	if slp136ImmediateUse.MatchString(fallback) {
+		return slp136AggregateSinkText(lines, start, fallback)
+	}
+	if opener := slp136OpenSinkStart(lines, start); opener >= 0 {
+		return slp136AggregateSinkText(lines, opener, fallback)
+	}
+	return fallback
 }
 
 func slp136MaybeSinkWrappers(line string, wrappers map[string]*slp136PendingFinding) {
@@ -380,18 +426,6 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 						slp136FinalizePending(pending, wrappers, &observedWrappers)
 						pending = nil
 					}
-				}
-
-				if pending == nil && ln.Kind == diff.LineAdd && errName != "" && !slp136NewAppError.MatchString(trimmed) && slp136InlineAppErrorSink(sinkText) {
-					pending = &slp136PendingFinding{
-						line:      ln.NewLineNo,
-						snippet:   strings.TrimSpace(sinkText),
-						preserved: slp136PreservesCause(sinkText, causePatterns),
-						sawErrUse: observedErrUse,
-						directUse: true,
-					}
-					slp136FinalizePending(pending, wrappers, &observedWrappers)
-					pending = nil
 				}
 
 				if pending == nil && ln.Kind == diff.LineAdd && errName != "" && slp136NewAppError.MatchString(trimmed) {
