@@ -26,6 +26,17 @@ class ParseArgsTest(unittest.TestCase):
                 benchmark_review.parse_args()
 
 
+class GhApiJsonTest(unittest.TestCase):
+    def test_raises_benchmark_error_on_malformed_paginated_json(self) -> None:
+        with patch.object(
+            benchmark_review,
+            "run_cmd",
+            return_value=completed(stdout='{"bad json"\n'),
+        ):
+            with self.assertRaisesRegex(benchmark_review.BenchmarkError, "gh api returned invalid JSON"):
+                benchmark_review.gh_api_json(["repos/example/repo/pulls/20/comments", "--paginate"])
+
+
 class PrepareWorktreeTest(unittest.TestCase):
     def setUp(self) -> None:
         self.repo_root = Path("repo-root")
@@ -127,6 +138,54 @@ class PrepareWorktreeTest(unittest.TestCase):
         self.assertEqual(calls[0], ["git", "-C", "repo-root", "fetch", "origin", "main"])
         self.assertEqual(calls[1], ["git", "-C", "repo-root", "rev-parse", "--verify", "merge-sha"])
         self.assertEqual(calls[2], ["git", "-C", "repo-root", "rev-parse", "merge-sha^1"])
+
+    def test_prepare_worktree_merged_missing_merge_sha_requires_base(self) -> None:
+        pr_meta = {"base": {"ref": "main"}, "merged": True}
+
+        with patch.object(benchmark_review.tempfile, "mkdtemp", return_value=self.worktree_path), \
+            patch.object(
+                benchmark_review,
+                "run_cmd",
+                side_effect=[
+                    completed(),
+                    completed(returncode=1, stderr="no worktree"),
+                ],
+            ) as run_cmd, \
+            patch.object(benchmark_review.shutil, "rmtree") as rmtree:
+            with self.assertRaisesRegex(benchmark_review.BenchmarkError, "missing merge_commit_sha"):
+                benchmark_review.prepare_worktree(self.repo_root, pr_meta, self.pr_number, "")
+
+        calls = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(calls[0], ["git", "-C", "repo-root", "fetch", "origin", "main"])
+        self.assertIn(["git", "-C", "repo-root", "worktree", "remove", "--force", self.worktree_path], calls)
+        rmtree.assert_called_once_with(Path(self.worktree_path), ignore_errors=True)
+
+    def test_prepare_worktree_merged_missing_merge_sha_uses_pr_head_when_base_supplied(self) -> None:
+        pr_meta = {"base": {"ref": "main"}, "merged": True}
+
+        with patch.object(benchmark_review.tempfile, "mkdtemp", return_value=self.worktree_path), \
+            patch.object(benchmark_review.os, "getpid", return_value=4321), \
+            patch.object(
+                benchmark_review,
+                "run_cmd",
+                side_effect=[
+                    completed(),
+                    completed(),
+                    completed(stdout="base-sha\n"),
+                    completed(),
+                ],
+            ) as run_cmd:
+            context = benchmark_review.prepare_worktree(self.repo_root, pr_meta, self.pr_number, "feature/base")
+
+        self.assertEqual(context.target_ref, "refs/slopgate-benchmark/pr-20-4321")
+        self.assertEqual(context.compare_base, "base-sha")
+        self.assertEqual(context.mode, "merged_pr_head")
+        self.assertEqual(context.temp_ref, "refs/slopgate-benchmark/pr-20-4321")
+        calls = [call.args[0] for call in run_cmd.call_args_list]
+        self.assertEqual(calls[0], ["git", "-C", "repo-root", "fetch", "origin", "main"])
+        self.assertEqual(calls[1], ["git", "-C", "repo-root", "fetch", "origin", "refs/pull/20/head:refs/slopgate-benchmark/pr-20-4321"])
+        self.assertEqual(calls[2], ["git", "-C", "repo-root", "rev-parse", "--verify", "feature/base"])
+        self.assertEqual(calls[3], ["git", "-C", "repo-root", "worktree", "add", "--detach", self.worktree_path, "refs/slopgate-benchmark/pr-20-4321"])
 
 
 class MatchStreamTest(unittest.TestCase):

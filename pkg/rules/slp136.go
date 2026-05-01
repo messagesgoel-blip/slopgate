@@ -101,7 +101,7 @@ func slp136AssignedWrapperVarPrefix(line string) string {
 
 func slp136CatchBodyText(line string) string {
 	idx := slp136CatchHeader.FindStringIndex(line)
-	if idx == nil {
+	if idx == nil || len(idx) < 2 {
 		return line
 	}
 	return line[idx[1]:]
@@ -173,7 +173,7 @@ func slp136AppendFinding(out *[]Finding, rule SLP136, filePath string, wrapper *
 
 func slp136FlushObservedWrappers(out *[]Finding, rule SLP136, filePath string, observedWrappers []*slp136PendingFinding) {
 	for _, wrapper := range observedWrappers {
-		if wrapper == nil || !wrapper.sawSink || !wrapper.sawErrUse || wrapper.preserved {
+		if wrapper == nil || !wrapper.sawSink || wrapper.preserved {
 			continue
 		}
 		slp136AppendFinding(out, rule, filePath, wrapper)
@@ -225,6 +225,9 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 
 				if !inCatch {
 					if m := slp136CatchHeader.FindStringSubmatch(trimmed); m != nil {
+						if len(m) < 2 {
+							continue
+						}
 						inCatch = true
 						errName = m[1]
 						causePatterns = buildSlp136Patterns(errName)

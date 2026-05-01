@@ -177,7 +177,15 @@ def owner_repo(repo_root_path: Path) -> str:
 
 def gh_api_json(args: list[str]) -> Any:
     proc = run_cmd(["gh", "api", *args])
-    return parse_paginated_json(proc.stdout)
+    try:
+        return parse_paginated_json(proc.stdout)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise BenchmarkError(
+            f"gh api returned invalid JSON: {exc}\n"
+            f"command: {proc.args}\n"
+            f"stdout:\n{proc.stdout}\n"
+            f"stderr:\n{proc.stderr}"
+        ) from exc
 
 
 def gh_graphql_json(query: str, variables: dict[str, Any]) -> Any:
@@ -247,21 +255,33 @@ def prepare_worktree(repo_root_path: Path, pr_meta: dict[str, Any], pr_number: i
     try:
         if merged:
             run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", base_branch])
-            target_ref = pr_meta["merge_commit_sha"]
-            target_verify = run_cmd(
-                ["git", "-C", str(repo_root_path), "rev-parse", "--verify", target_ref],
-                check=False,
-            )
-            if target_verify.returncode != 0:
-                raise BenchmarkError(
-                    f"merged PR target ref could not be resolved locally: {target_ref}\n"
-                    f"stderr:\n{target_verify.stderr}"
+            target_ref = pr_meta.get("merge_commit_sha") or ""
+            if target_ref:
+                target_verify = run_cmd(
+                    ["git", "-C", str(repo_root_path), "rev-parse", "--verify", target_ref],
+                    check=False,
                 )
-            if requested_base:
+                if target_verify.returncode != 0:
+                    raise BenchmarkError(
+                        f"merged PR target ref could not be resolved locally: {target_ref}\n"
+                        f"stderr:\n{target_verify.stderr}"
+                    )
+                if requested_base:
+                    compare_base = resolved_compare_base()
+                else:
+                    compare_base = run_cmd(["git", "-C", str(repo_root_path), "rev-parse", f"{target_ref}^1"]).stdout.strip()
+                mode = "merged_pr"
+            elif requested_base:
+                temp_ref = f"refs/slopgate-benchmark/pr-{pr_number}-{os.getpid()}"
+                run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", f"refs/pull/{pr_number}/head:{temp_ref}"])
+                target_ref = temp_ref
                 compare_base = resolved_compare_base()
+                mode = "merged_pr_head"
             else:
-                compare_base = run_cmd(["git", "-C", str(repo_root_path), "rev-parse", f"{target_ref}^1"]).stdout.strip()
-            mode = "merged_pr"
+                raise BenchmarkError(
+                    "merged PR metadata is missing merge_commit_sha; rerun with --base "
+                    "so the benchmark can compare the PR head against an explicit base"
+                )
         else:
             temp_ref = f"refs/slopgate-benchmark/pr-{pr_number}-{os.getpid()}"
             run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", f"refs/pull/{pr_number}/head:{temp_ref}"])

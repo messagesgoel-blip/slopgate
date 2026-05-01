@@ -42,7 +42,7 @@ func TestSLP136_DoesNotLeakPastBalancedSingleLineCatch(t *testing.T) {
 	assertFindings(t, SLP136{}.Check(d), 0, "SLP136", SeverityWarn)
 }
 
-func TestSLP136_DoesNotTreatCatchHeaderAsErrorUse(t *testing.T) {
+func TestSLP136_FiresWhenCaughtErrorIsNotReferencedExplicitly(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api/src/routes/files.js b/api/src/routes/files.js
 --- a/api/src/routes/files.js
 +++ b/api/src/routes/files.js
@@ -53,7 +53,7 @@ func TestSLP136_DoesNotTreatCatchHeaderAsErrorUse(t *testing.T) {
 +  }
  }
 `)
-	assertFindings(t, SLP136{}.Check(d), 0, "SLP136", SeverityWarn)
+	assertFindings(t, SLP136{}.Check(d), 1, "SLP136", SeverityWarn)
 }
 
 func TestSLP136_IgnoresCauseFieldInConstructor(t *testing.T) {
