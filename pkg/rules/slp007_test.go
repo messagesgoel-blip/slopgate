@@ -2,6 +2,7 @@ package rules
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -303,6 +304,63 @@ export function SettingsPage() {
 	got := SLP007{}.Check(d)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding when repo file resolves through symlink escape, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_UsesSnapshotRefInsteadOfLiveWorktree(t *testing.T) {
+	root := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v failed: %v\n%s", args, err, string(out))
+		}
+	}
+
+	runGit("init")
+	runGit("config", "user.email", "test@example.com")
+	runGit("config", "user.name", "Test User")
+
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	headContent := `import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return <User className="icon" />;
+}
+`
+	if err := os.WriteFile(target, []byte(headContent), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	runGit("add", "src/page.tsx")
+	runGit("commit", "-m", "seed")
+
+	worktreeContent := `import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return null;
+}
+`
+	if err := os.WriteFile(target, []byte(worktreeContent), 0o600); err != nil {
+		t.Fatalf("rewrite worktree file: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return <User className="icon" />;
+`)
+	d.SnapshotWorktree = false
+	d.SnapshotRef = "HEAD"
+	got := SLP007{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when snapshot ref still contains usage, got %d: %+v", len(got), got)
 	}
 }
 

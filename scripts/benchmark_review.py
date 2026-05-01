@@ -178,22 +178,34 @@ def fetch_pr_meta(owner_repo_name: str, pr_number: int) -> dict[str, Any]:
 
 
 def prepare_worktree(repo_root_path: Path, pr_meta: dict[str, Any], pr_number: int, requested_base: str) -> WorktreeContext:
-    base_branch = requested_base or pr_meta["base"]["ref"]
+    base_branch = pr_meta["base"]["ref"]
     merged = bool(pr_meta.get("merged"))
     worktree_path = Path(tempfile.mkdtemp(prefix=f"slopgate-benchmark-{pr_number}-"))
 
-    if merged:
+    def resolved_compare_base() -> str:
+        if requested_base:
+            verify_proc = run_cmd(
+                ["git", "-C", str(repo_root_path), "rev-parse", "--verify", requested_base],
+                check=False,
+            )
+            if verify_proc.returncode == 0:
+                return requested_base
         run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", base_branch])
+        return f"origin/{base_branch}"
+
+    if merged:
         target_ref = pr_meta["merge_commit_sha"]
-        compare_base = run_cmd(["git", "-C", str(repo_root_path), "rev-parse", f"{target_ref}^1"]).stdout.strip()
+        if requested_base:
+            compare_base = resolved_compare_base()
+        else:
+            compare_base = run_cmd(["git", "-C", str(repo_root_path), "rev-parse", f"{target_ref}^1"]).stdout.strip()
         mode = "merged_pr"
         temp_ref = None
     else:
         temp_ref = f"refs/slopgate-benchmark/pr-{pr_number}-{os.getpid()}"
         run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", f"refs/pull/{pr_number}/head:{temp_ref}"])
-        run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", base_branch])
         target_ref = temp_ref
-        compare_base = f"origin/{base_branch}"
+        compare_base = resolved_compare_base()
         mode = "open_pr_head"
 
     run_cmd(["git", "-C", str(repo_root_path), "worktree", "add", "--detach", str(worktree_path), target_ref])
@@ -532,7 +544,9 @@ def combine_streams_by_location(streams: list[ReviewFinding]) -> list[ReviewFind
 def main() -> int:
     args = parse_args()
     if not os.environ.get("GH_TOKEN"):
-        raise BenchmarkError("GH_TOKEN not set")
+        auth_proc = run_cmd(["gh", "auth", "status"], check=False)
+        if auth_proc.returncode != 0:
+            raise BenchmarkError("GH_TOKEN not set and gh is not authenticated")
 
     requested_base = args.base_opt or args.base_ref
     root = repo_root(args.repo_path)
@@ -621,7 +635,9 @@ def main() -> int:
     default_output_path = Path(tempfile.gettempdir()) / f"benchmark-{slug.replace('/', '-')}-{args.pr_number}.json"
     output_path = args.output or str(default_output_path)
     payload = json.dumps(result, indent=2)
-    Path(output_path).write_text(payload + "\n", encoding="utf-8")
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    output_file.write_text(payload + "\n", encoding="utf-8")
     print(f"JSON report: {output_path}", file=sys.stderr)
     return 0
 

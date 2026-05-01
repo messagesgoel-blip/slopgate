@@ -2,7 +2,6 @@ package rules
 
 import (
 	"io/fs"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -106,18 +105,30 @@ func slpRepoJSFiles(d *diff.Diff) ([]string, error) {
 }
 
 func slpReadRepoFile(d *diff.Diff, relPath string) (string, bool) {
-	if d == nil || d.RepoRoot == "" {
-		return "", false
+	return slp007FileContent(d, relPath)
+}
+
+func slp137HasAddedPositivePriorityBotCalls(d *diff.Diff) bool {
+	if d == nil {
+		return false
 	}
-	resolved, ok := slp007ResolveFile(d.RepoRoot, relPath)
-	if !ok {
-		return "", false
+	for _, f := range d.Files {
+		if f.IsDelete || isDocFile(f.Path) || isTestFile(f.Path) || !isJSOrTSFile(f.Path) {
+			continue
+		}
+		for _, h := range f.Hunks {
+			for i, ln := range h.Lines {
+				if ln.Kind != diff.LineAdd || !slp137PositivePriorityLine.MatchString(ln.Content) {
+					continue
+				}
+				window := slpWindowText(h.Lines, i, 8, 2)
+				if slp137QueueAdd.MatchString(window) && slp137BotJobPattern.MatchString(window) {
+					return true
+				}
+			}
+		}
 	}
-	content, err := os.ReadFile(resolved) // #nosec G304 -- resolved path is constrained to repo root by slp007ResolveFile.
-	if err != nil {
-		return "", false
-	}
-	return string(content), true
+	return false
 }
 
 func slp137HasUnprioritizedBotCalls(d *diff.Diff) bool {
@@ -149,6 +160,9 @@ func slp137HasUnprioritizedBotCalls(d *diff.Diff) bool {
 }
 
 func (r SLP137) Check(d *diff.Diff) []Finding {
+	if !slp137HasAddedPositivePriorityBotCalls(d) {
+		return nil
+	}
 	if !slp137HasUnprioritizedBotCalls(d) {
 		return nil
 	}
@@ -214,14 +228,36 @@ func (r SLP138) Check(d *diff.Diff) []Finding {
 }
 
 func slp139HasRawS3Sibling(d *diff.Diff, excludePath string) bool {
-	files, err := slpRepoJSFiles(d)
-	if err != nil {
-		return false
+	rawPaths := slp139RawS3Paths(d)
+	return slp139HasRawS3SiblingIn(rawPaths, excludePath)
+}
+
+func slp139CandidatePaths(d *diff.Diff) map[string]bool {
+	candidates := map[string]bool{}
+	if d == nil {
+		return candidates
 	}
-	for _, relPath := range files {
-		if relPath == excludePath {
+	for _, f := range d.Files {
+		if f.IsDelete || isDocFile(f.Path) || isTestFile(f.Path) || !isJSOrTSFile(f.Path) {
 			continue
 		}
+		for _, ln := range f.AddedLines() {
+			if slp139HardeningHook.MatchString(ln.Content) {
+				candidates[f.Path] = true
+				break
+			}
+		}
+	}
+	return candidates
+}
+
+func slp139RawS3Paths(d *diff.Diff) map[string]bool {
+	rawPaths := map[string]bool{}
+	files, err := slpRepoJSFiles(d)
+	if err != nil {
+		return rawPaths
+	}
+	for _, relPath := range files {
 		content, ok := slpReadRepoFile(d, relPath)
 		if !ok {
 			continue
@@ -229,18 +265,36 @@ func slp139HasRawS3Sibling(d *diff.Diff, excludePath string) bool {
 		if !slp139RawS3Client.MatchString(content) || !slp139RawCredParse.MatchString(content) {
 			continue
 		}
-		return true
+		rawPaths[relPath] = true
+	}
+	return rawPaths
+}
+
+func slp139HasRawS3SiblingIn(rawPaths map[string]bool, excludePath string) bool {
+	for relPath := range rawPaths {
+		if relPath != excludePath {
+			return true
+		}
 	}
 	return false
 }
 
 func (r SLP139) Check(d *diff.Diff) []Finding {
+	candidates := slp139CandidatePaths(d)
+	if len(candidates) == 0 {
+		return nil
+	}
+	rawPaths := slp139RawS3Paths(d)
+	if len(rawPaths) == 0 {
+		return nil
+	}
+
 	var out []Finding
 	for _, f := range d.Files {
 		if f.IsDelete || isDocFile(f.Path) || isTestFile(f.Path) || !isJSOrTSFile(f.Path) {
 			continue
 		}
-		if !slp139HasRawS3Sibling(d, f.Path) {
+		if !candidates[f.Path] || !slp139HasRawS3SiblingIn(rawPaths, f.Path) {
 			continue
 		}
 		for _, ln := range f.AddedLines() {

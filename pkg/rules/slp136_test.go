@@ -81,3 +81,37 @@ func TestSLP136_FiresOnUnrelatedCauseField(t *testing.T) {
 `)
 	assertFindings(t, SLP136{}.Check(d), 1, "SLP136", SeverityWarn)
 }
+
+func TestSLP136_FiresWhenWrappedVariableHitsSinkWithoutCause(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/routes/files.js b/api/src/routes/files.js
+--- a/api/src/routes/files.js
++++ b/api/src/routes/files.js
+@@ -1,3 +1,9 @@
+ async function handler(req, res) {
++  } catch (err) {
++    logger.error({ err }, "folder-stats failed");
++    const appErr = new AppError(CODES.INTERNAL, "internal server error");
++    error(res, appErr);
++  }
+ }
+`)
+	assertFindings(t, SLP136{}.Check(d), 1, "SLP136", SeverityWarn)
+}
+
+func TestSLP136_PreservationDoesNotLeakAcrossMultipleWrappers(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/routes/files.js b/api/src/routes/files.js
+--- a/api/src/routes/files.js
++++ b/api/src/routes/files.js
+@@ -1,3 +1,12 @@
+ async function handler(req, res) {
++  } catch (err) {
++    logger.error({ err }, "folder-stats failed");
++    const preservedErr = new AppError(CODES.INTERNAL, "internal server error");
++    preservedErr.cause = err;
++    const appErr = new AppError(CODES.INTERNAL, "internal server error");
++    error(res, appErr);
++  }
+ }
+`)
+	assertFindings(t, SLP136{}.Check(d), 1, "SLP136", SeverityWarn)
+}

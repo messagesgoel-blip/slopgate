@@ -3,6 +3,7 @@ package rules
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -434,12 +435,8 @@ func slp007ResolveFile(repoRoot, relPath string) (string, bool) {
 	if repoRoot == "" {
 		return "", false
 	}
-	if filepath.IsAbs(filepath.FromSlash(relPath)) {
-		return "", false
-	}
-
-	cleanSlash := path.Clean(strings.ReplaceAll(relPath, "\\", "/"))
-	if cleanSlash == "." || cleanSlash == ".." || strings.HasPrefix(cleanSlash, "../") {
+	cleanSlash, ok := slp007CleanRelativePath(relPath)
+	if !ok {
 		return "", false
 	}
 
@@ -466,19 +463,56 @@ func slp007ResolveFile(repoRoot, relPath string) (string, bool) {
 	return targetEval, true
 }
 
-func slp007FileLines(d *diff.Diff, relPath string) ([]string, bool) {
-	if d == nil || d.RepoRoot == "" {
-		return nil, false
+func slp007CleanRelativePath(relPath string) (string, bool) {
+	if filepath.IsAbs(filepath.FromSlash(relPath)) {
+		return "", false
 	}
-	resolved, ok := slp007ResolveFile(d.RepoRoot, relPath)
+	cleanSlash := path.Clean(strings.ReplaceAll(relPath, "\\", "/"))
+	if cleanSlash == "." || cleanSlash == ".." || strings.HasPrefix(cleanSlash, "../") {
+		return "", false
+	}
+	return cleanSlash, true
+}
+
+func slp007FileContent(d *diff.Diff, relPath string) (string, bool) {
+	if d == nil || d.RepoRoot == "" {
+		return "", false
+	}
+	if d.SnapshotWorktree {
+		resolved, ok := slp007ResolveFile(d.RepoRoot, relPath)
+		if !ok {
+			return "", false
+		}
+		content, err := os.ReadFile(resolved) // #nosec G304 -- path is constrained to the repo root above.
+		if err != nil {
+			return "", false
+		}
+		return string(content), true
+	}
+	if d.SnapshotRef == "" {
+		return "", false
+	}
+	cleanSlash, ok := slp007CleanRelativePath(relPath)
+	if !ok {
+		return "", false
+	}
+	spec := d.SnapshotRef + ":" + cleanSlash
+	if d.SnapshotRef == ":" {
+		spec = ":" + cleanSlash
+	}
+	out, err := exec.Command("git", "-C", d.RepoRoot, "show", spec).Output()
+	if err != nil {
+		return "", false
+	}
+	return string(out), true
+}
+
+func slp007FileLines(d *diff.Diff, relPath string) ([]string, bool) {
+	content, ok := slp007FileContent(d, relPath)
 	if !ok {
 		return nil, false
 	}
-	content, err := os.ReadFile(resolved) // #nosec G304 -- path is constrained to the repo root above.
-	if err != nil {
-		return nil, false
-	}
-	return strings.Split(string(content), "\n"), true
+	return strings.Split(content, "\n"), true
 }
 
 func identUsedInFile(ident string, lines []string, goMode bool, skipLineN int) bool {

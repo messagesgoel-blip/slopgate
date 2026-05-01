@@ -18,7 +18,13 @@ func FilterIgnored(d *Diff, patterns []string) *Diff {
 	if len(patterns) == 0 || d == nil {
 		return d
 	}
-	out := &Diff{Files: make([]File, 0, len(d.Files)), RepoRoot: d.RepoRoot, Staged: d.Staged}
+	out := &Diff{
+		Files:            make([]File, 0, len(d.Files)),
+		RepoRoot:         d.RepoRoot,
+		Staged:           d.Staged,
+		SnapshotRef:      d.SnapshotRef,
+		SnapshotWorktree: d.SnapshotWorktree,
+	}
 	for _, f := range d.Files {
 		if matchesAny(f.Path, patterns) {
 			continue

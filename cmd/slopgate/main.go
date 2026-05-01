@@ -111,6 +111,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		parsed.RepoRoot = root
 	}
 	parsed.Staged = staged
+	if staged {
+		parsed.SnapshotRef = ":"
+	} else if base != "" {
+		parsed.SnapshotRef = "HEAD"
+	} else {
+		parsed.SnapshotWorktree = true
+	}
 
 	// Apply .slopgateignore if present at the repo root.
 	ignorePatterns, err := loadIgnorePatterns(repoDir)
