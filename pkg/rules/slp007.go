@@ -2,6 +2,9 @@ package rules
 
 import (
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -239,14 +242,23 @@ func parseJSImports(added []diff.Line) []importInfo {
 // for aliases, X otherwise).
 func parseJSNamedItems(braces string) []string {
 	var items []string
-	for _, m := range slp007JSNamedItem.FindAllStringSubmatch(braces, -1) {
+	for _, item := range strings.Split(braces, ",") {
+		item = strings.TrimSpace(item)
+		item = strings.TrimPrefix(item, "type ")
+		if item == "" {
+			continue
+		}
+		m := slp007JSNamedItem.FindStringSubmatch(item)
+		if m == nil {
+			continue
+		}
 		name := m[1]
 		alias := m[2]
 		if alias != "" {
 			items = append(items, alias)
-		} else {
-			items = append(items, name)
+			continue
 		}
+		items = append(items, name)
 	}
 	return items
 }
@@ -418,6 +430,76 @@ func identUsedInAddedLines(ident string, added []diff.Line, goMode bool, skipLin
 	return false
 }
 
+func slp007ResolveFile(repoRoot, relPath string) (string, bool) {
+	if repoRoot == "" {
+		return "", false
+	}
+	if filepath.IsAbs(filepath.FromSlash(relPath)) {
+		return "", false
+	}
+
+	cleanSlash := path.Clean(strings.ReplaceAll(relPath, "\\", "/"))
+	if cleanSlash == "." || cleanSlash == ".." || strings.HasPrefix(cleanSlash, "../") {
+		return "", false
+	}
+
+	rootAbs, err := filepath.Abs(repoRoot)
+	if err != nil {
+		return "", false
+	}
+	targetAbs, err := filepath.Abs(filepath.Join(rootAbs, filepath.FromSlash(cleanSlash)))
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(rootAbs, targetAbs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return targetAbs, true
+}
+
+func slp007FileLines(d *diff.Diff, relPath string) ([]string, bool) {
+	if d == nil || d.RepoRoot == "" {
+		return nil, false
+	}
+	resolved, ok := slp007ResolveFile(d.RepoRoot, relPath)
+	if !ok {
+		return nil, false
+	}
+	content, err := os.ReadFile(resolved) // #nosec G304 -- path is constrained to the repo root above.
+	if err != nil {
+		return nil, false
+	}
+	return strings.Split(string(content), "\n"), true
+}
+
+func identUsedInFile(ident string, lines []string, goMode bool, skipLineN int) bool {
+	if len(lines) == 0 {
+		return false
+	}
+
+	var searchPat string
+	if goMode {
+		searchPat = ident + "."
+	}
+
+	for i, line := range lines {
+		if i+1 == skipLineN {
+			continue
+		}
+		if goMode {
+			if strings.Contains(line, searchPat) {
+				return true
+			}
+			continue
+		}
+		if wordInLine(line, ident) {
+			return true
+		}
+	}
+	return false
+}
+
 // wordInLine reports whether the given word appears as a whole word in the
 // line content. This prevents false positives like "Stateful" matching
 // "State".
@@ -492,8 +574,13 @@ func (r SLP007) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
+		fileLines, haveFileLines := slp007FileLines(d, f.Path)
+
 		for _, imp := range imports {
 			if identUsedInAddedLines(imp.ident, added, goMode, imp.lineNo) {
+				continue
+			}
+			if haveFileLines && identUsedInFile(imp.ident, fileLines, goMode, imp.lineNo) {
 				continue
 			}
 

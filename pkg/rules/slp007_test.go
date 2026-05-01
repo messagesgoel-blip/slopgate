@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -191,6 +193,51 @@ func TestSLP007_GoLastPathSegmentUnused(t *testing.T) {
 	}
 	if !strings.Contains(got[0].Message, "json") {
 		t.Errorf("message should mention json: %q", got[0].Message)
+	}
+}
+
+func TestSLP007_JSNamedImportTypeModifierIgnored(t *testing.T) {
+	d := parseDiff(t, `diff --git a/app.tsx b/app.tsx
+--- a/app.tsx
++++ b/app.tsx
+@@ -1,1 +1,4 @@
+ // app
++import { type Page, render } from 'pkg';
++export function App(page: Page) { return render(page.title); }
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for TS type modifier, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_UsesCurrentFileWhenRepoRootAvailable(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	content := `import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return <User className="icon" />;
+}
+`
+	if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return <User className="icon" />;
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when import is used in current file, got %d: %+v", len(got), got)
 	}
 }
 

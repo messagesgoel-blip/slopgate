@@ -213,6 +213,26 @@ func TestSLP017_MagicNumber(t *testing.T) {
 			want: 0,
 		},
 		{
+			name: "length validation bound not flagged",
+			diff: `diff --git a/api.js b/api.js
+--- a/api.js
++++ b/api.js
+@@ -1,2 +1,3 @@
++if (prefix !== undefined && prefix.length > 1024) throw new Error("too long")
+`,
+			want: 0,
+		},
+		{
+			name: "descriptive measurement field not flagged",
+			diff: `diff --git a/ui.tsx b/ui.tsx
+--- a/ui.tsx
++++ b/ui.tsx
+@@ -1,2 +1,4 @@
++const particle = { count: 80, width: 12, height: 18, duration: 1.4 }
+`,
+			want: 0,
+		},
+		{
 			name: "non-standard number still flagged",
 			diff: `diff --git a/tax.js b/tax.js
 --- a/tax.js

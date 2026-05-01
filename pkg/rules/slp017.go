@@ -46,6 +46,11 @@ var slp017HTTPStatusContext = regexp.MustCompile(`(?i)\.status\s*\(|status\s*[=:
 // If line contains LIMIT, limit, pageSize, batch, etc., treat common limits as intentional.
 var slp017LimitContext = regexp.MustCompile(`(?i)LIMIT\s+\d|limit\s*[=:]\s*\d|pageSize|page_size|batchSize|batch_size|max.*=.*\d|take\s*\(\s*\d|top\s*\d|first\s*\d|\.limit\s*\(`)
 
+// slp017MeasurementContext matches descriptive size/duration/validation fields.
+// These literals are usually schema bounds, UI geometry, or timing knobs already
+// covered better by more specific rules than generic magic-number detection.
+var slp017MeasurementContext = regexp.MustCompile(`(?i)\b(?:len|length|width|height|size|depth|count|duration|delay|timeout|ttl|retry|retries|interval|capacity|buffer|chunk|offset|page|concurrency|radius|opacity)\b|\.length\b|\b(?:max|min)(?:imum)?[A-Z_]|(?:^|[^\w])(?:max|min)(?:[A-Z_]|[a-z])`)
+
 // slp017HexOctal matches hex (0x...) or octal (0o...) literals.
 var slp017HexOctal = regexp.MustCompile(`0[xXoO][\da-fA-F]+`)
 
@@ -97,6 +102,10 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 			isHTTPContext := slp017HTTPStatusContext.MatchString(clean)
 			// Check for limit/batch context — exempt common limits.
 			isLimitContext := slp017LimitContext.MatchString(clean)
+			// Exempt descriptive measurement/validation contexts.
+			if slp017MeasurementContext.MatchString(clean) {
+				continue
+			}
 
 			for _, m := range slp017Number.FindAllStringSubmatch(clean, -1) {
 				num := m[1]

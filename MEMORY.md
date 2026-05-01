@@ -21,6 +21,7 @@ This file tracks key information about the slopgate project for future agent ses
 - **Maturity threshold**: 80% overlap to consider replacing CodeRabbit
 - **Gap analysis**: slopgate catches syntactic patterns; CodeRabbit catches semantic/logic bugs
 - **Benchmark archive**: `/srv/storage/shared/slopgate-benchmarks/`
+- **Benchmark v2**: `scripts/benchmark_review.py` and the shared `run-slopgate-benchmark` wrapper now benchmark in an isolated worktree, score open PRs against the real PR head, and emit legacy/all-comments plus actionable/Sentry-aware overlap metrics.
 
 ## Rule Categories
 
@@ -57,8 +58,10 @@ This file tracks key information about the slopgate project for future agent ses
 
 ## Benchmark Scripts
 
-- `/srv/storage/shared/agent-toolkit/bin/run-slopgate-benchmark` - Universal runner
-- `/srv/storage/shared/agent-toolkit/bin/benchmark-aggregator` - Collects results
+- `scripts/benchmark_review.py` - Canonical benchmark implementation
+- `scripts/benchmark-coderabbit.sh` - Thin local wrapper around the canonical implementation
+- `/srv/storage/shared/agent-toolkit/bin/run-slopgate-benchmark` - Shared wrapper that delegates to the canonical implementation
+- `/srv/storage/shared/agent-toolkit/bin/benchmark-aggregator` - Collects legacy plus actionable/Sentry-aware benchmark totals
 
 ## Development Workflow
 

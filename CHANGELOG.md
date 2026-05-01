@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.0.17 (2026-05-01)
+
+Benchmark v2 plus 4 new parity rules:
+
+- Benchmarking now uses isolated worktrees, benchmarks open PRs against real PR heads, and reports legacy/all-comments plus actionable/Sentry-aware overlap.
+- **SLP137**: Bot queue uses mixed explicit/default BullMQ priority across sibling call sites
+- **SLP138**: Provider call forwards token auth but drops available creds/credentials context
+- **SLP139**: S3 hardening helper added but sibling call sites still parse raw credential blobs
+- **SLP140**: Credential hardening helper is called on generic token input without JSON/provider guard
+
+Total: 136 rules
+
+## v0.0.16 (2026-05-01)
+
+Noise tuning plus one new Sentry-aligned parity rule:
+
+- Tuned **SLP007** to reuse current-file context when available and to ignore TypeScript `type` import modifiers.
+- Tuned **SLP017** to stop flagging descriptive size/duration/validation literals already better covered by specialized rules.
+- Tuned **SLP019** to ignore multiline `return` / `throw` / cleanup-callback expressions instead of mislabeling them as unreachable code.
+- Tuned **SLP068** to skip test files and collapse overlapping duplicate-window spam into one finding.
+- **SLP136**: Caught error wrapped in `AppError` without preserving the original cause
+
+Total: 132 rules
 ## v0.0.15 (2026-04-30)
 
 Noise tuning plus 8 new mechanical CodeRabbit parity rules:
