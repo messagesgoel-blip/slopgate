@@ -192,7 +192,7 @@ def prepare_worktree(repo_root_path: Path, pr_meta: dict[str, Any], pr_number: i
                 check=False,
             )
             if verify_proc.returncode == 0:
-                return requested_base
+                return verify_proc.stdout.strip()
             fetch_proc = run_cmd(
                 ["git", "-C", str(repo_root_path), "fetch", "origin", requested_base],
                 check=False,
@@ -203,17 +203,27 @@ def prepare_worktree(repo_root_path: Path, pr_meta: dict[str, Any], pr_number: i
                 check=False,
             )
             if fetch_proc.returncode == 0 and remote_verify.returncode == 0:
-                return remote_ref
+                return remote_verify.stdout.strip()
             raise BenchmarkError(
                 f"requested base could not be resolved: {requested_base}\n"
                 f"fetch stderr:\n{fetch_proc.stderr}\n"
                 f"verify stderr:\n{remote_verify.stderr}"
             )
         run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", base_branch])
-        return f"origin/{base_branch}"
+        return run_cmd(["git", "-C", str(repo_root_path), "rev-parse", "--verify", f"origin/{base_branch}"]).stdout.strip()
 
     if merged:
+        run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", base_branch])
         target_ref = pr_meta["merge_commit_sha"]
+        target_verify = run_cmd(
+            ["git", "-C", str(repo_root_path), "rev-parse", "--verify", target_ref],
+            check=False,
+        )
+        if target_verify.returncode != 0:
+            raise BenchmarkError(
+                f"merged PR target ref could not be resolved locally: {target_ref}\n"
+                f"stderr:\n{target_verify.stderr}"
+            )
         if requested_base:
             compare_base = resolved_compare_base()
         else:

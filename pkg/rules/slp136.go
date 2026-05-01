@@ -32,6 +32,7 @@ type slp136PendingFinding struct {
 	snippet   string
 	depth     int
 	preserved bool
+	sawErrUse bool
 	variable  string
 	directUse bool
 }
@@ -108,7 +109,7 @@ func slp136MaybeSinkWrappers(line string, wrappers map[string]*slp136PendingFind
 		if !wordInLine(line, variable) {
 			continue
 		}
-		if !wrapper.preserved {
+		if wrapper.sawErrUse && !wrapper.preserved {
 			*out = append(*out, Finding{
 				RuleID:   rule.ID(),
 				Severity: rule.DefaultSeverity(),
@@ -127,7 +128,7 @@ func slp136FinalizePending(out *[]Finding, rule SLP136, filePath string, wrapper
 		return
 	}
 	if wrapper.directUse {
-		if !wrapper.preserved {
+		if wrapper.sawErrUse && !wrapper.preserved {
 			*out = append(*out, Finding{
 				RuleID:   rule.ID(),
 				Severity: rule.DefaultSeverity(),
@@ -171,6 +172,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 				}
 				content := ln.Content
 				trimmed := strings.TrimSpace(content)
+				skipCatchDepthUpdate := false
 
 				if !inCatch {
 					if m := slp136CatchHeader.FindStringSubmatch(trimmed); m != nil {
@@ -182,19 +184,41 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 							catchSub = content[idx:]
 						}
 						catchDepth = strings.Count(catchSub, "{") - strings.Count(catchSub, "}")
-						if catchDepth <= 0 {
-							catchDepth = 1
-						}
+						bodyText := slp136CatchBodyText(catchSub)
+						content = bodyText
+						trimmed = strings.TrimSpace(bodyText)
 						observedErrUse = false
-						if slp136MentionsCaughtError(slp136CatchBodyText(trimmed), errName) {
+						if slp136MentionsCaughtError(trimmed, errName) {
 							observedErrUse = true
 						}
+						if trimmed == "" {
+							if catchDepth <= 0 {
+								inCatch = false
+								catchDepth = 0
+								errName = ""
+								causePatterns = nil
+								observedErrUse = false
+								pending = nil
+								clear(wrappers)
+								lastAssignedVar = ""
+							}
+							continue
+						}
+						skipCatchDepthUpdate = true
+					} else {
+						continue
 					}
-					continue
 				}
 
-				if errName != "" && slp136MentionsCaughtError(trimmed, errName) {
+				mentionedErr := errName != "" && slp136MentionsCaughtError(trimmed, errName)
+				if mentionedErr {
 					observedErrUse = true
+					if pending != nil {
+						pending.sawErrUse = true
+					}
+					for _, wrapper := range wrappers {
+						wrapper.sawErrUse = true
+					}
 				}
 
 				if pending != nil {
@@ -208,7 +232,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 					}
 				}
 
-				if pending == nil && ln.Kind == diff.LineAdd && errName != "" && observedErrUse &&
+				if pending == nil && ln.Kind == diff.LineAdd && errName != "" &&
 					slp136NewAppError.MatchString(trimmed) {
 					variable := slp136AssignedWrapperVar(trimmed)
 					if variable == "" {
@@ -224,6 +248,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 						snippet:   strings.TrimSpace(ln.Content),
 						depth:     depth,
 						preserved: slp136PreservesCause(trimmed, causePatterns),
+						sawErrUse: observedErrUse,
 						variable:  variable,
 						directUse: directUse,
 					}
@@ -247,8 +272,10 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 				}
 
 			catchDepthUpdate:
-				catchDepth += strings.Count(content, "{")
-				catchDepth -= strings.Count(content, "}")
+				if !skipCatchDepthUpdate {
+					catchDepth += strings.Count(content, "{")
+					catchDepth -= strings.Count(content, "}")
+				}
 				if catchDepth <= 0 {
 					if pending != nil {
 						slp136FinalizePending(&out, r, f.Path, pending, wrappers)
