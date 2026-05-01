@@ -25,8 +25,35 @@ var (
 	slp136ImmediateUse = regexp.MustCompile(`\b(?:error|next)\s*\(|\bthrow\b|\breturn\b`)
 )
 
+type slp136PendingFinding struct {
+	line    int
+	snippet string
+	depth   int
+}
+
 func slp136MentionsCaughtError(line, errName string) bool {
 	return wordInLine(line, errName)
+}
+
+func slp136PreservesCause(line, errName string) bool {
+	if errName == "" {
+		return false
+	}
+	quotedErrName := regexp.QuoteMeta(errName)
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`\bcause\s*:\s*` + quotedErrName + `\b`),
+		regexp.MustCompile(`\b[A-Za-z_$][A-Za-z0-9_$]*\s*\.\s*cause\s*=\s*` + quotedErrName + `\b`),
+	}
+	for _, pattern := range patterns {
+		if pattern.MatchString(line) {
+			return true
+		}
+	}
+	return false
+}
+
+func slp136ExpressionDepthDelta(line string) int {
+	return strings.Count(line, "(") + strings.Count(line, "{") - strings.Count(line, ")") - strings.Count(line, "}")
 }
 
 func (r SLP136) Check(d *diff.Diff) []Finding {
@@ -42,6 +69,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 			errName := ""
 			observedErrUse := false
 			causePreserved := false
+			var pending *slp136PendingFinding
 
 			reset := func() {
 				inCatch = false
@@ -49,6 +77,7 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 				errName = ""
 				observedErrUse = false
 				causePreserved = false
+				pending = nil
 			}
 
 			for _, ln := range h.Lines {
@@ -82,14 +111,36 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 				if errName != "" && slp136MentionsCaughtError(trimmed, errName) {
 					observedErrUse = true
 				}
-				if errName != "" && (slp136CauseField.MatchString(trimmed) || regexp.MustCompile(`\b`+regexp.QuoteMeta(errName)+`\s*\.\s*cause\s*=`).MatchString(trimmed)) {
+				if errName != "" && slp136PreservesCause(trimmed, errName) {
 					causePreserved = true
 				}
 
-				if ln.Kind == diff.LineAdd && errName != "" && observedErrUse && !causePreserved &&
+				if pending != nil {
+					pending.depth += slp136ExpressionDepthDelta(content)
+					if pending.depth <= 0 {
+						if !causePreserved {
+							out = append(out, Finding{
+								RuleID:   r.ID(),
+								Severity: r.DefaultSeverity(),
+								File:     f.Path,
+								Line:     pending.line,
+								Message:  "caught error is wrapped in AppError without preserving cause — attach the original error for diagnostics",
+								Snippet:  pending.snippet,
+							})
+						}
+						pending = nil
+					}
+				}
+
+				if pending == nil && ln.Kind == diff.LineAdd && errName != "" && observedErrUse && !causePreserved &&
 					slp136NewAppError.MatchString(trimmed) && slp136ImmediateUse.MatchString(trimmed) {
-					if slp136CauseField.MatchString(trimmed) {
-						causePreserved = true
+					depth := slp136ExpressionDepthDelta(content)
+					if depth > 0 {
+						pending = &slp136PendingFinding{
+							line:    ln.NewLineNo,
+							snippet: strings.TrimSpace(ln.Content),
+							depth:   depth,
+						}
 					} else {
 						out = append(out, Finding{
 							RuleID:   r.ID(),
@@ -105,6 +156,16 @@ func (r SLP136) Check(d *diff.Diff) []Finding {
 				catchDepth += strings.Count(content, "{")
 				catchDepth -= strings.Count(content, "}")
 				if catchDepth <= 0 {
+					if pending != nil && !causePreserved {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     pending.line,
+							Message:  "caught error is wrapped in AppError without preserving cause — attach the original error for diagnostics",
+							Snippet:  pending.snippet,
+						})
+					}
 					reset()
 				}
 			}

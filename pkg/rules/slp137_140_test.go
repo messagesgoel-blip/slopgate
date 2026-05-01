@@ -9,13 +9,13 @@ import (
 func TestSLP137_FiresOnMixedBotPriorityAcrossRepo(t *testing.T) {
 	root := t.TempDir()
 	oldFile := filepath.Join(root, "api/src/workers/botFetch.js")
-	if err := os.MkdirAll(filepath.Dir(oldFile), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(oldFile), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	if err := os.WriteFile(oldFile, []byte(`async function run(queue, payload) {
   await queue.add('bot.fetch', buildJobEnvelope('bot.fetch', payload));
 }
-`), 0o644); err != nil {
+`), 0o600); err != nil {
 		t.Fatalf("write old file: %v", err)
 	}
 
@@ -35,13 +35,13 @@ func TestSLP137_FiresOnMixedBotPriorityAcrossRepo(t *testing.T) {
 func TestSLP137_IgnoresWhenSiblingCallsAlsoUsePriority(t *testing.T) {
 	root := t.TempDir()
 	oldFile := filepath.Join(root, "api/src/workers/botFetch.js")
-	if err := os.MkdirAll(filepath.Dir(oldFile), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(oldFile), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	if err := os.WriteFile(oldFile, []byte(`async function run(queue, payload) {
   await queue.add('bot.fetch', buildJobEnvelope('bot.fetch', payload), { priority: 1 });
 }
-`), 0o644); err != nil {
+`), 0o600); err != nil {
 		t.Fatalf("write old file: %v", err)
 	}
 
@@ -94,14 +94,14 @@ func TestSLP138_IgnoresWhenCredsAreForwarded(t *testing.T) {
 func TestSLP139_FiresWhenRawS3SiblingRemains(t *testing.T) {
 	root := t.TempDir()
 	sibling := filepath.Join(root, "api/src/services/driveListService.js")
-	if err := os.MkdirAll(filepath.Dir(sibling), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(sibling), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	if err := os.WriteFile(sibling, []byte(`function open(accessToken) {
   const creds = JSON.parse(accessToken);
   return new S3Client({ credentials: creds });
 }
-`), 0o644); err != nil {
+`), 0o600); err != nil {
 		t.Fatalf("write sibling: %v", err)
 	}
 
@@ -119,14 +119,14 @@ func TestSLP139_FiresWhenRawS3SiblingRemains(t *testing.T) {
 func TestSLP139_IgnoresWhenSiblingAlreadyUsesHardening(t *testing.T) {
 	root := t.TempDir()
 	sibling := filepath.Join(root, "api/src/services/driveListService.js")
-	if err := os.MkdirAll(filepath.Dir(sibling), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(sibling), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	if err := os.WriteFile(sibling, []byte(`function open(accessToken) {
   const creds = parseAndNormalizeStoredS3Creds(accessToken, provider);
   return new S3Client(s3ClientConfigSafe(creds));
 }
-`), 0o644); err != nil {
+`), 0o600); err != nil {
 		t.Fatalf("write sibling: %v", err)
 	}
 
@@ -167,6 +167,32 @@ func TestSLP140_IgnoresProviderGuardedHardenerCall(t *testing.T) {
  }
 `)
 	assertFindings(t, SLP140{}.Check(d), 0, "SLP140", SeverityWarn)
+}
+
+func TestSLP139_FiresWhenSiblingMixesHardeningAndRawPatterns(t *testing.T) {
+	root := t.TempDir()
+	sibling := filepath.Join(root, "api/src/services/driveListService.js")
+	if err := os.MkdirAll(filepath.Dir(sibling), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(sibling, []byte(`function open(accessToken) {
+  const safe = parseAndNormalizeStoredS3Creds(accessToken, provider);
+  const creds = JSON.parse(accessToken);
+  return new S3Client({ credentials: creds, endpoint: safe.endpoint });
+}
+`), 0o600); err != nil {
+		t.Fatalf("write sibling: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/api/src/routes/userRemotes.js b/api/src/routes/userRemotes.js
+--- a/api/src/routes/userRemotes.js
++++ b/api/src/routes/userRemotes.js
+@@ -1,3 +1,5 @@
+ async function load(accessToken) {
++  const creds = parseAndNormalizeStoredS3Creds(accessToken, provider);
+ }
+`)
+	assertFindings(t, SLP139{}.Check(d), 1, "SLP139", SeverityWarn)
 }
 
 func TestSLP140_IgnoresJSONGuardedHardenerCall(t *testing.T) {

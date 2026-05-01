@@ -49,7 +49,7 @@ var slp017LimitContext = regexp.MustCompile(`(?i)LIMIT\s+\d|limit\s*[=:]\s*\d|pa
 // slp017MeasurementContext matches descriptive size/duration/validation fields.
 // These literals are usually schema bounds, UI geometry, or timing knobs already
 // covered better by more specific rules than generic magic-number detection.
-var slp017MeasurementContext = regexp.MustCompile(`(?i)\b(?:len|length|width|height|size|depth|count|duration|delay|timeout|ttl|retry|retries|interval|capacity|buffer|chunk|offset|page|concurrency|radius|opacity)\b|\.length\b|\b(?:max|min)(?:imum)?[A-Z_]|(?:^|[^\w])(?:max|min)(?:[A-Z_]|[a-z])`)
+var slp017MeasurementContext = regexp.MustCompile(`(?i)\b(?:len|length|width|height|size|depth|count|duration|delay|timeout|ttl|retry|retries|interval|capacity|buffer|chunk|offset|page|concurrency|radius|opacity)(?:[A-Z][A-Za-z0-9_]*)?\b|\.length\b|\b(?:max|min)(?:imum)?[A-Z_]|(?:^|[^\w])(?:max|min)(?:[A-Z_]|[a-z])`)
 
 // slp017HexOctal matches hex (0x...) or octal (0o...) literals.
 var slp017HexOctal = regexp.MustCompile(`0[xXoO][\da-fA-F]+`)

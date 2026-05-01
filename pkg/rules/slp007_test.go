@@ -214,7 +214,7 @@ func TestSLP007_JSNamedImportTypeModifierIgnored(t *testing.T) {
 func TestSLP007_UsesCurrentFileWhenRepoRootAvailable(t *testing.T) {
 	root := t.TempDir()
 	target := filepath.Join(root, "src", "page.tsx")
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	content := `import { User } from "lucide-react";
@@ -223,7 +223,7 @@ export function SettingsPage() {
   return <User className="icon" />;
 }
 `
-	if err := os.WriteFile(target, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(target, []byte(content), 0o600); err != nil {
 		t.Fatalf("write file: %v", err)
 	}
 
@@ -238,6 +238,71 @@ export function SettingsPage() {
 	got := SLP007{}.Check(d)
 	if len(got) != 0 {
 		t.Fatalf("expected 0 findings when import is used in current file, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_StagedDiffDoesNotConsultLiveFileFallback(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	content := `import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return <User className="icon" />;
+}
+`
+	if err := os.WriteFile(target, []byte(content), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return null;
+`)
+	d.Staged = true
+	got := SLP007{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for staged diff fallback, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_RejectsSymlinkEscapeWhenReadingRepoFile(t *testing.T) {
+	root := t.TempDir()
+	outsideDir := t.TempDir()
+	outsideFile := filepath.Join(outsideDir, "outside.tsx")
+	if err := os.WriteFile(outsideFile, []byte(`import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return <User className="icon" />;
+}
+`), 0o600); err != nil {
+		t.Fatalf("write outside file: %v", err)
+	}
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.Symlink(outsideFile, target); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return null;
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when repo file resolves through symlink escape, got %d: %+v", len(got), got)
 	}
 }
 

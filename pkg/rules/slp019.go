@@ -53,7 +53,7 @@ func slp019IsTerminator(content string) bool {
 			// Ensure the match isn't a longer identifier (e.g. "sys.exit_code").
 			rest := word[len(key):]
 			if len(rest) == 0 || rest[0] == '(' || (!isAlphaNum(rest[0]) && rest[0] != '_') {
-				return true
+				return !slp019StatementContinues(raw, trimmed, key)
 			}
 		}
 	}

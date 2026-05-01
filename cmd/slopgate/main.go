@@ -110,6 +110,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if root, rootErr := repoRoot(repoDir); rootErr == nil {
 		parsed.RepoRoot = root
 	}
+	parsed.Staged = staged
 
 	// Apply .slopgateignore if present at the repo root.
 	ignorePatterns, err := loadIgnorePatterns(repoDir)

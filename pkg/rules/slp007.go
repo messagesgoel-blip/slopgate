@@ -447,15 +447,23 @@ func slp007ResolveFile(repoRoot, relPath string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
+	rootEval, err := filepath.EvalSymlinks(rootAbs)
+	if err != nil {
+		return "", false
+	}
 	targetAbs, err := filepath.Abs(filepath.Join(rootAbs, filepath.FromSlash(cleanSlash)))
 	if err != nil {
 		return "", false
 	}
-	rel, err := filepath.Rel(rootAbs, targetAbs)
+	targetEval, err := filepath.EvalSymlinks(targetAbs)
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(rootEval, targetEval)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", false
 	}
-	return targetAbs, true
+	return targetEval, true
 }
 
 func slp007FileLines(d *diff.Diff, relPath string) ([]string, bool) {
@@ -574,7 +582,11 @@ func (r SLP007) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		fileLines, haveFileLines := slp007FileLines(d, f.Path)
+		haveFileLines := d != nil && !d.Staged
+		var fileLines []string
+		if haveFileLines {
+			fileLines, haveFileLines = slp007FileLines(d, f.Path)
+		}
 
 		for _, imp := range imports {
 			if identUsedInAddedLines(imp.ident, added, goMode, imp.lineNo) {

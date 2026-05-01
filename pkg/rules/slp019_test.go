@@ -161,11 +161,24 @@ func TestSLP019_UnreachableCode(t *testing.T) {
 --- a/main.js
 +++ b/main.js
 @@ -1,4 +1,8 @@
- function fail() {
+function fail() {
 +  throw new AppError("bad", {
 +    field: "name",
 +  })
- }`,
+}`,
+			want: 0,
+		},
+		{
+			name: "multiline sys exit not flagged",
+			diff: `diff --git a/main.py b/main.py
+--- a/main.py
++++ b/main.py
+@@ -1,4 +1,7 @@
+ def fail():
++    sys.exit(
++        1
++    )
+`,
 			want: 0,
 		},
 	}

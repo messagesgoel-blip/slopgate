@@ -73,14 +73,14 @@ var (
 	slp140JSONGuard     = regexp.MustCompile(`JSON\.parse\s*\(\s*(?:accessToken|refreshToken|token)\s*\)|startsWith\s*\(\s*['"` + "`" + `]\{['"` + "`" + `]\s*\)|trim\(\)\.startsWith\s*\(\s*['"` + "`" + `]\{['"` + "`" + `]\s*\)|looksLikeJson|isJson`)
 )
 
-func slpRepoJSFiles(d *diff.Diff) []string {
+func slpRepoJSFiles(d *diff.Diff) ([]string, error) {
 	if d == nil || d.RepoRoot == "" {
-		return nil
+		return nil, nil
 	}
 	var out []string
-	_ = filepath.WalkDir(d.RepoRoot, func(path string, entry fs.DirEntry, err error) error {
+	if err := filepath.WalkDir(d.RepoRoot, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return err
 		}
 		if entry.IsDir() {
 			name := entry.Name()
@@ -92,15 +92,17 @@ func slpRepoJSFiles(d *diff.Diff) []string {
 		}
 		rel, err := filepath.Rel(d.RepoRoot, path)
 		if err != nil {
-			return nil
+			return err
 		}
 		rel = filepath.ToSlash(rel)
 		if isJSOrTSFile(rel) && !isTestFile(rel) {
 			out = append(out, rel)
 		}
 		return nil
-	})
-	return out
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func slpReadRepoFile(d *diff.Diff, relPath string) (string, bool) {
@@ -119,7 +121,11 @@ func slpReadRepoFile(d *diff.Diff, relPath string) (string, bool) {
 }
 
 func slp137HasUnprioritizedBotCalls(d *diff.Diff) bool {
-	for _, relPath := range slpRepoJSFiles(d) {
+	files, err := slpRepoJSFiles(d)
+	if err != nil {
+		return false
+	}
+	for _, relPath := range files {
 		content, ok := slpReadRepoFile(d, relPath)
 		if !ok {
 			continue
@@ -208,7 +214,11 @@ func (r SLP138) Check(d *diff.Diff) []Finding {
 }
 
 func slp139HasRawS3Sibling(d *diff.Diff, excludePath string) bool {
-	for _, relPath := range slpRepoJSFiles(d) {
+	files, err := slpRepoJSFiles(d)
+	if err != nil {
+		return false
+	}
+	for _, relPath := range files {
 		if relPath == excludePath {
 			continue
 		}
@@ -217,9 +227,6 @@ func slp139HasRawS3Sibling(d *diff.Diff, excludePath string) bool {
 			continue
 		}
 		if !slp139RawS3Client.MatchString(content) || !slp139RawCredParse.MatchString(content) {
-			continue
-		}
-		if slp139HardeningHook.MatchString(content) {
 			continue
 		}
 		return true

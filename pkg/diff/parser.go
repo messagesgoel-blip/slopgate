@@ -37,6 +37,7 @@ const (
 type Diff struct {
 	Files    []File
 	RepoRoot string // optional absolute worktree root for rules that inspect files
+	Staged   bool   // true when the diff came from git diff --cached
 }
 
 // File represents a single file's changes within a diff.

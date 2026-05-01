@@ -114,7 +114,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def trim_body(body: str) -> str:
-    first_line = (body or "").splitlines()[0].strip()
+    lines = (body or "").splitlines()
+    first_line = lines[0].strip() if lines else ""
     return first_line[:120]
 
 
@@ -149,8 +150,9 @@ def owner_repo(repo_root_path: Path) -> str:
     remote = proc.stdout.strip()
     owner_repo_val = remote
     for token in ("github.com:", "github.com/"):
-        if token in owner_repo_val:
-            owner_repo_val = owner_repo_val.split(token, 1)[1]
+        before, separator, after = owner_repo_val.partition(token)
+        if separator:
+            owner_repo_val = after
             break
     owner_repo_val = owner_repo_val.removesuffix(".git").strip("/")
     if owner_repo_val.count("/") != 1:
@@ -178,9 +180,7 @@ def fetch_pr_meta(owner_repo_name: str, pr_number: int) -> dict[str, Any]:
 def prepare_worktree(repo_root_path: Path, pr_meta: dict[str, Any], pr_number: int, requested_base: str) -> WorktreeContext:
     base_branch = requested_base or pr_meta["base"]["ref"]
     merged = bool(pr_meta.get("merged"))
-    worktrees_dir = repo_root_path / ".worktrees"
-    worktrees_dir.mkdir(parents=True, exist_ok=True)
-    worktree_path = Path(tempfile.mkdtemp(prefix=f"slopgate-benchmark-{pr_number}-", dir=worktrees_dir))
+    worktree_path = Path(tempfile.mkdtemp(prefix=f"slopgate-benchmark-{pr_number}-"))
 
     if merged:
         run_cmd(["git", "-C", str(repo_root_path), "fetch", "origin", base_branch])
@@ -400,9 +400,10 @@ def collect_sentry_findings(
             if not issue_id:
                 continue
             events = json.loads(run_cmd(["python3", str(helper), "events", issue_id]).stdout)
-            if not events:
+            if not isinstance(events, list) or not events:
                 continue
-            event_id = str(events[0].get("id", ""))
+            first_event = events[0]
+            event_id = str(first_event.get("id", ""))
             if not event_id:
                 continue
             event = json.loads(run_cmd(["python3", str(helper), "event", issue_id, event_id]).stdout)
@@ -416,10 +417,11 @@ def collect_sentry_findings(
                 continue
 
             title = issue.get("title") or issue.get("culprit") or issue.get("shortId") or "Sentry issue"
+            location_path, location_line = location
             findings.append(
                 ReviewFinding(
-                    path=location[0],
-                    line=int(location[1]),
+                    path=location_path,
+                    line=int(location_line),
                     body=trim_body(str(title)),
                     item_id=issue_id,
                     source="sentry",

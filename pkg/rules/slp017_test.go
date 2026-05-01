@@ -233,6 +233,16 @@ func TestSLP017_MagicNumber(t *testing.T) {
 			want: 0,
 		},
 		{
+			name: "camelCase measurement fields not flagged",
+			diff: `diff --git a/api.ts b/api.ts
+--- a/api.ts
++++ b/api.ts
+@@ -1,2 +1,3 @@
++const opts = { durationMs: 140, timeoutMs: 200, intervalMs: 50 }
+`,
+			want: 0,
+		},
+		{
 			name: "non-standard number still flagged",
 			diff: `diff --git a/tax.js b/tax.js
 --- a/tax.js
