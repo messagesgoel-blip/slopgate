@@ -37,6 +37,7 @@ def load_benchmark(path: Path) -> dict[str, Any] | None:
             return None
         return data
     except (json.JSONDecodeError, KeyError):
+        # Skip malformed benchmark files silently
         return None
 
 
@@ -183,7 +184,7 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    if args.file:
+    if args.file and len(args.file) >= 2:
         output = compare_files(args.file[0], args.file[1])
     elif args.trend:
         output = show_trend()
