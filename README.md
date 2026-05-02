@@ -146,15 +146,43 @@ When using shallow clones, fetch full history (`fetch-depth: 0`) so base refs re
 Compare Slopgate against review streams on a PR:
 
 ```bash
+# Legacy wrapper (delegates to benchmark_review.py)
 scripts/benchmark-coderabbit.sh /srv/storage/repo/whimsy 174
+
+# Direct usage with full options
+python3 scripts/benchmark_review.py /srv/storage/repo/whimsy 174 \
+  --sentry-project api --sentry-project app \
+  --output /tmp/benchmark-whimsy-174.json
 ```
 
 Current benchmark behavior:
 
 - uses an isolated temporary worktree, so dirty local branches do not poison results
 - benchmarks open PRs against the actual PR head, not the caller's current checkout
+- benchmarks merged PRs against the merge commit vs the base branch
 - reports legacy `CodeRabbit all comments` overlap plus `actionable unresolved threads`
 - optionally ingests Sentry findings with `--sentry-project api --sentry-project app`
+- supports `--base-ref` override for comparing against a specific ref instead of PR base
+
+### Comparing benchmarks
+
+Track progress over time with the comparison script:
+
+```bash
+# Show trend for a specific repo
+python3 scripts/benchmark-compare.py slopgate
+
+# Compare two specific PRs
+python3 scripts/benchmark-compare.py slopgate 16 20
+
+# Compare two benchmark files directly
+python3 scripts/benchmark-compare.py --file /tmp/bench1.json /tmp/bench2.json
+
+# Show trend across all repos
+python3 scripts/benchmark-compare.py --trend
+```
+
+Benchmarks are automatically archived to `/srv/storage/shared/slopgate-benchmarks/` by pre-commit, pre-push, and post-merge hooks.
 
 ---
 

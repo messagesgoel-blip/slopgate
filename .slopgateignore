@@ -11,3 +11,6 @@ pkg/rules/slp_*_test.go
 # that trigger SLP051 and SLP118 but are correct by construction.
 pkg/rules/slp007.go
 pkg/rules/slp017.go
+
+# Internal benchmark/utility scripts — not production code
+scripts/benchmark-compare.py
