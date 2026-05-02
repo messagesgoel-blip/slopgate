@@ -8,8 +8,8 @@ import (
 )
 
 // SLP142 flags unsafe path construction where filepath.Join or path.Join
-// is used to access files without subsequent symlink evaluation and 
-// containment checks. This catches potential path traversal and 
+// is used to access files without subsequent symlink evaluation and
+// containment checks. This catches potential path traversal and
 // symlink escape vulnerabilities.
 type SLP142 struct{}
 
@@ -22,7 +22,7 @@ func (SLP142) Description() string {
 var (
 	slp142PathJoin = regexp.MustCompile(`\b(?:filepath|path)\.Join\s*\(`)
 	slp142FileOp   = regexp.MustCompile(`\b(?:os\.(?:Open|OpenFile|ReadFile|ReadDir|Remove|RemoveAll|Create|Stat|Lstat)|ioutil\.ReadFile|ioutil\.ReadDir)\s*\(`)
-	slp142EvalSafe = regexp.MustCompile(`\b(?:EvalSymlinks|filepath\.Rel|strings\.HasPrefix)\b`)
+	slp142EvalSafe = regexp.MustCompile(`\bEvalSymlinks\b`)
 )
 
 func (r SLP142) Check(d *diff.Diff) []Finding {
@@ -40,9 +40,10 @@ func (r SLP142) Check(d *diff.Diff) []Finding {
 			}
 
 			// Collect surrounding context (heuristic: current line + next 10)
-			context := collectHunkBlock(added, i, 12)
+			context := collectHunkBlock(added, i, 12, false)
 			
 			// If it contains a file operation using the constructed path
+
 			if slp142FileOp.MatchString(context) {
 				// But lacks safety checks
 				if !slp142EvalSafe.MatchString(context) {

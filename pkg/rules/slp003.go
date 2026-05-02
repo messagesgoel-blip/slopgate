@@ -48,14 +48,45 @@ var slp003WrapTokens = []string{
 	"fmt.Errorf", "errors.Wrap", "errors.Wrapf",
 }
 
+var slp003IgnoreMarker = regexp.MustCompile(`(?i)\b(ignore|skip|intentional|expected)\b[:\s]*(slp003)?`)
+
 // slp003IsIgnored reports whether the error handler contains an intentional
 // ignore marker like // ignore or // skip or // intentional.
 func slp003IsIgnored(content string) bool {
-	lower := strings.ToLower(content)
-	return strings.Contains(lower, "ignore") || 
-		strings.Contains(lower, "skip") || 
-		strings.Contains(lower, "intentional") ||
-		strings.Contains(lower, "expected")
+	// Only look for markers in comment segments.
+	parts := strings.Split(content, "//")
+	if len(parts) > 1 {
+		for _, p := range parts[1:] {
+			if slp003IgnoreMarker.MatchString(p) {
+				return true
+			}
+		}
+	}
+	parts = strings.Split(content, "/*")
+	if len(parts) > 1 {
+		for _, p := range parts[1:] {
+			// Find closing tag if any.
+			end := strings.Index(p, "*/")
+			comment := p
+			if end >= 0 {
+				comment = p[:end]
+			}
+			if slp003IgnoreMarker.MatchString(comment) {
+				return true
+			}
+		}
+	}
+	// Python/Shell style
+	parts = strings.Split(content, "#")
+	if len(parts) > 1 {
+		for _, p := range parts[1:] {
+			if slp003IgnoreMarker.MatchString(p) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // slp003GoHasHandling reports whether a Go error-handler block body

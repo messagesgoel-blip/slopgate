@@ -40,8 +40,8 @@ func (r SLP141) Check(d *diff.Diff) []Finding {
 				continue
 			}
 
-			// Collect the useEffect block (heuristic: next 10 lines or until closing brace)
-			block := collectHunkBlock(added, i, 15)
+			// Collect the useEffect block
+			block := collectHunkBlock(added, i, 15, true)
 			if block == "" {
 				continue
 			}
@@ -66,14 +66,34 @@ func (r SLP141) Check(d *diff.Diff) []Finding {
 }
 
 // collectHunkBlock concatenates up to 'limit' lines from 'added' starting at 'start',
-// stopping if there's a gap in line numbers.
-func collectHunkBlock(added []diff.Line, start int, limit int) string {
+// stopping if there's a gap in line numbers. If trackBraces is true, it also stops
+// when the brace depth returns to zero (assuming it started at or above zero).
+func collectHunkBlock(added []diff.Line, start int, limit int, trackBraces bool) string {
 	var lines []string
+	depth := 0
+	started := false
+
 	for i := start; i < len(added) && i < start+limit; i++ {
 		if i > start && added[i].NewLineNo != added[i-1].NewLineNo+1 {
 			break
 		}
-		lines = append(lines, stripCommentAndStrings(added[i].Content))
+		content := added[i].Content
+		lines = append(lines, stripCommentAndStrings(content))
+
+		if trackBraces {
+			// Track brace depth.
+			open := strings.Count(content, "{")
+			close := strings.Count(content, "}")
+
+			if open > 0 {
+				started = true
+			}
+			depth += open - close
+
+			if started && depth <= 0 {
+				break
+			}
+		}
 	}
 	return strings.Join(lines, "\n")
 }

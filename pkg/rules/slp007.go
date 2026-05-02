@@ -577,7 +577,7 @@ func slp007IsImportLikeLine(line string) bool {
 		return true
 	case strings.HasPrefix(trimmed, "use "):
 		return true
-	case strings.HasPrefix(trimmed, "export ") && (strings.Contains(trimmed, " from ") || strings.Contains(trimmed, " {") || strings.Contains(trimmed, "{")):
+	case strings.HasPrefix(trimmed, "export {") || strings.HasPrefix(trimmed, "export *") || strings.Contains(trimmed, " from "):
 		return true
 	case strings.HasPrefix(trimmed, "require("):
 		return true
