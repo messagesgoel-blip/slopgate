@@ -76,6 +76,9 @@ func slp017MaskMeasurementContexts(s string) string {
 	// Build a set of character ranges to mask.
 	mask := make([]bool, len(s))
 	for _, tok := range tokens {
+		if len(tok) < 2 {
+			continue
+		}
 		// Mask the token itself.
 		start, end := tok[0], tok[1]
 		if start >= 0 && end <= len(mask) {
