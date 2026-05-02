@@ -96,6 +96,40 @@ func TestSLP017_MagicNumber(t *testing.T) {
 			want: 0,
 		},
 		{
+			name: "common numbers (100, 1000) not flagged",
+			diff: `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,3 +1,4 @@
+ func calc(x int) int {
+-	return 0
++	return x * 100 + 1000
+ }`,
+			want: 0,
+		},
+		{
+			name: "setTimeout literal not flagged",
+			diff: `diff --git a/app.js b/app.js
+--- a/app.js
++++ b/app.js
+@@ -1,3 +1,4 @@
+-foo();
++setTimeout(() => foo(), 500);
++`,
+			want: 0,
+		},
+		{
+			name: "CSS-like property not flagged",
+			diff: `diff --git a/styles.js b/app.js
+--- a/styles.js
++++ b/styles.js
+@@ -1,3 +1,4 @@
+-const s = {};
++const style = { width: 1024, height: 768, opacity: 0.5 };
++`,
+			want: 0,
+		},
+		{
 			name: "ALL_CAPS assignment not flagged",
 			diff: `diff --git a/main.go b/main.go
 --- a/main.go

@@ -196,7 +196,7 @@ func (r SLP059) Check(d *diff.Diff) []Finding {
 			}
 			args := call[callMatch[1]:]
 			// Any interpolation or concatenation is an immediate red flag.
-			if strings.Contains(args, "$") || strings.Contains(args, "+") || strings.Contains(args, "fmt.Sprintf") {
+			if strings.Contains(args, "$") || strings.Contains(args, "+") || strings.Contains(args, "fmt.Sprintf") || strings.Contains(args, "strings.Join") {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

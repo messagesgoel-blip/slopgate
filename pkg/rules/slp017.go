@@ -28,7 +28,10 @@ func (SLP017) Description() string {
 var slp017Number = regexp.MustCompile(`(?:^|[^\w.])((?:0|[1-9]\d*)(?:\.\d+)?)(?:[^\w.]|$)`)
 
 // slp017SmallNumber matches 0, 1, or 2 (common innocuous values).
-var slp017SmallNumber = regexp.MustCompile(`^[012]$`)
+var slp017SmallNumber = regexp.MustCompile(`^(?:[012]|10|20|30|40|50|60|90|100|200|300|400|500|1000|2000|3000|4000|5000|10000)$`)
+
+// slp017InnocuousFunction matches calls where numeric literals are often expected.
+var slp017InnocuousFunction = regexp.MustCompile(`(?i)\b(?:setTimeout|setInterval|delay|sleep|wait|rgba?|hsla?|opacity|zIndex|flex|grid|scale|rotate|translate|width|height|margin|padding|top|right|bottom|left)\b`)
 
 // slp017HTTPStatus matches common HTTP status codes that are intentional.
 // These are not "magic numbers" — they're standard API response codes.
@@ -160,6 +163,8 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 			isHTTPContext := slp017HTTPStatusContext.MatchString(clean)
 			// Check for limit/batch context — exempt common limits.
 			isLimitContext := slp017LimitContext.MatchString(clean)
+			// Check for innocuous function context.
+			isInnocuousContext := slp017InnocuousFunction.MatchString(clean)
 			// Mask measurement context tokens and their associated numbers
 			// so unrelated literals on the same line are still checked.
 			clean = slp017MaskMeasurementContexts(clean)
@@ -167,6 +172,10 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 			for _, m := range slp017Number.FindAllStringSubmatch(clean, -1) {
 				num := m[1]
 				if slp017SmallNumber.MatchString(num) {
+					continue
+				}
+				// Exempt literals in innocuous function contexts (heuristic).
+				if isInnocuousContext {
 					continue
 				}
 				// Exempt HTTP status codes in HTTP context.

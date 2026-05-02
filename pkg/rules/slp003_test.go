@@ -237,6 +237,26 @@ func TestSLP003_GoSingleLineReturnFalseNil(t *testing.T) {
 	}
 }
 
+func TestSLP003_GoIgnoreComment_NoFinding(t *testing.T) {
+	// if err != nil { /* ignore */ } — intentional, NOT a finding.
+	d := parseDiff(t, `diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,1 +1,4 @@
+ package a
++func Foo() error {
++	if err != nil {
++		// ignore
++	}
++	return nil
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (ignored), got %d: %+v", len(got), got)
+	}
+}
+
 // --- JS/TS tests ---
 
 func TestSLP003_JSEmptyCatch(t *testing.T) {
@@ -290,6 +310,24 @@ func TestSLP003_JSCatchReturnSemicolon(t *testing.T) {
 	got := SLP003{}.Check(d)
 	if len(got) != 1 {
 		t.Fatalf("expected 1 finding (return; bail), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP003_JSIgnoreComment_NoFinding(t *testing.T) {
+	// catch (e) { /* ignore */ } — intentional, NOT a finding.
+	d := parseDiff(t, `diff --git a/a.js b/a.js
+--- a/a.js
++++ b/a.js
+@@ -1,1 +1,4 @@
++try {
++  foo();
++} catch (e) {
++  // intentional
++}
+`)
+	got := SLP003{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (ignored), got %d: %+v", len(got), got)
 	}
 }
 

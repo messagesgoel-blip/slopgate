@@ -48,9 +48,22 @@ var slp003WrapTokens = []string{
 	"fmt.Errorf", "errors.Wrap", "errors.Wrapf",
 }
 
+// slp003IsIgnored reports whether the error handler contains an intentional
+// ignore marker like // ignore or // skip or // intentional.
+func slp003IsIgnored(content string) bool {
+	lower := strings.ToLower(content)
+	return strings.Contains(lower, "ignore") || 
+		strings.Contains(lower, "skip") || 
+		strings.Contains(lower, "intentional") ||
+		strings.Contains(lower, "expected")
+}
+
 // slp003GoHasHandling reports whether a Go error-handler block body
 // contains logging, error wrapping, or re-panic.
 func slp003GoHasHandling(content string) bool {
+	if slp003IsIgnored(content) {
+		return true
+	}
 	for _, tok := range slp003LogTokens {
 		if strings.Contains(content, tok) {
 			return true
@@ -89,6 +102,9 @@ var slp003JSBailTokens = []string{
 // slp003JSHasHandling reports whether a JS/TS catch block body
 // contains logging or error re-throwing.
 func slp003JSHasHandling(content string) bool {
+	if slp003IsIgnored(content) {
+		return true
+	}
 	for _, tok := range slp003JSLogTokens {
 		if strings.Contains(content, tok) {
 			return true
@@ -131,6 +147,9 @@ var slp003PythonLogTokens = []string{
 // slp003PythonHasHandling reports whether a Python except block body
 // contains logging, error re-raising, or error wrapping.
 func slp003PythonHasHandling(content string) bool {
+	if slp003IsIgnored(content) {
+		return true
+	}
 	for _, tok := range slp003PythonLogTokens {
 		if strings.Contains(content, tok) {
 			return true
@@ -165,6 +184,9 @@ var slp003JavaLogTokens = []string{
 // slp003JavaHasHandling reports whether a Java catch block body
 // contains logging or error re-throwing.
 func slp003JavaHasHandling(content string) bool {
+	if slp003IsIgnored(content) {
+		return true
+	}
 	for _, tok := range slp003JavaLogTokens {
 		if strings.Contains(content, tok) {
 			return true
@@ -207,6 +229,9 @@ var slp003RustLogTokens = []string{
 // slp003RustHasHandling reports whether a Rust error-handler body
 // contains logging or error propagation (e/Err(e) in return).
 func slp003RustHasHandling(content string) bool {
+	if slp003IsIgnored(content) {
+		return true
+	}
 	for _, tok := range slp003RustLogTokens {
 		if strings.Contains(content, tok) {
 			return true
