@@ -82,8 +82,10 @@ func slp017MaskMeasurementContexts(s string) string {
 		// Mask the token itself.
 		start, end := tok[0], tok[1]
 		if start >= 0 && end <= len(mask) {
-			for i := start; i < end; i++ {
-				mask[i] = true
+			for k := start; k < end; k++ {
+				if k < len(mask) {
+					mask[k] = true
+				}
 			}
 		}
 		// Also mask the number that follows (e.g., "timeout: 200" or "width=800" or ".length > 1024").
