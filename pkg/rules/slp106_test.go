@@ -54,3 +54,24 @@ func TestSLP106_Description(t *testing.T) {
 		t.Errorf("default severity should be warn")
 	}
 }
+
+func TestSLP106_FiresOnSecondOpenWithoutClose(t *testing.T) {
+	d := parseDiff(t, `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,1 +1,6 @@
++  f1, err := os.Open("file1.txt")
++  f2, err := os.Open("file2.txt")
++  if err != nil {
++    return err
++  }
++  defer f1.Close()
+`)
+	got := SLP106{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding for f2 without close, got %d", len(got))
+	}
+	if got[0].Line != 2 {
+		t.Errorf("expected finding on line 2 (f2), got line %d", got[0].Line)
+	}
+}
