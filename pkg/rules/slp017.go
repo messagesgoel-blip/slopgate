@@ -63,6 +63,54 @@ var slp017ConstDecl = regexp.MustCompile(`(?:^|\s)(?:const|final|static\s+final|
 // slp017AllCapsAssign matches ALL_CAPS_NAME = or ALL_CAPS_NAME :=.
 var slp017AllCapsAssign = regexp.MustCompile(`[A-Z][A-Z0-9_]*\s*:?=`)
 
+// slp017MaskMeasurementContexts replaces measurement context tokens and their
+// associated numbers with placeholders, so unrelated literals on the same line
+// are still checked for magic numbers.
+func slp017MaskMeasurementContexts(s string) string {
+	// Find all measurement context tokens.
+	tokens := slp017MeasurementContext.FindAllStringIndex(s, -1)
+	if len(tokens) == 0 {
+		return s
+	}
+
+	// Build a set of character ranges to mask.
+	mask := make([]bool, len(s))
+	for _, tok := range tokens {
+		// Mask the token itself.
+		for i := tok[0]; i < tok[1]; i++ {
+			mask[i] = true
+		}
+		// Also mask the number that follows (e.g., "timeout: 200" or "width=800" or ".length > 1024").
+		// Skip whitespace and assignment/comparison separators.
+		j := tok[1]
+		for j < len(s) && (s[j] == ' ' || s[j] == '\t' || s[j] == ':' || s[j] == '=' || s[j] == ',' || s[j] == '>' || s[j] == '<') {
+			mask[j] = true
+			j++
+		}
+		// Handle >= and <=
+		if j < len(s) && s[j] == '=' {
+			mask[j] = true
+			j++
+		}
+		// Mask the number.
+		for j < len(s) && (s[j] >= '0' && s[j] <= '9' || s[j] == '.') {
+			mask[j] = true
+			j++
+		}
+	}
+
+	// Build masked string.
+	var b strings.Builder
+	for i, c := range s {
+		if mask[i] {
+			b.WriteByte('X')
+		} else {
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
+}
+
 func (r SLP017) Check(d *diff.Diff) []Finding {
 	var out []Finding
 	for _, f := range d.Files {
@@ -102,10 +150,9 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 			isHTTPContext := slp017HTTPStatusContext.MatchString(clean)
 			// Check for limit/batch context — exempt common limits.
 			isLimitContext := slp017LimitContext.MatchString(clean)
-			// Exempt descriptive measurement/validation contexts.
-			if slp017MeasurementContext.MatchString(clean) {
-				continue
-			}
+			// Mask measurement context tokens and their associated numbers
+			// so unrelated literals on the same line are still checked.
+			clean = slp017MaskMeasurementContexts(clean)
 
 			for _, m := range slp017Number.FindAllStringSubmatch(clean, -1) {
 				num := m[1]

@@ -503,7 +503,7 @@ func slp007FileContent(d *diff.Diff, relPath string) (string, bool) {
 	switch d.SnapshotRef {
 	case ":":
 		ctx, cancel := context.WithTimeout(context.Background(), slp007GitShowTimeout)
-		defer context.CancelFunc(cancel)()
+		defer cancel()
 		cmd := exec.CommandContext(ctx, "git", "show")
 		cmd.Dir = d.RepoRoot
 		cmd.Args = append(cmd.Args, ":"+cleanSlash)
@@ -514,7 +514,7 @@ func slp007FileContent(d *diff.Diff, relPath string) (string, bool) {
 		return string(out), true
 	case "HEAD":
 		ctx, cancel := context.WithTimeout(context.Background(), slp007GitShowTimeout)
-		defer context.CancelFunc(cancel)()
+		defer cancel()
 		cmd := exec.CommandContext(ctx, "git", "show")
 		cmd.Dir = d.RepoRoot
 		cmd.Args = append(cmd.Args, "HEAD:"+cleanSlash)

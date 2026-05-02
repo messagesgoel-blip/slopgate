@@ -60,7 +60,7 @@ func slp019IsTerminator(content string) bool {
 	// Strip everything from first non-alpha rune onward (e.g. "panic(" → "panic").
 	var b strings.Builder
 	for _, r := range word {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '.' {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
 			b.WriteRune(r)
 		} else {
 			break
@@ -106,11 +106,10 @@ func slp019StatementContinues(raw, cleaned, keyword string) bool {
 		return true
 	}
 
-	trimmedRaw := strings.TrimSpace(raw)
-	if slp019ContinuationSuffix.MatchString(trimmedRaw) {
+	if slp019ContinuationSuffix.MatchString(cleaned) {
 		return true
 	}
-	return strings.HasSuffix(trimmedRaw, "=>")
+	return strings.HasSuffix(cleaned, "=>")
 }
 
 func isAlphaNum(b byte) bool {

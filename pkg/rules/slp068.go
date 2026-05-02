@@ -41,7 +41,7 @@ func (r SLP068) Check(d *diff.Diff) []Finding {
 		}
 		seen := make(map[string]bool)
 		flagged := make(map[int]bool)
-		lastFlaggedLine := -1000
+		lastFlaggedLineByKey := make(map[string]int)
 		for i := 0; i <= len(added)-5; i++ {
 			key := windowKey(added, i)
 			if len(strings.TrimSpace(key)) < 20 {
@@ -49,9 +49,10 @@ func (r SLP068) Check(d *diff.Diff) []Finding {
 			}
 			if seen[key] {
 				lineNo := added[i].NewLineNo
-				if !flagged[lineNo] && lineNo-lastFlaggedLine >= 5 {
+				last, ok := lastFlaggedLineByKey[key]
+				if !flagged[lineNo] && (!ok || lineNo-last >= 5) {
 					flagged[lineNo] = true
-					lastFlaggedLine = lineNo
+					lastFlaggedLineByKey[key] = lineNo
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),

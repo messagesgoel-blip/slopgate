@@ -117,8 +117,8 @@ func TestSLP068_CollapsesOverlappingWindowSpam(t *testing.T) {
  }
 `)
 	got := SLP068{}.Check(d)
-	if len(got) != 1 {
-		t.Fatalf("expected 1 collapsed finding, got %d: %+v", len(got), got)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 findings (one per distinct duplicate key), got %d: %+v", len(got), got)
 	}
 }
 

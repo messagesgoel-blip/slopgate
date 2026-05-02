@@ -370,3 +370,18 @@ func TestSLP136_PreservationDoesNotLeakAcrossMultipleWrappers(t *testing.T) {
 `)
 	assertFindings(t, SLP136{}.Check(d), 1, "SLP136", SeverityWarn)
 }
+
+func TestSLP136_FiresOnWrappedAppErrorWithDifferentCatchVar(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/src/routes/files.js b/api/src/routes/files.js
+--- a/api/src/routes/files.js
++++ b/api/src/routes/files.js
+@@ -1,3 +1,7 @@
+ async function handler(req, res) {
++  } catch (caught) {
++    logger.error({ caught }, "folder-stats failed");
++    error(res, new AppError(CODES.INTERNAL, "internal server error"));
++  }
+ }
+ `)
+	assertFindings(t, SLP136{}.Check(d), 1, "SLP136", SeverityWarn)
+}
