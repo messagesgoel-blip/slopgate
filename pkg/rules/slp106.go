@@ -48,7 +48,7 @@ func (r SLP106) Check(d *diff.Diff) []Finding {
 				// Check for acquisition with variable assignment
 				if slp106Acquire.MatchString(clean) {
 					// Try to extract the variable being assigned
-					if match := slp106VarAssign.FindStringSubmatch(clean); match != nil {
+					if match := slp106VarAssign.FindStringSubmatch(clean); match != nil && len(match) >= 2 {
 						varName := match[1]
 						acquired[varName] = ln
 					} else {
@@ -60,7 +60,7 @@ func (r SLP106) Check(d *diff.Diff) []Finding {
 
 				// Check for release on a specific variable
 				if slp106Release.MatchString(clean) || slp106DeferClose.MatchString(clean) {
-					if match := slp106VarCall.FindStringSubmatch(clean); match != nil {
+					if match := slp106VarCall.FindStringSubmatch(clean); match != nil && len(match) >= 2 {
 						varName := match[1]
 						delete(acquired, varName)
 					} else if slp106DeferClose.MatchString(content) {

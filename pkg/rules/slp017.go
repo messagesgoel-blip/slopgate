@@ -77,18 +77,23 @@ func slp017MaskMeasurementContexts(s string) string {
 	mask := make([]bool, len(s))
 	for _, tok := range tokens {
 		// Mask the token itself.
-		for i := tok[0]; i < tok[1]; i++ {
-			mask[i] = true
+		start, end := tok[0], tok[1]
+		if start >= 0 && end <= len(mask) {
+			for i := start; i < end; i++ {
+				mask[i] = true
+			}
 		}
 		// Also mask the number that follows (e.g., "timeout: 200" or "width=800" or ".length > 1024").
 		// Skip whitespace and assignment/comparison separators.
-		j := tok[1]
+		j := end
 		for j < len(s) && (s[j] == ' ' || s[j] == '\t' || s[j] == ':' || s[j] == '=' || s[j] == ',' || s[j] == '>' || s[j] == '<') {
-			mask[j] = true
+			if j < len(mask) {
+				mask[j] = true
+			}
 			j++
 		}
 		// Handle >= and <=
-		if j < len(s) && s[j] == '=' {
+		if j < len(s) && j < len(mask) && s[j] == '=' {
 			mask[j] = true
 			j++
 		}
