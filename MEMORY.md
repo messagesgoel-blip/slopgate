@@ -12,8 +12,8 @@ This file tracks key information about the slopgate project for future agent ses
 
 ## Current Version
 
-- **v0.0.7** (merged PR #9, 2026-04-18)
-- 27 rules (SLP001-SLP027, SLP030; note: SLP004 was never assigned)
+- **v0.0.17** (feature branch `feat/benchmark-v2-parity-wave`, 2026-05-01)
+- 136 total rules (core diff + AST + extended parity checks through SLP140)
 
 ## Benchmark Status
 
@@ -21,6 +21,7 @@ This file tracks key information about the slopgate project for future agent ses
 - **Maturity threshold**: 80% overlap to consider replacing CodeRabbit
 - **Gap analysis**: slopgate catches syntactic patterns; CodeRabbit catches semantic/logic bugs
 - **Benchmark archive**: `/srv/storage/shared/slopgate-benchmarks/`
+- **Benchmark v2**: `scripts/benchmark_review.py` and the shared `run-slopgate-benchmark` wrapper now benchmark in an isolated worktree, score open PRs against the real PR head, and emit legacy/all-comments plus actionable/Sentry-aware overlap metrics.
 
 ## Rule Categories
 
@@ -57,8 +58,10 @@ This file tracks key information about the slopgate project for future agent ses
 
 ## Benchmark Scripts
 
-- `/srv/storage/shared/agent-toolkit/bin/run-slopgate-benchmark` - Universal runner
-- `/srv/storage/shared/agent-toolkit/bin/benchmark-aggregator` - Collects results
+- `scripts/benchmark_review.py` - Canonical benchmark implementation
+- `scripts/benchmark-coderabbit.sh` - Thin local wrapper around the canonical implementation
+- `/srv/storage/shared/agent-toolkit/bin/run-slopgate-benchmark` - Shared wrapper that delegates to the canonical implementation
+- `/srv/storage/shared/agent-toolkit/bin/benchmark-aggregator` - Collects legacy plus actionable/Sentry-aware benchmark totals
 
 ## Development Workflow
 
@@ -84,3 +87,4 @@ Available via gitconfig URL rewrite (see ~/.gitconfig for details)
 ## Memory Updates
 
 - 2026-04-18: Added SLP024-SLP027, tuned SLP017, version bump to v0.0.6
+- 2026-05-01: Added Benchmark v2 and the canonical benchmark scripts; tuned SLP007, SLP017, SLP019, and SLP068; added SLP136-SLP140; bumped version to v0.0.17

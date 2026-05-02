@@ -35,8 +35,11 @@ const (
 
 // Diff is the top-level parsed representation of a unified diff.
 type Diff struct {
-	Files    []File
-	RepoRoot string // optional absolute worktree root for rules that inspect files
+	Files            []File
+	RepoRoot         string // optional absolute worktree root for rules that inspect files
+	Staged           bool   // true when the diff came from git diff --cached
+	SnapshotRef      string // optional git snapshot source for the new side, e.g. HEAD or :
+	SnapshotWorktree bool   // true when the new-side snapshot matches the live worktree
 }
 
 // File represents a single file's changes within a diff.

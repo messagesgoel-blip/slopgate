@@ -46,6 +46,11 @@ var slp017HTTPStatusContext = regexp.MustCompile(`(?i)\.status\s*\(|status\s*[=:
 // If line contains LIMIT, limit, pageSize, batch, etc., treat common limits as intentional.
 var slp017LimitContext = regexp.MustCompile(`(?i)LIMIT\s+\d|limit\s*[=:]\s*\d|pageSize|page_size|batchSize|batch_size|max.*=.*\d|take\s*\(\s*\d|top\s*\d|first\s*\d|\.limit\s*\(`)
 
+// slp017MeasurementContext matches descriptive size/duration/validation fields.
+// These literals are usually schema bounds, UI geometry, or timing knobs already
+// covered better by more specific rules than generic magic-number detection.
+var slp017MeasurementContext = regexp.MustCompile(`(?i)\b(?:len|length|width|height|size|depth|count|duration|delay|timeout|ttl|retry|retries|interval|capacity|buffer|chunk|offset|page|concurrency|radius|opacity)(?:[A-Z][A-Za-z0-9_]*)?\b|\.length\b|\b(?:max|min)(?:imum)?[A-Z_]|(?:^|[^\w])(?:max|min)(?:[A-Z_]|[a-z])`)
+
 // slp017HexOctal matches hex (0x...) or octal (0o...) literals.
 var slp017HexOctal = regexp.MustCompile(`0[xXoO][\da-fA-F]+`)
 
@@ -57,6 +62,64 @@ var slp017ConstDecl = regexp.MustCompile(`(?:^|\s)(?:const|final|static\s+final|
 
 // slp017AllCapsAssign matches ALL_CAPS_NAME = or ALL_CAPS_NAME :=.
 var slp017AllCapsAssign = regexp.MustCompile(`[A-Z][A-Z0-9_]*\s*:?=`)
+
+// slp017MaskMeasurementContexts replaces measurement context tokens and their
+// associated numbers with placeholders, so unrelated literals on the same line
+// are still checked for magic numbers.
+func slp017MaskMeasurementContexts(s string) string {
+	// Find all measurement context tokens.
+	tokens := slp017MeasurementContext.FindAllStringIndex(s, -1)
+	if len(tokens) == 0 {
+		return s
+	}
+
+	// Build a set of character ranges to mask.
+	mask := make([]bool, len(s))
+	for _, tok := range tokens {
+		if len(tok) < 2 {
+			continue
+		}
+		// Mask the token itself.
+		start, end := tok[0], tok[1]
+		if start >= 0 && end <= len(mask) {
+			for k := start; k < end; k++ {
+				if k < len(mask) {
+					mask[k] = true
+				}
+			}
+		}
+		// Also mask the number that follows (e.g., "timeout: 200" or "width=800" or ".length > 1024").
+		// Skip whitespace and assignment/comparison separators.
+		j := end
+		for j < len(s) && (s[j] == ' ' || s[j] == '\t' || s[j] == ':' || s[j] == '=' || s[j] == ',' || s[j] == '>' || s[j] == '<') {
+			if j < len(mask) {
+				mask[j] = true
+			}
+			j++
+		}
+		// Handle >= and <=
+		if j < len(s) && j < len(mask) && s[j] == '=' {
+			mask[j] = true
+			j++
+		}
+		// Mask the number.
+		for j < len(s) && (s[j] >= '0' && s[j] <= '9' || s[j] == '.') {
+			mask[j] = true
+			j++
+		}
+	}
+
+	// Build masked string.
+	var b strings.Builder
+	for i, c := range s {
+		if mask[i] {
+			b.WriteByte('X')
+		} else {
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
+}
 
 func (r SLP017) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -97,6 +160,9 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 			isHTTPContext := slp017HTTPStatusContext.MatchString(clean)
 			// Check for limit/batch context — exempt common limits.
 			isLimitContext := slp017LimitContext.MatchString(clean)
+			// Mask measurement context tokens and their associated numbers
+			// so unrelated literals on the same line are still checked.
+			clean = slp017MaskMeasurementContexts(clean)
 
 			for _, m := range slp017Number.FindAllStringSubmatch(clean, -1) {
 				num := m[1]

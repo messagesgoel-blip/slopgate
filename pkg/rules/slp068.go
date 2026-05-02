@@ -32,12 +32,16 @@ func (r SLP068) Check(d *diff.Diff) []Finding {
 		if f.IsDelete || isDocFile(f.Path) || !isSourceLikeFile(f.Path) {
 			continue
 		}
+		if isTestFile(f.Path) {
+			continue
+		}
 		added := f.AddedLines()
 		if len(added) < 5 {
 			continue
 		}
 		seen := make(map[string]bool)
 		flagged := make(map[int]bool)
+		lastFlaggedLineByKey := make(map[string]int)
 		for i := 0; i <= len(added)-5; i++ {
 			key := windowKey(added, i)
 			if len(strings.TrimSpace(key)) < 20 {
@@ -45,8 +49,10 @@ func (r SLP068) Check(d *diff.Diff) []Finding {
 			}
 			if seen[key] {
 				lineNo := added[i].NewLineNo
-				if !flagged[lineNo] {
+				last, ok := lastFlaggedLineByKey[key]
+				if !flagged[lineNo] && (!ok || lineNo-last >= 5) {
 					flagged[lineNo] = true
+					lastFlaggedLineByKey[key] = lineNo
 					out = append(out, Finding{
 						RuleID:   r.ID(),
 						Severity: r.DefaultSeverity(),

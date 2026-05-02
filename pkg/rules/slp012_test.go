@@ -20,6 +20,7 @@ func parseDiffWithRoot(t *testing.T, root, s string) *diff.Diff {
 	t.Helper()
 	d := parseDiff(t, s)
 	d.RepoRoot = root
+	d.SnapshotWorktree = true
 	return d
 }
 

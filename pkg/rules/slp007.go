@@ -1,12 +1,20 @@
 package rules
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
+
+const slp007GitShowTimeout = 2 * time.Second
 
 // SLP007 flags imports that are added in a diff but never referenced in any
 // other added line of the same file. This catches the classic AI "just in
@@ -239,14 +247,23 @@ func parseJSImports(added []diff.Line) []importInfo {
 // for aliases, X otherwise).
 func parseJSNamedItems(braces string) []string {
 	var items []string
-	for _, m := range slp007JSNamedItem.FindAllStringSubmatch(braces, -1) {
+	for _, item := range strings.Split(braces, ",") {
+		item = strings.TrimSpace(item)
+		item = strings.TrimPrefix(item, "type ")
+		if item == "" {
+			continue
+		}
+		m := slp007JSNamedItem.FindStringSubmatch(item)
+		if m == nil {
+			continue
+		}
 		name := m[1]
 		alias := m[2]
 		if alias != "" {
 			items = append(items, alias)
-		} else {
-			items = append(items, name)
+			continue
 		}
+		items = append(items, name)
 	}
 	return items
 }
@@ -418,6 +435,153 @@ func identUsedInAddedLines(ident string, added []diff.Line, goMode bool, skipLin
 	return false
 }
 
+func slp007ResolveFile(repoRoot, relPath string) (string, bool) {
+	if repoRoot == "" {
+		return "", false
+	}
+	cleanSlash, ok := slp007CleanRelativePath(relPath)
+	if !ok {
+		return "", false
+	}
+
+	rootAbs, err := filepath.Abs(repoRoot)
+	if err != nil {
+		return "", false
+	}
+	rootEval, err := filepath.EvalSymlinks(rootAbs)
+	if err != nil {
+		return "", false
+	}
+	targetAbs, err := filepath.Abs(filepath.Join(rootAbs, filepath.FromSlash(cleanSlash)))
+	if err != nil {
+		return "", false
+	}
+	targetEval, err := filepath.EvalSymlinks(targetAbs)
+	if err != nil {
+		return "", false
+	}
+	rel, err := filepath.Rel(rootEval, targetEval)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return targetEval, true
+}
+
+func slp007CleanRelativePath(relPath string) (string, bool) {
+	if filepath.IsAbs(filepath.FromSlash(relPath)) {
+		return "", false
+	}
+	cleanSlash := path.Clean(strings.ReplaceAll(relPath, "\\", "/"))
+	if cleanSlash == "." || cleanSlash == ".." || strings.HasPrefix(cleanSlash, "../") {
+		return "", false
+	}
+	return cleanSlash, true
+}
+
+func slp007FileContent(d *diff.Diff, relPath string) (string, bool) {
+	if d == nil || d.RepoRoot == "" {
+		return "", false
+	}
+	if d.SnapshotWorktree {
+		resolved, ok := slp007ResolveFile(d.RepoRoot, relPath)
+		if !ok {
+			return "", false
+		}
+		content, err := os.ReadFile(resolved) // #nosec G304 -- path is constrained to the repo root above.
+		if err != nil {
+			return "", false
+		}
+		return string(content), true
+	}
+	if d.SnapshotRef == "" {
+		return "", false
+	}
+	cleanSlash, ok := slp007CleanRelativePath(relPath)
+	if !ok {
+		return "", false
+	}
+	switch d.SnapshotRef {
+	case ":":
+		ctx, cancel := context.WithTimeout(context.Background(), slp007GitShowTimeout)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "git", "show")
+		cmd.Dir = d.RepoRoot
+		cmd.Args = append(cmd.Args, ":"+cleanSlash)
+		out, err := cmd.Output()
+		if err != nil {
+			return "", false
+		}
+		return string(out), true
+	case "HEAD":
+		ctx, cancel := context.WithTimeout(context.Background(), slp007GitShowTimeout)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "git", "show")
+		cmd.Dir = d.RepoRoot
+		cmd.Args = append(cmd.Args, "HEAD:"+cleanSlash)
+		out, err := cmd.Output()
+		if err != nil {
+			return "", false
+		}
+		return string(out), true
+	default:
+		return "", false
+	}
+}
+
+func slp007FileLines(d *diff.Diff, relPath string) ([]string, bool) {
+	content, ok := slp007FileContent(d, relPath)
+	if !ok {
+		return nil, false
+	}
+	return strings.Split(content, "\n"), true
+}
+
+func identUsedInFile(ident string, lines []string, goMode bool, skipLineN int) bool {
+	if len(lines) == 0 {
+		return false
+	}
+
+	var searchPat string
+	if goMode {
+		searchPat = ident + "."
+	}
+
+	for i, line := range lines {
+		if i+1 == skipLineN {
+			continue
+		}
+		if goMode {
+			if strings.Contains(line, searchPat) {
+				return true
+			}
+			continue
+		}
+		if slp007IsImportLikeLine(line) {
+			continue
+		}
+		if wordInLine(stripCommentAndStrings(line), ident) {
+			return true
+		}
+	}
+	return false
+}
+
+func slp007IsImportLikeLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	switch {
+	case strings.HasPrefix(trimmed, "import "):
+		return true
+	case strings.HasPrefix(trimmed, "from ") && strings.Contains(trimmed, " import "):
+		return true
+	case strings.HasPrefix(trimmed, "use "):
+		return true
+	case strings.HasPrefix(trimmed, "export ") && strings.Contains(trimmed, " from "):
+		return true
+	default:
+		return false
+	}
+}
+
 // wordInLine reports whether the given word appears as a whole word in the
 // line content. This prevents false positives like "Stateful" matching
 // "State".
@@ -492,8 +656,19 @@ func (r SLP007) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
+		var fileLines []string
+		fileLinesLoaded := false
+		haveFileLines := false
+
 		for _, imp := range imports {
 			if identUsedInAddedLines(imp.ident, added, goMode, imp.lineNo) {
+				continue
+			}
+			if !fileLinesLoaded && d != nil {
+				fileLines, haveFileLines = slp007FileLines(d, f.Path)
+				fileLinesLoaded = true
+			}
+			if haveFileLines && identUsedInFile(imp.ident, fileLines, goMode, imp.lineNo) {
 				continue
 			}
 

@@ -107,6 +107,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "slopgate: diff parse: %v\n", err)
 		return 2
 	}
+	if root, rootErr := repoRoot(repoDir); rootErr == nil {
+		parsed.RepoRoot = root
+	}
+	parsed.Staged = staged
+	if staged {
+		parsed.SnapshotRef = ":"
+	} else if base != "" {
+		parsed.SnapshotRef = "HEAD"
+	} else {
+		parsed.SnapshotWorktree = true
+	}
 
 	// Apply .slopgateignore if present at the repo root.
 	ignorePatterns, err := loadIgnorePatterns(repoDir)

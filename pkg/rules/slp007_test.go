@@ -1,6 +1,9 @@
 package rules
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -191,6 +194,261 @@ func TestSLP007_GoLastPathSegmentUnused(t *testing.T) {
 	}
 	if !strings.Contains(got[0].Message, "json") {
 		t.Errorf("message should mention json: %q", got[0].Message)
+	}
+}
+
+func TestSLP007_JSNamedImportTypeModifierIgnored(t *testing.T) {
+	d := parseDiff(t, `diff --git a/app.tsx b/app.tsx
+--- a/app.tsx
++++ b/app.tsx
+@@ -1,1 +1,4 @@
+ // app
++import { type Page, render } from 'pkg';
++export function App(page: Page) { return render(page.title); }
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for TS type modifier, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_UsesCurrentFileWhenRepoRootAvailable(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	content := `import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return <User className="icon" />;
+}
+`
+	if err := os.WriteFile(target, []byte(content), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return <User className="icon" />;
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when import is used in current file, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_StagedDiffUsesIndexSnapshot(t *testing.T) {
+	root := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v failed: %v\n%s", args, err, string(out))
+		}
+	}
+
+	runGit("init")
+	runGit("config", "user.email", "test@example.com")
+	runGit("config", "user.name", "Test User")
+
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	indexContent := `import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return <User className="icon" />;
+}
+`
+	if err := os.WriteFile(target, []byte(indexContent), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	runGit("add", "src/page.tsx")
+
+	worktreeContent := `import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return null;
+}
+`
+	if err := os.WriteFile(target, []byte(worktreeContent), 0o600); err != nil {
+		t.Fatalf("rewrite worktree file: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return null;
+`)
+	d.Staged = true
+	d.SnapshotWorktree = false
+	d.SnapshotRef = ":"
+	got := SLP007{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when staged snapshot still contains usage, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_RejectsSymlinkEscapeWhenReadingRepoFile(t *testing.T) {
+	root := t.TempDir()
+	outsideDir := t.TempDir()
+	outsideFile := filepath.Join(outsideDir, "outside.tsx")
+	if err := os.WriteFile(outsideFile, []byte(`import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return <User className="icon" />;
+}
+`), 0o600); err != nil {
+		t.Fatalf("write outside file: %v", err)
+	}
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.Symlink(outsideFile, target); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return null;
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when repo file resolves through symlink escape, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_UsesSnapshotRefInsteadOfLiveWorktree(t *testing.T) {
+	root := t.TempDir()
+	runGit := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v failed: %v\n%s", args, err, string(out))
+		}
+	}
+
+	runGit("init")
+	runGit("config", "user.email", "test@example.com")
+	runGit("config", "user.name", "Test User")
+
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	headContent := `import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return <User className="icon" />;
+}
+`
+	if err := os.WriteFile(target, []byte(headContent), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	runGit("add", "src/page.tsx")
+	runGit("commit", "-m", "seed")
+
+	worktreeContent := `import { User } from "lucide-react";
+
+export function SettingsPage() {
+  return null;
+}
+`
+	if err := os.WriteFile(target, []byte(worktreeContent), 0o600); err != nil {
+		t.Fatalf("rewrite worktree file: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return <User className="icon" />;
+`)
+	d.SnapshotWorktree = false
+	d.SnapshotRef = "HEAD"
+	got := SLP007{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings when snapshot ref still contains usage, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_DoesNotTreatImportLikeLinesAsUsageInFileFallback(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	content := `export { User } from "./icons";
+
+export function SettingsPage() {
+  return null;
+}
+`
+	if err := os.WriteFile(target, []byte(content), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return null;
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when only import-like lines mention the ident, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP007_FileFallbackIgnoresNonGoCommentsAndStrings(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "src", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	content := `import { User } from "lucide-react";
+
+const label = "User";
+// User appears only in a comment.
+export function SettingsPage() {
+  return null;
+}
+`
+	if err := os.WriteFile(target, []byte(content), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	d := parseDiffWithRoot(t, root, `diff --git a/src/page.tsx b/src/page.tsx
+--- a/src/page.tsx
++++ b/src/page.tsx
+@@ -1,2 +1,3 @@
++import { User } from "lucide-react";
+ export function SettingsPage() {
+   return null;
+`)
+	got := SLP007{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding when only comments and strings mention the ident, got %d: %+v", len(got), got)
 	}
 }
 

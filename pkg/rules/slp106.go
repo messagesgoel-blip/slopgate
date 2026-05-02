@@ -19,7 +19,10 @@ func (SLP106) Description() string {
 }
 
 var slp106Acquire = regexp.MustCompile(`(?i)\b(?:os\.Open|OpenFile|sql\.Open|Connect|Acquire|Dial|Listen|NewClient|NewConsumer|NewProducer)\(`)
-var slp106Release = regexp.MustCompile(`(?i)\b(?:Close|Release|Disconnect|Shutdown|defer.*?\bclose|defer.*?\bcancel)\(`)
+var slp106Release = regexp.MustCompile(`(?i)\b(?:Close|Release|Disconnect|Shutdown)\(`)
+var slp106DeferClose = regexp.MustCompile(`(?i)\bdefer\s+`)
+var slp106VarAssign = regexp.MustCompile(`(?i)(\w+)\s*(?:,\s*\w+\s*)?:=\s*.*?(?:os\.Open|OpenFile|sql\.Open|Connect|Acquire|Dial|Listen|NewClient|NewConsumer|NewProducer)\(`)
+var slp106VarCall = regexp.MustCompile(`(?i)\b(\w+)\.(?:Close|Release|Disconnect|Shutdown)\(`)
 
 func (r SLP106) Check(d *diff.Diff) []Finding {
 	var out []Finding
@@ -32,32 +35,50 @@ func (r SLP106) Check(d *diff.Diff) []Finding {
 		}
 
 		for _, h := range f.Hunks {
-			var acquireLines []diff.Line
+			// Track acquired resources by variable name
+			acquired := make(map[string]diff.Line) // varName -> line
+
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
 				clean := stripCommentAndStrings(ln.Content)
-				// Process all acquire/release tokens in source order so same-line
-				// pairs (e.g. sql.Open followed by db.Close) cancel correctly.
-				acqPos := slp106Acquire.FindAllStringIndex(clean, -1)
-				relPos := slp106Release.FindAllStringIndex(clean, -1)
-				ai, ri := 0, 0
-				for ai < len(acqPos) || ri < len(relPos) {
-					acqFirst := ri >= len(relPos) || (ai < len(acqPos) && acqPos[ai][0] < relPos[ri][0])
-					if acqFirst {
-						acquireLines = append(acquireLines, ln)
-						ai++
+				content := strings.TrimSpace(ln.Content)
+
+				// Check for acquisition with variable assignment
+				if slp106Acquire.MatchString(clean) {
+					// Try to extract the variable being assigned
+					if match := slp106VarAssign.FindStringSubmatch(clean); match != nil && len(match) >= 2 {
+						varName := match[1]
+						acquired[varName] = ln
 					} else {
-						if len(acquireLines) > 0 {
-							acquireLines = acquireLines[:len(acquireLines)-1]
+						// Acquisition without clear variable — use line number as key
+						varName := "__line__" + string(rune(ln.NewLineNo))
+						acquired[varName] = ln
+					}
+				}
+
+				// Check for release on a specific variable
+				if slp106Release.MatchString(clean) || slp106DeferClose.MatchString(clean) {
+					if match := slp106VarCall.FindStringSubmatch(clean); match != nil && len(match) >= 2 {
+						varName := match[1]
+						delete(acquired, varName)
+					} else if slp106DeferClose.MatchString(content) {
+						// Generic defer close without variable — try to match any single acquire
+						// This handles cases like "defer conn.Close()" where conn is a parameter
+						if len(acquired) == 1 {
+							// Only one acquire, assume this closes it
+							for k := range acquired {
+								delete(acquired, k)
+								break
+							}
 						}
-						ri++
 					}
 				}
 			}
+
 			// Emit findings for any remaining unmatched acquires.
-			for _, ln := range acquireLines {
+			for _, ln := range acquired {
 				out = append(out, Finding{
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),

@@ -72,6 +72,56 @@ func TestSLP068_IgnoresDuplicateDocsBlock(t *testing.T) {
 	}
 }
 
+func TestSLP068_IgnoresTestFiles(t *testing.T) {
+	d := parseDiff(t, `diff --git a/api/tests/example.test.js b/api/tests/example.test.js
+--- a/api/tests/example.test.js
++++ b/api/tests/example.test.js
+@@ -1,1 +1,11 @@
+ describe("x", () => {
++  const payload = { ok: true }
++  expect(payload.ok).toBe(true)
++  call(payload)
++  expect(call).toHaveBeenCalled()
++  cleanup()
++  const payload = { ok: true }
++  expect(payload.ok).toBe(true)
++  call(payload)
++  expect(call).toHaveBeenCalled()
++  cleanup()
+ })
+`)
+	got := SLP068{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for duplicated test setup, got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP068_CollapsesOverlappingWindowSpam(t *testing.T) {
+	d := parseDiff(t, `diff --git a/component.tsx b/component.tsx
+--- a/component.tsx
++++ b/component.tsx
+@@ -1,1 +1,15 @@
+ export function View() {
++  const a = one()
++  const b = two()
++  const c = three()
++  const d = four()
++  const e = five()
++  const f = six()
++  const a = one()
++  const b = two()
++  const c = three()
++  const d = four()
++  const e = five()
++  const f = six()
+ }
+`)
+	got := SLP068{}.Check(d)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 findings (one per distinct duplicate key), got %d: %+v", len(got), got)
+	}
+}
+
 func TestSLP068_Meta(t *testing.T) {
 	r := SLP068{}
 	if r.ID() != "SLP068" {

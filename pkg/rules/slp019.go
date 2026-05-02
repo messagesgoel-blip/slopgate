@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -33,7 +34,10 @@ var slp019Terminators = map[string]bool{
 	"sys.exit": true, // Python
 }
 
+var slp019ContinuationSuffix = regexp.MustCompile(`(?:[([{.,:+\-*/%&|^!?]|\b(?:and|or)\b)\s*$`)
+
 func slp019IsTerminator(content string) bool {
+	raw := strings.TrimSpace(content)
 	trimmed := strings.TrimSpace(stripCommentAndStrings(content))
 	if trimmed == "" {
 		return false
@@ -49,20 +53,63 @@ func slp019IsTerminator(content string) bool {
 			// Ensure the match isn't a longer identifier (e.g. "sys.exit_code").
 			rest := word[len(key):]
 			if len(rest) == 0 || rest[0] == '(' || (!isAlphaNum(rest[0]) && rest[0] != '_') {
-				return true
+				return !slp019StatementContinues(raw, trimmed, key)
 			}
 		}
 	}
 	// Strip everything from first non-alpha rune onward (e.g. "panic(" → "panic").
 	var b strings.Builder
 	for _, r := range word {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '.' {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
 			b.WriteRune(r)
 		} else {
 			break
 		}
 	}
-	return slp019Terminators[strings.ToLower(b.String())]
+	keyword := strings.ToLower(b.String())
+	if !slp019Terminators[keyword] {
+		return false
+	}
+	return !slp019StatementContinues(raw, trimmed, keyword)
+}
+
+func slp019StatementContinues(raw, cleaned, keyword string) bool {
+	remainder := strings.TrimSpace(strings.TrimPrefix(cleaned, keyword))
+	if remainder == "" {
+		return false
+	}
+
+	var parens, brackets, braces int
+	for _, r := range remainder {
+		switch r {
+		case '(':
+			parens++
+		case ')':
+			if parens > 0 {
+				parens--
+			}
+		case '[':
+			brackets++
+		case ']':
+			if brackets > 0 {
+				brackets--
+			}
+		case '{':
+			braces++
+		case '}':
+			if braces > 0 {
+				braces--
+			}
+		}
+	}
+	if parens > 0 || brackets > 0 || braces > 0 {
+		return true
+	}
+
+	if slp019ContinuationSuffix.MatchString(cleaned) {
+		return true
+	}
+	return strings.HasSuffix(cleaned, "=>")
 }
 
 func isAlphaNum(b byte) bool {

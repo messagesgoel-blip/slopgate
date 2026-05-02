@@ -128,6 +128,59 @@ func TestSLP019_UnreachableCode(t *testing.T) {
  }`,
 			want: 1,
 		},
+		{
+			name: "multiline return object not flagged",
+			diff: `diff --git a/main.go b/main.go
+--- a/main.go
++++ b/main.go
+@@ -1,4 +1,8 @@
+ func foo() any {
++	return {
++		ok: true,
++		value: 1,
++	}
+ }`,
+			want: 0,
+		},
+		{
+			name: "return cleanup callback not flagged",
+			diff: `diff --git a/app.tsx b/app.tsx
+--- a/app.tsx
++++ b/app.tsx
+@@ -1,4 +1,7 @@
+ function useThing() {
++  return () => {
++    cleanup()
++  }
+ }`,
+			want: 0,
+		},
+		{
+			name: "multiline throw constructor not flagged",
+			diff: `diff --git a/main.js b/main.js
+--- a/main.js
++++ b/main.js
+@@ -1,4 +1,8 @@
+function fail() {
++  throw new AppError("bad", {
++    field: "name",
++  })
+}`,
+			want: 0,
+		},
+		{
+			name: "multiline sys exit not flagged",
+			diff: `diff --git a/main.py b/main.py
+--- a/main.py
++++ b/main.py
+@@ -1,4 +1,7 @@
+ def fail():
++    sys.exit(
++        1
++    )
+`,
+			want: 0,
+		},
 	}
 
 	for _, tt := range tests {
