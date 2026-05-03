@@ -195,15 +195,11 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 						continue
 					}
 					// For timer functions, require the literal to be a top-level
-					// delay argument (comma-separated or single-arg overload).
+					// delay argument (0 or 1 top-level commas with no open nesting).
 					fnName := strings.TrimSpace(clean[fnMatch[0] : fnMatch[1]-1])
 					if isTimerFn(fnName) {
-						beforeNum := strings.TrimRight(clean[fnMatch[1]:m[2]], " \t")
-						lastCh := byte('(') // empty beforeNum means '(' immediately precedes
-						if len(beforeNum) > 0 {
-							lastCh = beforeNum[len(beforeNum)-1]
-						}
-						if lastCh != ',' && lastCh != '(' {
+						prefix := clean[fnMatch[1]:m[2]]
+						if !isTopLevelDelayArg(prefix) {
 							continue
 						}
 					}
@@ -261,4 +257,29 @@ func findMatchingParen(s string, openParenPos int) int {
 func isTimerFn(fnName string) bool {
 	lower := strings.ToLower(fnName)
 	return strings.Contains(lower, "timeout") || strings.Contains(lower, "interval")
+}
+
+// isTopLevelDelayArg reports whether prefix (text between the function's opening paren
+// and the numeric literal) indicates the literal is a top-level delay argument:
+// 0 or 1 top-level commas with no open nesting. Arrow functions short-circuit to true
+// since their parens make simple depth tracking unreliable.
+func isTopLevelDelayArg(prefix string) bool {
+	if strings.Contains(prefix, "=>") {
+		return true
+	}
+	depth := 0
+	commas := 0
+	for _, ch := range prefix {
+		switch ch {
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			depth--
+		case ',':
+			if depth == 0 {
+				commas++
+			}
+		}
+	}
+	return depth == 0 && commas <= 1
 }

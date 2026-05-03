@@ -87,7 +87,6 @@ func collectHunkBlock(added []diff.Line, start int, limit int, trackBraces bool)
 		if trackBraces {
 			// Treat braceless arrow callbacks as a complete block.
 			if strings.Contains(stripped, "=>") && !strings.Contains(stripped, "{") {
-				started = true
 				break
 			}
 			// Track brace depth.

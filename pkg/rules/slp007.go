@@ -91,7 +91,7 @@ var (
 	slp007UseKW       = regexp.MustCompile(`^use\s`)
 	slp007ExportBrace = regexp.MustCompile(`^export\s*\{`)
 	slp007ExportStar  = regexp.MustCompile(`^export\s+\*`)
-	slp007ExportFrom  = regexp.MustCompile(`^export\s+.*\s+from\s`)
+	slp007ExportFrom  = regexp.MustCompile(`^export\s+.*\s+from\s+['"\x60]`)
 	slp007RequireCall = regexp.MustCompile(`^require\s*\(`)
 )
 
