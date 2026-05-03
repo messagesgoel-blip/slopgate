@@ -39,13 +39,12 @@ func (r SLP142) Check(d *diff.Diff) []Finding {
 				continue
 			}
 
-			// Collect surrounding context (heuristic: current line + next 10)
+			// Collect surrounding context (heuristic: current line + next 12)
 			context := collectHunkBlock(added, i, 12, false)
-			
-			// If it contains a file operation using the constructed path
 
+			// If it contains a file operation using the constructed path
 			if slp142FileOp.MatchString(context) {
-				// But lacks safety checks
+				// But lacks safety checks — only EvalSymlinks counts as safe
 				if !slp142EvalSafe.MatchString(context) {
 					out = append(out, Finding{
 						RuleID:   r.ID(),
