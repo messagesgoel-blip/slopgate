@@ -12,8 +12,8 @@ This file tracks key information about the slopgate project for future agent ses
 
 ## Current Version
 
-- **v0.0.18** (feature branch `feat/parity-and-noise-reduction-wave`, 2026-05-02)
-- 138 total rules (core diff + AST + extended parity checks through SLP142)
+- **v0.0.18** (merged to main, 2026-05-03)
+- 142 total rules (core diff + AST + extended parity checks through SLP142)
 
 ## Benchmark Status
 
