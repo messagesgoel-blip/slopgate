@@ -21,12 +21,15 @@ func (SLP141) Description() string {
 var (
 	slp141UseEffect   = regexp.MustCompile(`\buseEffect\s*\(`)
 	slp141AsyncCall   = regexp.MustCompile(`\b(?:await\s+)?(?:fetch|load|refresh|get|post|put|delete|update|sync|fetch\w+|load\w+)\s*\(`)
-	slp141AsyncFunc   = regexp.MustCompile(`\basync\s+(?:function|\w+\s*=)`)
-	slp141GuardCheck  = regexp.MustCompile(`\b(?:if\s*\(|&&\s*)(?:loading|isLoading|isFetching|active|mounted|ref\s*\.\s*current)\b`)
+	slp141AsyncFunc   = regexp.MustCompile(`\b(?:async\s+(?:function|\w+\s*=)|\w+\s*=\s*async\b)`)
+	slp141GuardCheck  = regexp.MustCompile(`\b(?:if\s*\(\s*!?\s*|&&\s*!?\s*)(?:loading|isLoading|isFetching|active|mounted|ref\s*\.\s*current)\b`)
 	slp141AbortSignal = regexp.MustCompile(`\b(?:signal|AbortController|abort)\b`)
 )
 
 func (r SLP141) Check(d *diff.Diff) []Finding {
+	if d == nil {
+		return nil
+	}
 	var out []Finding
 	for _, f := range d.Files {
 		if f.IsDelete || !isJSOrTSFile(f.Path) {

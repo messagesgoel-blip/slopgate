@@ -175,10 +175,17 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 				if slp017SmallNumber.MatchString(num) {
 					continue
 				}
-				// Exempt literals inside innocuous function calls (localized heuristic).
+				// Exempt literals inside innocuous function calls (bounded-span heuristic).
 				inInnocuous := false
 				for _, fnMatch := range slp017InnocuousFunction.FindAllStringIndex(clean, -1) {
-					if fnMatch[1] <= m[2] && !strings.Contains(clean[fnMatch[1]:m[2]], ";") {
+					callEnd := findMatchingParen(clean, fnMatch[1]-1)
+					if callEnd < 0 {
+						continue
+					}
+					// Literal must lie entirely inside the call arguments
+					// and no semicolon between the function start and the literal.
+					if fnMatch[1] <= m[2] && m[3] <= callEnd &&
+						!strings.Contains(clean[fnMatch[0]:m[2]], ";") {
 						inInnocuous = true
 						break
 					}
@@ -207,4 +214,25 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 		}
 	}
 	return out
+}
+
+// findMatchingParen returns the index of the ')' that matches the '(' at openParenPos.
+// Returns -1 if no matching paren is found.
+func findMatchingParen(s string, openParenPos int) int {
+	if openParenPos < 0 || openParenPos >= len(s) || s[openParenPos] != '(' {
+		return -1
+	}
+	depth := 1
+	for i := openParenPos + 1; i < len(s); i++ {
+		switch s[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
 }
