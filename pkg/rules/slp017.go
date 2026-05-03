@@ -28,7 +28,10 @@ func (SLP017) Description() string {
 var slp017Number = regexp.MustCompile(`(?:^|[^\w.])((?:0|[1-9]\d*)(?:\.\d+)?)(?:[^\w.]|$)`)
 
 // slp017SmallNumber matches 0, 1, or 2 (common innocuous values).
-var slp017SmallNumber = regexp.MustCompile(`^[012]$`)
+var slp017SmallNumber = regexp.MustCompile(`^(?:[012]|10|20|30|40|50|60|70|80|90|100|200|300|400|500|1000|2000|3000|4000|5000|10000)$`)
+
+// slp017InnocuousFunction matches timer/wait-style function calls where numeric literals are often expected.
+var slp017InnocuousFunction = regexp.MustCompile(`(?i)\b(?:setTimeout|setInterval|delay|sleep|wait)\s*\(`)
 
 // slp017HTTPStatus matches common HTTP status codes that are intentional.
 // These are not "magic numbers" — they're standard API response codes.
@@ -164,9 +167,46 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 			// so unrelated literals on the same line are still checked.
 			clean = slp017MaskMeasurementContexts(clean)
 
-			for _, m := range slp017Number.FindAllStringSubmatch(clean, -1) {
-				num := m[1]
+			for _, m := range slp017Number.FindAllStringSubmatchIndex(clean, -1) {
+				if len(m) < 2 {
+					continue
+				}
+				num := clean[m[2]:m[3]]
 				if slp017SmallNumber.MatchString(num) {
+					continue
+				}
+				// Exempt literals inside innocuous function calls (bounded-span heuristic).
+				inInnocuous := false
+				for _, fnMatch := range slp017InnocuousFunction.FindAllStringIndex(clean, -1) {
+					callEnd := findMatchingParen(clean, fnMatch[1]-1)
+					if callEnd < 0 {
+						continue
+					}
+					// Literal must lie entirely inside the call arguments.
+					if fnMatch[1] > m[2] || m[3] > callEnd {
+						continue
+					}
+					// No semicolon between the function start and the literal.
+					if strings.Contains(clean[fnMatch[0]:m[2]], ";") {
+						continue
+					}
+					// Reject literals nested inside other parens/brackets/braces.
+					if strings.ContainsAny(clean[fnMatch[1]:m[2]], "([{") {
+						continue
+					}
+					// For timer functions, require the literal to be a top-level
+					// delay argument (0 or 1 top-level commas with no open nesting).
+					fnName := strings.TrimSpace(clean[fnMatch[0] : fnMatch[1]-1])
+					if isTimerFn(fnName) {
+						prefix := clean[fnMatch[1]:m[2]]
+						if !isTopLevelDelayArg(prefix) {
+							continue
+						}
+					}
+					inInnocuous = true
+					break
+				}
+				if inInnocuous {
 					continue
 				}
 				// Exempt HTTP status codes in HTTP context.
@@ -190,4 +230,56 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 		}
 	}
 	return out
+}
+
+// findMatchingParen returns the index of the ')' that matches the '(' at openParenPos.
+// Returns -1 if no matching paren is found.
+func findMatchingParen(s string, openParenPos int) int {
+	if openParenPos < 0 || openParenPos >= len(s) || s[openParenPos] != '(' {
+		return -1
+	}
+	depth := 1
+	for i := openParenPos + 1; i < len(s); i++ {
+		switch s[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+// isTimerFn reports whether fnName is a timer function (setTimeout/setInterval).
+func isTimerFn(fnName string) bool {
+	lower := strings.ToLower(fnName)
+	return strings.Contains(lower, "timeout") || strings.Contains(lower, "interval")
+}
+
+// isTopLevelDelayArg reports whether prefix (text between the function's opening paren
+// and the numeric literal) indicates the literal is a top-level delay argument:
+// 0 or 1 top-level commas with no open nesting. Arrow functions short-circuit to true
+// since their parens make simple depth tracking unreliable.
+func isTopLevelDelayArg(prefix string) bool {
+	if strings.Contains(prefix, "=>") {
+		return true
+	}
+	depth := 0
+	commas := 0
+	for _, ch := range prefix {
+		switch ch {
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			depth--
+		case ',':
+			if depth == 0 {
+				commas++
+			}
+		}
+	}
+	return depth == 0 && commas <= 1
 }

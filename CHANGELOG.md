@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.0.18 (2026-05-02)
+
+Noise reduction wave plus 2 new parity rules:
+
+- Tuned **SLP003** to allow intentional `// ignore` or `// intentional` comments in empty catch/if-err blocks.
+- Improved **SLP007** skip logic for complex JS/TS/Python import/export patterns during full-file usage scans.
+- Expanded **SLP017** whitelist for common numeric constants (10, 20, 100, 1000, etc.) and added heuristics for "innocuous" function contexts like `setTimeout`.
+- Hardened **SLP059** to detect unsanitized `exec.Command` arguments assembled via `strings.Join`.
+- **SLP141**: Missing in-flight request guard or `AbortController` in React `useEffect` hooks calling async functions.
+- **SLP142**: Unsafe path resolution — `filepath.Join` used in file operations without subsequent `EvalSymlinks` containment checks.
+
+Total: 142 rules
+
 ## v0.0.17 (2026-05-01)
 
 Benchmark v2 plus 4 new parity rules:

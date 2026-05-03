@@ -131,6 +131,8 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 		"SLP138": false,
 		"SLP139": false,
 		"SLP140": false,
+		"SLP141": false,
+		"SLP142": false,
 	}
 	for _, rule := range r.All() {
 		if _, ok := want[rule.ID()]; ok {
@@ -147,7 +149,7 @@ func TestDefault_RegistersAllV001Rules(t *testing.T) {
 func TestDefault_NoExtraRules(t *testing.T) {
 	r := Default()
 
-	wantCount := 126
+	wantCount := 128
 	if got := len(r.All()); got != wantCount {
 		t.Errorf("Default registry has %d rules, want %d", got, wantCount)
 	}
@@ -171,7 +173,7 @@ func TestDefault_NoExtraRules(t *testing.T) {
 		"SLP126", "SLP127",
 		"SLP128", "SLP129", "SLP130", "SLP131", "SLP132",
 		"SLP133", "SLP134", "SLP135", "SLP136", "SLP137",
-		"SLP138", "SLP139", "SLP140",
+		"SLP138", "SLP139", "SLP140", "SLP141", "SLP142",
 	}
 	for _, id := range newRules {
 		if !ruleIDs[id] {
