@@ -83,6 +83,18 @@ var slp007JSStarImport = regexp.MustCompile(`^\s*import\s*\*\s*as\s+([A-Za-z_$][
 // slp007JSNamedItem matches a single item inside braces: X or X as Y.
 var slp007JSNamedItem = regexp.MustCompile(`(\w+)\s*(?:as\s+(\w+))?`)
 
+// slp007ImportLike patterns use ECMAScript-aware whitespace for import/export detection.
+var (
+	slp007ImportKW    = regexp.MustCompile(`^import\s`)
+	slp007ImportBrace = regexp.MustCompile(`^import\s*\{`)
+	slp007FromImport  = regexp.MustCompile(`^from\s+.*\s+import\s`)
+	slp007UseKW       = regexp.MustCompile(`^use\s`)
+	slp007ExportBrace = regexp.MustCompile(`^export\s*\{`)
+	slp007ExportStar  = regexp.MustCompile(`^export\s+\*`)
+	slp007ExportFrom  = regexp.MustCompile(`^export\s+.*\s+from\s`)
+	slp007RequireCall = regexp.MustCompile(`^require\s*\(`)
+)
+
 // --- Python import patterns ---
 
 // slp007PyPlainImport matches `import X` or `import X, Y` or `import X as Y`.
@@ -569,17 +581,15 @@ func identUsedInFile(ident string, lines []string, goMode bool, skipLineN int) b
 func slp007IsImportLikeLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
 	switch {
-	case strings.HasPrefix(trimmed, "import "):
+	case slp007ImportKW.MatchString(trimmed) || slp007ImportBrace.MatchString(trimmed):
 		return true
-	case strings.HasPrefix(trimmed, "import{") || strings.HasPrefix(trimmed, "import {"):
+	case slp007FromImport.MatchString(trimmed):
 		return true
-	case strings.HasPrefix(trimmed, "from ") && strings.Contains(trimmed, " import "):
+	case slp007UseKW.MatchString(trimmed):
 		return true
-	case strings.HasPrefix(trimmed, "use "):
+	case slp007ExportBrace.MatchString(trimmed) || slp007ExportStar.MatchString(trimmed) || slp007ExportFrom.MatchString(trimmed):
 		return true
-	case strings.HasPrefix(trimmed, "export {") || strings.HasPrefix(trimmed, "export{") || strings.HasPrefix(trimmed, "export *") || (strings.Contains(trimmed, " from ") && strings.HasPrefix(trimmed, "export ")):
-		return true
-	case strings.HasPrefix(trimmed, "require("):
+	case slp007RequireCall.MatchString(trimmed):
 		return true
 	default:
 		return false

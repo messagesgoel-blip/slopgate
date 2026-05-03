@@ -182,13 +182,33 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 					if callEnd < 0 {
 						continue
 					}
-					// Literal must lie entirely inside the call arguments
-					// and no semicolon between the function start and the literal.
-					if fnMatch[1] <= m[2] && m[3] <= callEnd &&
-						!strings.Contains(clean[fnMatch[0]:m[2]], ";") {
-						inInnocuous = true
-						break
+					// Literal must lie entirely inside the call arguments.
+					if fnMatch[1] > m[2] || m[3] > callEnd {
+						continue
 					}
+					// No semicolon between the function start and the literal.
+					if strings.Contains(clean[fnMatch[0]:m[2]], ";") {
+						continue
+					}
+					// Reject literals nested inside other parens/brackets/braces.
+					if strings.ContainsAny(clean[fnMatch[1]:m[2]], "([{") {
+						continue
+					}
+					// For timer functions, require the literal to be a top-level
+					// delay argument (comma-separated or single-arg overload).
+					fnName := strings.TrimSpace(clean[fnMatch[0] : fnMatch[1]-1])
+					if isTimerFn(fnName) {
+						beforeNum := strings.TrimRight(clean[fnMatch[1]:m[2]], " \t")
+						lastCh := byte('(') // empty beforeNum means '(' immediately precedes
+						if len(beforeNum) > 0 {
+							lastCh = beforeNum[len(beforeNum)-1]
+						}
+						if lastCh != ',' && lastCh != '(' {
+							continue
+						}
+					}
+					inInnocuous = true
+					break
 				}
 				if inInnocuous {
 					continue
@@ -235,4 +255,10 @@ func findMatchingParen(s string, openParenPos int) int {
 		}
 	}
 	return -1
+}
+
+// isTimerFn reports whether fnName is a timer function (setTimeout/setInterval).
+func isTimerFn(fnName string) bool {
+	lower := strings.ToLower(fnName)
+	return strings.Contains(lower, "timeout") || strings.Contains(lower, "interval")
 }
