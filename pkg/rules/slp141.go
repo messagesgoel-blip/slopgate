@@ -78,17 +78,18 @@ func collectHunkBlock(added []diff.Line, start int, limit int, trackBraces bool)
 			break
 		}
 		content := added[i].Content
-		lines = append(lines, stripCommentAndStrings(content))
+		stripped := stripCommentAndStrings(content)
+		lines = append(lines, stripped)
 
 		if trackBraces {
 			// Track brace depth.
-			open := strings.Count(content, "{")
-			close := strings.Count(content, "}")
+			open := strings.Count(stripped, "{")
+			closeBraces := strings.Count(stripped, "}")
 
 			if open > 0 {
 				started = true
 			}
-			depth += open - close
+			depth += open - closeBraces
 
 			if started && depth <= 0 {
 				break

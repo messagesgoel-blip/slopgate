@@ -28,7 +28,7 @@ func (SLP017) Description() string {
 var slp017Number = regexp.MustCompile(`(?:^|[^\w.])((?:0|[1-9]\d*)(?:\.\d+)?)(?:[^\w.]|$)`)
 
 // slp017SmallNumber matches 0, 1, or 2 (common innocuous values).
-var slp017SmallNumber = regexp.MustCompile(`^(?:[012]|10|20|30|40|50|60|90|100|200|300|400|500|1000|2000|3000|4000|5000|10000)$`)
+var slp017SmallNumber = regexp.MustCompile(`^(?:[012]|10|20|30|40|50|60|70|80|90|100|200|300|400|500|1000|2000|3000|4000|5000|10000)$`)
 
 // slp017InnocuousFunction matches timer/wait-style function calls where numeric literals are often expected.
 var slp017InnocuousFunction = regexp.MustCompile(`(?i)\b(?:setTimeout|setInterval|delay|sleep|wait)\s*\(`)
@@ -175,9 +175,15 @@ func (r SLP017) Check(d *diff.Diff) []Finding {
 				if slp017SmallNumber.MatchString(num) {
 					continue
 				}
-				// Exempt literals in innocuous function contexts (heuristic).
-				// Check the line segment leading up to the number.
-				if slp017InnocuousFunction.MatchString(clean[:m[2]]) {
+				// Exempt literals inside innocuous function calls (localized heuristic).
+				inInnocuous := false
+				for _, fnMatch := range slp017InnocuousFunction.FindAllStringIndex(clean, -1) {
+					if fnMatch[1] <= m[2] && !strings.Contains(clean[fnMatch[1]:m[2]], ";") {
+						inInnocuous = true
+						break
+					}
+				}
+				if inInnocuous {
 					continue
 				}
 				// Exempt HTTP status codes in HTTP context.

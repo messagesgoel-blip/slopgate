@@ -11,7 +11,7 @@ Noise reduction wave plus 2 new parity rules:
 - **SLP141**: Missing in-flight request guard or `AbortController` in React `useEffect` hooks calling async functions.
 - **SLP142**: Unsafe path resolution — `filepath.Join` used in file operations without subsequent `EvalSymlinks` containment checks.
 
-Total: 138 rules
+Total: 142 rules
 
 ## v0.0.17 (2026-05-01)
 
