@@ -35,10 +35,10 @@ var defaultValPattern = regexp.MustCompile(`=\s*[^,}\s]`)
 
 // guardPatterns match common defensive checks before destructuring.
 var guardPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`if\s*\(\s*[^)]+\s*\)\s*{`),                       // if (obj) ...
-	regexp.MustCompile(`if\s*\(\s*!?\s*[^)]+\s*\)\s*return`),           // guard clause
-	regexp.MustCompile(`[^=]=\s*[^;]+\s*\|\|`),                         // safe fallback before
-	regexp.MustCompile(`[^=]=\s*[^;]+\s*\?\?`),                         // nullish coalescing
+	regexp.MustCompile(`if\s*\(\s*[^)]+\s*\)\s*{`),           // if (obj) ...
+	regexp.MustCompile(`if\s*\(\s*!?\s*[^)]+\s*\)\s*return`), // guard clause
+	regexp.MustCompile(`[^=]=\s*[^;]+\s*\|\|`),               // safe fallback before
+	regexp.MustCompile(`[^=]=\s*[^;]+\s*\?\?`),               // nullish coalescing
 }
 
 // possibleUndefSource matches common sources that can be undefined:
@@ -63,7 +63,7 @@ func isPotentiallyUndefinedSource(source string) bool {
 // hasDefaultValue checks if destructuring pattern has defaults for all properties.
 func hasDefaultValue(destructureLine string) bool {
 	// Check for "=" within braces indicating defaults: {a = 1, b = 2}
-	 braceStart := strings.Index(destructureLine, "{")
+	braceStart := strings.Index(destructureLine, "{")
 	braceEnd := strings.Index(destructureLine, "}")
 	if braceStart < 0 || braceEnd < 0 {
 		return false
@@ -113,31 +113,31 @@ func (r SLP147) Check(d *diff.Diff) []Finding {
 				}
 				line := ln.Content
 
-			// Check if this is a destructuring assignment
-			if !destructuringPattern.MatchString(line) {
-				continue
-			}
+				// Check if this is a destructuring assignment
+				if !destructuringPattern.MatchString(line) {
+					continue
+				}
 
-			// Extract the source expression
-			parts := destructuringPattern.FindStringSubmatch(line)
-			if len(parts) < 4 {
-				continue
-			}
-			sourceExpr := strings.TrimSpace(parts[3])
+				// Extract the source expression
+				parts := destructuringPattern.FindStringSubmatch(line)
+				if len(parts) < 4 {
+					continue
+				}
+				sourceExpr := strings.TrimSpace(parts[3])
 
-			// Skip if source has inline fallback guard (e.g., req.user || {})
-			if strings.Contains(sourceExpr, "||") || strings.Contains(sourceExpr, "??") {
-				continue
-			}
+				// Skip if source has inline fallback guard (e.g., req.user || {})
+				if strings.Contains(sourceExpr, "||") || strings.Contains(sourceExpr, "??") {
+					continue
+				}
 
-			// Quick heuristic: skip obvious safe sources
-			if sourceExpr == "this" ||
-				sourceExpr == "window" ||
-				sourceExpr == "global" ||
-				sourceExpr == "globalThis" ||
-				strings.HasPrefix(sourceExpr, "process.env") {
-				continue
-			}
+				// Quick heuristic: skip obvious safe sources
+				if sourceExpr == "this" ||
+					sourceExpr == "window" ||
+					sourceExpr == "global" ||
+					sourceExpr == "globalThis" ||
+					strings.HasPrefix(sourceExpr, "process.env") {
+					continue
+				}
 
 				// Check if source is potentially undefined
 				if !isPotentiallyUndefinedSource(sourceExpr) {

@@ -28,13 +28,13 @@ func (SLP144) Description() string {
 
 // errorPatterns maps error handling patterns we look for.
 var errorPatterns = map[string]*regexp.Regexp{
-	"res-fail":    regexp.MustCompile(`\bres\.fail\s*\(`),
-	"res-send":    regexp.MustCompile(`\bres\.(send|json|status)\s*\(`),
-	"res-error":   regexp.MustCompile(`\bres\.error\s*\(`),
-	"res-next":    regexp.MustCompile(`\bnext\s*\(\s*(?:err)?\s*\)`),
-	"throw":       regexp.MustCompile(`\bthrow\s+(?:new )?Error\s*\(`),
-	"throw-err":   regexp.MustCompile(`\bthrow\s+err\b`),
-	"return-err":  regexp.MustCompile(`\breturn\s+next\s*\(\s*err\s*\)`),
+	"res-fail":     regexp.MustCompile(`\bres\.fail\s*\(`),
+	"res-send":     regexp.MustCompile(`\bres\.(send|json|status)\s*\(`),
+	"res-error":    regexp.MustCompile(`\bres\.error\s*\(`),
+	"res-next":     regexp.MustCompile(`\bnext\s*\(\s*(?:err)?\s*\)`),
+	"throw":        regexp.MustCompile(`\bthrow\s+(?:new )?Error\s*\(`),
+	"throw-err":    regexp.MustCompile(`\bthrow\s+err\b`),
+	"return-err":   regexp.MustCompile(`\breturn\s+next\s*\(\s*err\s*\)`),
 	"callback-err": regexp.MustCompile(`\bcb\s*\(\s*err\s*\)`),
 }
 
@@ -93,35 +93,35 @@ func (r SLP144) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-	// Detect what error handling patterns are used
-	patternsFound := detectMixedPatterns(addedLines)
-	if len(patternsFound) > 1 {
-		// Find first added line number for reporting
-		var firstLine int = 0
-		for _, h := range f.Hunks {
-			for _, ln := range h.Lines {
-				if ln.Kind == diff.LineAdd {
-					firstLine = ln.NewLineNo
+		// Detect what error handling patterns are used
+		patternsFound := detectMixedPatterns(addedLines)
+		if len(patternsFound) > 1 {
+			// Find first added line number for reporting
+			var firstLine int = 0
+			for _, h := range f.Hunks {
+				for _, ln := range h.Lines {
+					if ln.Kind == diff.LineAdd {
+						firstLine = ln.NewLineNo
+						break
+					}
+				}
+				if firstLine > 0 {
 					break
 				}
 			}
-			if firstLine > 0 {
-				break
+			if firstLine == 0 {
+				firstLine = 1 // fallback
 			}
+			// Multiple patterns found - inconsistent
+			out = append(out, Finding{
+				RuleID:   r.ID(),
+				Severity: r.DefaultSeverity(),
+				File:     f.Path,
+				Line:     firstLine,
+				Message:  "inconsistent error handling patterns detected: " + strings.Join(patternsFound, ", "),
+				Snippet:  "mixing res.fail, res.send, throw, and/or next(err)",
+			})
 		}
-		if firstLine == 0 {
-			firstLine = 1 // fallback
-		}
-		// Multiple patterns found - inconsistent
-		out = append(out, Finding{
-			RuleID:   r.ID(),
-			Severity: r.DefaultSeverity(),
-			File:     f.Path,
-			Line:     firstLine,
-			Message:  "inconsistent error handling patterns detected: " + strings.Join(patternsFound, ", "),
-			Snippet:  "mixing res.fail, res.send, throw, and/or next(err)",
-		})
-	}
 	}
 
 	return out

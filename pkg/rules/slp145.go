@@ -51,8 +51,8 @@ var timeoutPatterns = []*regexp.Regexp{
 
 // extremeTimeouts defines thresholds (in ms) for flagging.
 const (
-	veryShortTimeout = 1000   // < 1 second
-	veryLongTimeout  = 30000  // > 30 seconds
+	veryShortTimeout = 1000  // < 1 second
+	veryLongTimeout  = 30000 // > 30 seconds
 )
 
 // hasJustifyingComment checks if the line or the next line contains a

@@ -87,20 +87,20 @@ func (r SLP146) Check(d *diff.Diff) []Finding {
 				}
 				line := ln.Content
 
-			// Pattern 1: async callback in map/forEach/filter/reduce
-			// Skip if the call is within Promise.all(...) which is safe.
-			if (asyncFunctionInMap1.MatchString(line) || asyncFunctionInMap2.MatchString(line)) &&
-				!strings.Contains(line, "Promise.all") {
-				out = append(out, Finding{
-					RuleID:   r.ID(),
-					Severity: r.DefaultSeverity(),
-					File:     f.Path,
-					Line:     ln.NewLineNo,
-					Message:  "async function in array iteration without Promise.all wrapper",
-					Snippet:  strings.TrimSpace(line),
-				})
-				continue
-			}
+				// Pattern 1: async callback in map/forEach/filter/reduce
+				// Skip if the call is within Promise.all(...) which is safe.
+				if (asyncFunctionInMap1.MatchString(line) || asyncFunctionInMap2.MatchString(line)) &&
+					!strings.Contains(line, "Promise.all") {
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "async function in array iteration without Promise.all wrapper",
+						Snippet:  strings.TrimSpace(line),
+					})
+					continue
+				}
 
 				// Pattern 2: forEach with function that might return promise
 				if forEachPattern.MatchString(line) && strings.Contains(line, "=>") {

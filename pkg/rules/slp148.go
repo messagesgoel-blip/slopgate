@@ -13,10 +13,10 @@ import (
 // This catches patterns like userId vs userID vs user_id for the same concept.
 //
 // Detection strategy:
-//   1. Extract all variable/constant declarations from added lines
-//   2. Normalize names (lowercase, strip underscores, etc.)
-//   3. Group by semantic similarity (Levenshtein distance, shared prefixes/suffixes)
-//   4. Flag groups with multiple naming conventions
+//  1. Extract all variable/constant declarations from added lines
+//  2. Normalize names (lowercase, strip underscores, etc.)
+//  3. Group by semantic similarity (Levenshtein distance, shared prefixes/suffixes)
+//  4. Flag groups with multiple naming conventions
 //
 // Languages: JavaScript, TypeScript, Go, Python, Java
 //
@@ -73,20 +73,20 @@ var ignoreList = map[string]bool{
 // semanticGroups maps common semantic categories.
 // Each key is a canonical concept that should have consistent naming.
 var semanticGroups = map[string][]string{
-	"id":        {"identifier", "uid", "uuid", "guid"},
-	"user":      {"user", "account", "profile", "customer", "client"},
-	"token":     {"token", "accesstoken", "authtoken", "bearer"},
-	"key":       {"key", "apikey", "secret_key"},
-	"secret":    {"secret", "apisecret", "password"},
-	"config":    {"config", "configuration", "settings", "options"},
-	"param":     {"parameter", "param", "arg", "argument"},
-	"value":     {"value", "val", "result", "output"},
-	"error":     {"error", "err", "failure"},
-	"message":   {"message", "msg", "text"},
+	"id":           {"identifier", "uid", "uuid", "guid"},
+	"user":         {"user", "account", "profile", "customer", "client"},
+	"token":        {"token", "accesstoken", "authtoken", "bearer"},
+	"key":          {"key", "apikey", "secret_key"},
+	"secret":       {"secret", "apisecret", "password"},
+	"config":       {"config", "configuration", "settings", "options"},
+	"param":        {"parameter", "param", "arg", "argument"},
+	"value":        {"value", "val", "result", "output"},
+	"error":        {"error", "err", "failure"},
+	"message":      {"message", "msg", "text"},
 	"notification": {"notification", "notif", "alert"},
-	"record":    {"record", "rec", "entry"},
-	"item":      {"item", "entry"},
-	"count":     {"count", "total", "num", "number"},
+	"record":       {"record", "rec", "entry"},
+	"item":         {"item", "entry"},
+	"count":        {"count", "total", "num", "number"},
 }
 
 // normalizeName returns a canonical semantic group key for a variable name.
