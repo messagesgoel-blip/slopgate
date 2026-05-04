@@ -41,6 +41,64 @@ class GhApiJsonTest(unittest.TestCase):
                 benchmark_review.gh_api_json(["repos/example/repo/pulls/20/comments", "--paginate"])
 
 
+class RunCmdTest(unittest.TestCase):
+    def test_run_cmd_strips_hook_git_env_for_git_commands(self) -> None:
+        with patch.dict(
+            benchmark_review.os.environ,
+            {
+                "GIT_INDEX_FILE": ".git/index",
+                "GIT_DIR": ".git",
+                "GIT_WORK_TREE": "tmp-worktree",
+                "GIT_PREFIX": "src/",
+                "KEEP_ME": "1",
+            },
+            clear=False,
+        ), patch.object(
+            benchmark_review.subprocess,
+            "run",
+            return_value=completed(stdout="ok\n"),
+        ) as run:
+            benchmark_review.run_cmd(["git", "status"])
+
+        env = run.call_args.kwargs["env"]
+        self.assertIsNotNone(env)
+        self.assertEqual(env.get("KEEP_ME"), "1")
+        self.assertNotIn("GIT_INDEX_FILE", env)
+        self.assertNotIn("GIT_DIR", env)
+        self.assertNotIn("GIT_WORK_TREE", env)
+        self.assertNotIn("GIT_PREFIX", env)
+
+    def test_worktree_cleanup_strips_hook_git_env(self) -> None:
+        context = benchmark_review.WorktreeContext(
+            repo_root=Path("repo-root"),
+            worktree_path=Path("worktree-path"),
+            target_ref="target-ref",
+            compare_base="base-ref",
+            requested_base="main",
+            base_branch="main",
+            mode="open_pr_head",
+            temp_ref="refs/slopgate-benchmark/pr-20-4321",
+        )
+        with patch.dict(
+            benchmark_review.os.environ,
+            {"GIT_INDEX_FILE": ".git/index"},
+            clear=False,
+        ), patch.object(
+            benchmark_review.subprocess,
+            "run",
+            return_value=completed(),
+        ) as run, patch.object(
+            benchmark_review.shutil,
+            "rmtree",
+        ):
+            context.cleanup()
+
+        envs = [call.kwargs["env"] for call in run.call_args_list]
+        self.assertEqual(len(envs), 2)
+        self.assertTrue(all(env is not None for env in envs))
+        self.assertTrue(all("GIT_INDEX_FILE" not in env for env in envs))
+
+
 class PrepareWorktreeTest(unittest.TestCase):
     def setUp(self) -> None:
         self.repo_root = Path("repo-root")

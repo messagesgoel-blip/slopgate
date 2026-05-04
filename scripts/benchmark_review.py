@@ -25,6 +25,7 @@ from typing import Any
 DEFAULT_SLOPGATE_BIN = os.environ.get("SLOPGATE_BIN", "/srv/storage/shared/tools/bin/slopgate")
 DEFAULT_SENTRY_HELPER = os.environ.get("SLOPGATE_SENTRY_HELPER", "/srv/storage/shared/tools/bin/sentry-whimsy")
 DEFAULT_FUZZY_RANGE = int(os.environ.get("BENCHMARK_FUZZY_RANGE", "2"))
+GIT_HOOK_ENV_VARS = ("GIT_INDEX_FILE", "GIT_DIR", "GIT_WORK_TREE", "GIT_PREFIX")
 
 
 class BenchmarkError(RuntimeError):
@@ -65,22 +66,41 @@ class WorktreeContext:
     temp_ref: str | None = None
 
     def cleanup(self) -> None:
+        """Remove the temporary worktree and scratch ref created for benchmarking."""
+        remove_cmd = ["git", "-C", str(self.repo_root), "worktree", "remove", "--force", str(self.worktree_path)]
         subprocess.run(
-            ["git", "-C", str(self.repo_root), "worktree", "remove", "--force", str(self.worktree_path)],
+            remove_cmd,
             check=False,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            env=subprocess_env(remove_cmd),
         )
         if self.temp_ref:
+            update_ref_cmd = ["git", "-C", str(self.repo_root), "update-ref", "-d", self.temp_ref]
             subprocess.run(
-                ["git", "-C", str(self.repo_root), "update-ref", "-d", self.temp_ref],
+                update_ref_cmd,
                 check=False,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                env=subprocess_env(update_ref_cmd),
             )
         shutil.rmtree(self.worktree_path, ignore_errors=True)
 
 
+def subprocess_env(cmd: list[str]) -> dict[str, str] | None:
+    """Strip hook-scoped Git environment from Git subprocesses only."""
+    command_name = Path(next(iter(cmd), "")).name
+    if command_name != "git":
+        return None
+    env = os.environ.copy()
+    changed = False
+    for key in GIT_HOOK_ENV_VARS:
+        if key in env:
+            changed = True
+            env.pop(key, None)
+    return env if changed else None
+
+"""Run subprocesses with normalized errors for benchmark diagnostics."""
 def run_cmd(
     cmd: list[str],
     *,
@@ -88,6 +108,7 @@ def run_cmd(
     check: bool = True,
     timeout: float | None = 60,
 ) -> subprocess.CompletedProcess[str]:
+    """Run a command and raise BenchmarkError when execution fails."""
     try:
         proc = subprocess.run(
             cmd,
@@ -96,6 +117,7 @@ def run_cmd(
             text=True,
             check=False,
             timeout=timeout,
+            env=subprocess_env(cmd),
         )
     except subprocess.TimeoutExpired as exc:
         raise BenchmarkError(f"command timed out after {timeout}s: {' '.join(cmd)}") from exc
