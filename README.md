@@ -190,7 +190,7 @@ Benchmarks are automatically archived to `/srv/storage/shared/slopgate-benchmark
 
 Current rule set:
 
-- **142 total rules**
+- **148 total rules**
 - **10 AST-aware Go rules** (`SLP071`–`SLP080`)
 
 Reserved IDs: **SLP004, SLP028, SLP029, SLP105**

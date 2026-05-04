@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.0.19 (unreleased)
+
+6 new rules for enhanced bug detection:
+
+- **SLP143**: Environment variable accessed without validation or default value
+- **SLP144**: Inconsistent error handling patterns in same file or route group
+- **SLP145**: Hardcoded timeout value lacks contextual justification
+- **SLP146**: Unawaited promise in loop or array iteration
+- **SLP147**: Object destructuring from potentially undefined source without guard
+- **SLP148**: Inconsistent naming for the same conceptual variable across modules
+
+Total: 148 rules
+
 ## v0.0.18 (2026-05-02)
 
 Noise reduction wave plus 2 new parity rules:
