@@ -100,7 +100,7 @@ def subprocess_env(cmd: list[str]) -> dict[str, str] | None:
             env.pop(key, None)
     return env if changed else None
 
-
+"""Run subprocesses with normalized errors for benchmark diagnostics."""
 def run_cmd(
     cmd: list[str],
     *,
