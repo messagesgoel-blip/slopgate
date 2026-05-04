@@ -29,8 +29,6 @@ func (SLP148) Description() string {
 	return "inconsistent naming for the same conceptual variable across modules"
 }
 
-// varDeclPattern matches variable declarations in various languages.
-var varDeclPattern = regexp.MustCompile(`(?:var|let|const|func|def|class|type|interface)\s+(\w+)`)
 
 // identifierPattern matches any identifier after a keyword.
 var identifierPattern = regexp.MustCompile(`\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b`)
@@ -198,14 +196,6 @@ func (r SLP148) Check(d *diff.Diff) []Finding {
 		}
 		if len(variantSet) < 2 {
 			continue // only one distinct name
-		}
-
-		// Gather snippet examples
-		var snippets []string
-		lines := make(map[int]string)
-		for _, v := range variants {
-			snippets = append(snippets, v.name)
-			lines[v.lineNo] = v.file
 		}
 
 		// Format message showing variants

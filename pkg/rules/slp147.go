@@ -30,8 +30,6 @@ func (SLP147) Description() string {
 // Captures: const/let/var, variable names, source expression
 var destructuringPattern = regexp.MustCompile(`(const|let|var)\s+{([^}]+)}\s*=\s*([^;]+);`)
 
-// defaultValPattern matches default values in destructuring (safe pattern).
-var defaultValPattern = regexp.MustCompile(`=\s*[^,}\s]`)
 
 // guardPatterns match common defensive checks before destructuring.
 var guardPatterns = []*regexp.Regexp{
@@ -60,18 +58,6 @@ func isPotentiallyUndefinedSource(source string) bool {
 	return false
 }
 
-// hasDefaultValue checks if destructuring pattern has defaults for all properties.
-func hasDefaultValue(destructureLine string) bool {
-	// Check for "=" within braces indicating defaults: {a = 1, b = 2}
-	braceStart := strings.Index(destructureLine, "{")
-	braceEnd := strings.Index(destructureLine, "}")
-	if braceStart < 0 || braceEnd < 0 {
-		return false
-	}
-	inner := destructureLine[braceStart+1 : braceEnd]
-	// Look for default assignments
-	return defaultValPattern.MatchString(inner)
-}
 
 // hasPrecedingGuard checks if any previous line in the hunk has a guard.
 func hasPrecedingGuard(h diff.Hunk, idx int) bool {

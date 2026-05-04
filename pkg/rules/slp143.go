@@ -41,9 +41,9 @@ func isTestOrDedicatedConfig(path string) bool {
 	if strings.Contains(lower, ".test.") ||
 		strings.Contains(lower, ".spec.") ||
 		strings.Contains(lower, "_test.") ||
-		strings.HasSuffix(lower, "/__tests__/") ||
-		strings.HasSuffix(lower, "/test/") ||
-		strings.HasSuffix(lower, "/tests/") {
+		strings.Contains(lower, "/__tests__/") ||
+		strings.Contains(lower, "/test/") ||
+		strings.Contains(lower, "/tests/") {
 		return true
 	}
 	// Dedicated config files

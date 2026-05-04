@@ -33,9 +33,6 @@ func (SLP146) Description() string {
 var asyncFunctionInMap1 = regexp.MustCompile(`\.(map|forEach|filter|reduce)\s*\(\s*async\s*\(`)
 var asyncFunctionInMap2 = regexp.MustCompile(`\.(map|forEach|filter|reduce)\s*\(\s*async\s+\w+\s*=>`)
 
-// promiseCallInLoop matches a function call that returns a promise but
-// isn't preceded by await in a loop context.
-var promiseCallInLoop = regexp.MustCompile(`\b(await\s+)?(?:await\s+)?[a-zA-Z_$][a-zA-Z0-9_$]*\s*\(\s*[^)]*\)\s*;?`)
 
 // forEachPattern matches forEach calls
 var forEachPattern = regexp.MustCompile(`\.forEach\s*\(`)
@@ -45,11 +42,9 @@ func isLoopLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
 	return strings.HasPrefix(trimmed, "for ") ||
 		strings.HasPrefix(trimmed, "for(") ||
-		strings.HasPrefix(trimmed, "for(") ||
 		strings.Contains(trimmed, " for ") ||
 		strings.HasPrefix(trimmed, "while ") ||
-		strings.HasPrefix(trimmed, "do ") ||
-		strings.HasPrefix(trimmed, "for...of")
+		strings.HasPrefix(trimmed, "do ")
 }
 
 // lineHasAwait checks if the line contains an await keyword at the start level

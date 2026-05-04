@@ -97,7 +97,7 @@ func (r SLP144) Check(d *diff.Diff) []Finding {
 		patternsFound := detectMixedPatterns(addedLines)
 		if len(patternsFound) > 1 {
 			// Find first added line number for reporting
-			var firstLine int = 0
+			firstLine := 0
 			for _, h := range f.Hunks {
 				for _, ln := range h.Lines {
 					if ln.Kind == diff.LineAdd {

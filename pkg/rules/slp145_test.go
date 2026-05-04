@@ -36,8 +36,10 @@ func TestSLP145_AllowsModerateTimeout(t *testing.T) {
 	d := parseDiff(t, `diff --git a/api.js b/api.js
 --- a/api.js
 +++ b/api.js
-@@ -20,3 +20,3 @@
- const timeout = 10000;
+@@ -20,3 +20,4 @@
+ const app = express();
++const timeout = 10000;
+ const server = app.listen(3000);
  `)
 	got := SLP145{}.Check(d)
 	if len(got) != 0 {
