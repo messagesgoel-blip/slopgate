@@ -66,6 +66,7 @@ class WorktreeContext:
     temp_ref: str | None = None
 
     def cleanup(self) -> None:
+        """Remove the temporary worktree and scratch ref created for benchmarking."""
         remove_cmd = ["git", "-C", str(self.repo_root), "worktree", "remove", "--force", str(self.worktree_path)]
         subprocess.run(
             remove_cmd,
@@ -87,7 +88,9 @@ class WorktreeContext:
 
 
 def subprocess_env(cmd: list[str]) -> dict[str, str] | None:
-    if not cmd or Path(cmd[0]).name != "git":
+    """Strip hook-scoped Git environment from Git subprocesses only."""
+    command_name = Path(next(iter(cmd), "")).name
+    if command_name != "git":
         return None
     env = os.environ.copy()
     changed = False
@@ -105,6 +108,7 @@ def run_cmd(
     check: bool = True,
     timeout: float | None = 60,
 ) -> subprocess.CompletedProcess[str]:
+    """Run a command and raise BenchmarkError when execution fails."""
     try:
         proc = subprocess.run(
             cmd,
