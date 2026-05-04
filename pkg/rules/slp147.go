@@ -113,31 +113,31 @@ func (r SLP147) Check(d *diff.Diff) []Finding {
 				}
 				line := ln.Content
 
-				// Check if this is a destructuring assignment
-				if !destructuringPattern.MatchString(line) {
-					continue
-				}
+			// Check if this is a destructuring assignment
+			if !destructuringPattern.MatchString(line) {
+				continue
+			}
 
-				// Check if it has default values (safe)
-				if hasDefaultValue(line) {
-					continue
-				}
+			// Extract the source expression
+			parts := destructuringPattern.FindStringSubmatch(line)
+			if len(parts) < 4 {
+				continue
+			}
+			sourceExpr := strings.TrimSpace(parts[3])
 
-				// Extract the source expression
-				parts := destructuringPattern.FindStringSubmatch(line)
-				if len(parts) < 4 {
-					continue
-				}
-				sourceExpr := strings.TrimSpace(parts[3])
+			// Skip if source has inline fallback guard (e.g., req.user || {})
+			if strings.Contains(sourceExpr, "||") || strings.Contains(sourceExpr, "??") {
+				continue
+			}
 
-				// Quick heuristic: skip obvious safe sources
-				if sourceExpr == "this" ||
-					sourceExpr == "window" ||
-					sourceExpr == "global" ||
-					sourceExpr == "globalThis" ||
-					strings.HasPrefix(sourceExpr, "process.env") {
-					continue
-				}
+			// Quick heuristic: skip obvious safe sources
+			if sourceExpr == "this" ||
+				sourceExpr == "window" ||
+				sourceExpr == "global" ||
+				sourceExpr == "globalThis" ||
+				strings.HasPrefix(sourceExpr, "process.env") {
+				continue
+			}
 
 				// Check if source is potentially undefined
 				if !isPotentiallyUndefinedSource(sourceExpr) {

@@ -34,32 +34,6 @@ var envVarPattern = regexp.MustCompile(`(?:process\.env\.|import\.meta\.env\.)\w
 // validationPattern matches common validation patterns that make env var usage safe.
 var validationPattern = regexp.MustCompile(`(?:if\s*.+|const\s+\w+\s*=\s*\w+\s*\|\||\?\?|Boolean\()|\.hasOwnProperty|env\[`)
 
-// isConfigLikeFile reports whether the file appears to be a configuration or
-// environment setup file where direct access is acceptable.
-func isConfigLikeFile(path string) bool {
-	lower := strings.ToLower(path)
-	return strings.Contains(lower, "config") ||
-		strings.Contains(lower, "env") ||
-		strings.Contains(lower, ".env") ||
-		strings.HasSuffix(lower, "/config.js") ||
-		strings.HasSuffix(lower, "/config.ts") ||
-		strings.HasSuffix(lower, "/env.js") ||
-		strings.HasSuffix(lower, "/env.ts")
-}
-
-// isEnvConfigFile reports whether the file appears to be a configuration or
-// environment setup file where direct access is acceptable.
-func isEnvConfigFile(path string) bool {
-	lower := strings.ToLower(path)
-	return strings.Contains(lower, "config") ||
-		strings.Contains(lower, "env") ||
-		strings.Contains(lower, ".env") ||
-		strings.HasSuffix(lower, "/config.js") ||
-		strings.HasSuffix(lower, "/config.ts") ||
-		strings.HasSuffix(lower, "/env.js") ||
-		strings.HasSuffix(lower, "/env.ts")
-}
-
 // isTestOrDedicatedConfig reports whether path is a test file or env config.
 func isTestOrDedicatedConfig(path string) bool {
 	lower := strings.ToLower(path)

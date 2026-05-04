@@ -93,19 +93,35 @@ func (r SLP144) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		// Detect what error handling patterns are used
-		patternsFound := detectMixedPatterns(addedLines)
-		if len(patternsFound) > 1 {
-			// Multiple patterns found - inconsistent
-			out = append(out, Finding{
-				RuleID:   r.ID(),
-				Severity: r.DefaultSeverity(),
-				File:     f.Path,
-				Line:     f.Hunks[0].Lines[0].NewLineNo, // Mark at first hunk
-				Message:  "inconsistent error handling patterns detected: " + strings.Join(patternsFound, ", "),
-				Snippet:  "mixing res.fail, res.send, throw, and/or next(err)",
-			})
+	// Detect what error handling patterns are used
+	patternsFound := detectMixedPatterns(addedLines)
+	if len(patternsFound) > 1 {
+		// Find first added line number for reporting
+		var firstLine int = 0
+		for _, h := range f.Hunks {
+			for _, ln := range h.Lines {
+				if ln.Kind == diff.LineAdd {
+					firstLine = ln.NewLineNo
+					break
+				}
+			}
+			if firstLine > 0 {
+				break
+			}
 		}
+		if firstLine == 0 {
+			firstLine = 1 // fallback
+		}
+		// Multiple patterns found - inconsistent
+		out = append(out, Finding{
+			RuleID:   r.ID(),
+			Severity: r.DefaultSeverity(),
+			File:     f.Path,
+			Line:     firstLine,
+			Message:  "inconsistent error handling patterns detected: " + strings.Join(patternsFound, ", "),
+			Snippet:  "mixing res.fail, res.send, throw, and/or next(err)",
+		})
+	}
 	}
 
 	return out

@@ -41,8 +41,8 @@ var timeoutPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?:socket|connection|request)Timeout\s*[=:]\s*(\d+)`),
 	// context.WithTimeout with numeric literal (Go)
 	regexp.MustCompile(`context\.WithTimeout\s*\(\s*[^,]+,\s*(\d+)\s*\*`),
-	// time.After / time.NewTimer with numeric
-	regexp.MustCompile(`time\.(After|NewTimer)\s*\(\s*(\d+)\s*`),
+	// time.After / time.NewTimer with numeric (non-capturing group for func name)
+	regexp.MustCompile(`time\.(?:After|NewTimer)\s*\(\s*(\d+)\s*`),
 	// Python: time.sleep, requests timeout
 	regexp.MustCompile(`time\.sleep\s*\(\s*(\d+)\s*\)`),
 	// Java: Thread.sleep
