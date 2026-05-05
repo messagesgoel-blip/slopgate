@@ -34,8 +34,8 @@ func (SLP145) Description() string {
 
 // timeoutEntry pairs a regex with a unit multiplier (1 = ms, 1000 = seconds).
 type timeoutEntry struct {
-	pattern   *regexp.Regexp
-	unitMs    int // multiplier to convert captured value to ms
+	pattern *regexp.Regexp
+	unitMs  int // multiplier to convert captured value to ms
 }
 
 // timeoutPatterns matches common timeout usages with numeric literals.
@@ -48,10 +48,10 @@ var timeoutPatterns = []timeoutEntry{
 	{regexp.MustCompile(`timeout\s*=\s*(\d+)`), 1},
 	// request/agent options (ms)
 	{regexp.MustCompile(`(?:socket|connection|request)Timeout\s*[=:]\s*(\d+)`), 1},
-	// Go: context.WithTimeout with numeric literal * time unit (seconds)
-	{regexp.MustCompile(`context\.WithTimeout\s*\(\s*[^,]+,\s*(\d+)\s*\*`), 1000},
-	// Go: time.After / time.NewTimer with numeric literal (seconds)
-	{regexp.MustCompile(`time\.(?:After|NewTimer)\s*\(\s*(\d+)\s*`), 1000},
+	// Go: context.WithTimeout with numeric literal * time.Second (captures the multiplier)
+	{regexp.MustCompile(`context\.WithTimeout\s*\(\s*[^,]+,\s*(\d+)\s*\*\s*time\.Second`), 1000},
+	// Go: time.After / time.NewTimer with numeric literal * time.Second
+	{regexp.MustCompile(`time\.(?:After|NewTimer)\s*\(\s*(\d+)\s*\*\s*time\.Second`), 1000},
 	// Python: time.sleep (seconds)
 	{regexp.MustCompile(`time\.sleep\s*\(\s*(\d+)\s*\)`), 1000},
 	// Java: Thread.sleep (ms)
@@ -67,14 +67,17 @@ const (
 // hasJustifyingComment checks if the line or the next line contains a
 // comment that explains why this timeout value is chosen.
 func hasJustifyingComment(lines []diff.Line, idx int) bool {
-	// Check current line for trailing comment
+	// Check current line for trailing comment (but not URLs like http://)
 	current := lines[idx].Content
-	if strings.Contains(current, "//") {
-		parts := strings.SplitAfter(current, "//")
-		if len(parts) > 1 {
-			comment := strings.TrimSpace(parts[1])
-			if len(comment) > 5 { // meaningful comment
-				return true
+	if commentIdx := strings.Index(current, "//"); commentIdx >= 0 {
+		// Skip if "//" is part of a URL scheme (e.g., "http://", "https://")
+		if !(commentIdx > 0 && current[commentIdx-1] == ':') {
+			parts := strings.SplitAfter(current, "//")
+			if len(parts) > 1 {
+				comment := strings.TrimSpace(parts[1])
+				if len(comment) > 5 { // meaningful comment
+					return true
+				}
 			}
 		}
 	}

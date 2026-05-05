@@ -32,7 +32,6 @@ func (SLP146) Description() string {
 var asyncFunctionInMap1 = regexp.MustCompile(`\.(map|forEach|filter|reduce)\s*\(\s*async\s*\(`)
 var asyncFunctionInMap2 = regexp.MustCompile(`\.(map|forEach|filter|reduce)\s*\(\s*async\s+\w+\s*=>`)
 
-
 // forEachPattern matches forEach calls
 var forEachPattern = regexp.MustCompile(`\.forEach\s*\(`)
 
@@ -56,27 +55,28 @@ func looksLikePromiseCall(line string) bool {
 	return false
 }
 
-// isLoopLine checks if a line contains a loop keyword.
+// loopLinePattern matches loop keywords as word boundaries.
+var loopLinePattern = regexp.MustCompile(`\b(for|while)\b`)
+
+// isLoopLine checks if a line contains a loop keyword, skipping comments.
 func isLoopLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
-	return strings.HasPrefix(trimmed, "for ") ||
+	// Skip comment lines
+	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
+		return false
+	}
+	return loopLinePattern.MatchString(trimmed) ||
 		strings.HasPrefix(trimmed, "for(") ||
-		strings.Contains(trimmed, " for ") ||
-		strings.HasPrefix(trimmed, "while ") ||
+		strings.HasPrefix(trimmed, "while(") ||
 		strings.HasPrefix(trimmed, "do ")
 }
 
-// lineHasAwait checks if the line contains an await keyword at the start level
-// (not inside nested parentheses or strings).
+// awaitPattern matches await as a word boundary (catches "(await foo())" etc).
+var awaitPattern = regexp.MustCompile(`\bawait\b`)
+
+// lineHasAwait checks if the line contains an await keyword as a standalone token.
 func lineHasAwait(line string) bool {
-	trimmed := strings.TrimSpace(line)
-	// Quick check for standalone await at statement start
-	if strings.HasPrefix(trimmed, "await ") {
-		return true
-	}
-	// Check for await in the line (could be in nested expression but that's
-	// usually good enough for diff-based detection)
-	return strings.Contains(trimmed, " await ")
+	return awaitPattern.MatchString(line)
 }
 
 func (r SLP146) Check(d *diff.Diff) []Finding {

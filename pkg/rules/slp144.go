@@ -38,10 +38,9 @@ func (SLP144) Description() string {
 var errorPatterns = map[string]*regexp.Regexp{
 	"res-fail":     regexp.MustCompile(`\bres\.fail\s*\(`),
 	"res-error":    regexp.MustCompile(`\bres\.error\s*\(`),
-	"res-next":     regexp.MustCompile(`\bnext\s*\(\s*(?:err)?\s*\)`),
+	"next-err":     regexp.MustCompile(`\b(?:return\s+)?next\s*\(\s*(?:err)?\s*\)`),
 	"throw":        regexp.MustCompile(`\bthrow\s+(?:new )?Error\s*\(`),
 	"throw-err":    regexp.MustCompile(`\bthrow\s+err\b`),
-	"return-err":   regexp.MustCompile(`\breturn\s+next\s*\(\s*err\s*\)`),
 	"callback-err": regexp.MustCompile(`\bcb\s*\(\s*err\s*\)`),
 }
 
@@ -50,8 +49,11 @@ var expressRoutePattern = regexp.MustCompile(`(?:app|router)\.(get|post|put|dele
 
 // isExpressRouteFile determines if the file contains Express-style routing.
 func isExpressRouteFile(path string, content string) bool {
-	// Check file extension
-	if !strings.HasSuffix(path, ".js") && !strings.HasSuffix(path, ".ts") {
+	// Check file extension (match the same extensions as Check)
+	if !strings.HasSuffix(path, ".js") &&
+		!strings.HasSuffix(path, ".jsx") &&
+		!strings.HasSuffix(path, ".ts") &&
+		!strings.HasSuffix(path, ".tsx") {
 		return false
 	}
 	// Look for route patterns in the file content (only visible in added lines)

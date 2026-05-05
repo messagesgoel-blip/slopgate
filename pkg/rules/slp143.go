@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -46,9 +47,14 @@ func isTestOrDedicatedConfig(path string) bool {
 		strings.Contains(lower, "/tests/") {
 		return true
 	}
-	// Dedicated config files
-	return strings.Contains(lower, "config") ||
-		strings.Contains(lower, "env") ||
+	// Dedicated config files: match by basename or path segment, not substring
+	base := filepath.Base(lower)
+	return strings.HasPrefix(base, "config.") ||
+		strings.HasPrefix(base, "env.") ||
+		base == "config" ||
+		base == "env" ||
+		strings.Contains(lower, "/config/") ||
+		strings.Contains(lower, "/env/") ||
 		strings.HasSuffix(lower, ".env")
 }
 
@@ -68,8 +74,10 @@ func hasValidationOnLine(line string) bool {
 	if strings.Contains(trimmed, "??") {
 		return true
 	}
-	// Check for ternary default
-	if strings.Contains(trimmed, "? ") && strings.Contains(trimmed, ":") {
+	// Check for ternary default (both "a ? b : c" and compact "a?b:c")
+	qIdx := strings.Index(trimmed, "?")
+	cIdx := strings.Index(trimmed, ":")
+	if qIdx >= 0 && cIdx >= 0 && qIdx < cIdx {
 		return true
 	}
 	return false

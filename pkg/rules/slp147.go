@@ -27,9 +27,9 @@ func (SLP147) Description() string {
 }
 
 // destructuringPattern matches destructuring assignments.
-// Captures: const/let/var, variable names, source expression
-var destructuringPattern = regexp.MustCompile(`(const|let|var)\s+{([^}]+)}\s*=\s*([^;]+);`)
-
+// Captures: const/let/var, variable names, source expression.
+// The trailing semicolon is optional to match semicolon-free code.
+var destructuringPattern = regexp.MustCompile(`(const|let|var)\s+{([^}]+)}\s*=\s*([^;]+?);?\s*$`)
 
 // guardPatterns match common defensive checks before destructuring.
 var guardPatterns = []*regexp.Regexp{
@@ -58,7 +58,6 @@ func isPotentiallyUndefinedSource(source string) bool {
 	return false
 }
 
-
 // hasPrecedingGuard checks if any previous line in the hunk has a guard.
 func hasPrecedingGuard(h diff.Hunk, idx int) bool {
 	// Look at up to 5 lines before to find a guard
@@ -67,9 +66,14 @@ func hasPrecedingGuard(h diff.Hunk, idx int) bool {
 		start = 0
 	}
 	for j := start; j < idx; j++ {
-		line := h.Lines[j].Content
+		line := h.Lines[j]
+		// Skip deleted lines — they're not live code
+		if line.Kind == diff.LineDelete {
+			continue
+		}
+		content := line.Content
 		for _, pattern := range guardPatterns {
-			if pattern.MatchString(line) {
+			if pattern.MatchString(content) {
 				return true
 			}
 		}

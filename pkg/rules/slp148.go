@@ -29,7 +29,6 @@ func (SLP148) Description() string {
 	return "inconsistent naming for the same conceptual variable across modules"
 }
 
-
 // identifierPattern matches any identifier after a keyword.
 var identifierPattern = regexp.MustCompile(`\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b`)
 
@@ -70,6 +69,8 @@ var ignoreList = map[string]bool{
 
 // semanticGroups maps common semantic categories.
 // Each key is a canonical concept that should have consistent naming.
+// Note: "entry" appears in both "record" and "item" groups; the
+// semanticGroupKeys slice ensures deterministic resolution.
 var semanticGroups = map[string][]string{
 	"id":           {"identifier", "uid", "uuid", "guid"},
 	"user":         {"user", "account", "profile", "customer", "client"},
@@ -87,16 +88,25 @@ var semanticGroups = map[string][]string{
 	"count":        {"count", "total", "num", "number"},
 }
 
+// semanticGroupKeys provides a deterministic iteration order for semanticGroups.
+// This ensures "entry" always resolves to the same concept regardless of Go
+// map iteration order.
+var semanticGroupKeys = []string{
+	"id", "user", "token", "key", "secret", "config", "param", "value",
+	"error", "message", "notification", "record", "item", "count",
+}
+
 // normalizeName returns a canonical semantic group key for a variable name.
 // It attempts to group true convention variants (e.g., userId, userID, user_id)
 // but NOT distinct fields that share a prefix (e.g., userId vs userEmail).
 func normalizeName(name string) string {
 	lower := strings.ToLower(name)
 
-	// Check each semantic group: exact match only.
+	// Check each semantic group: exact match only, in deterministic order.
 	// Prefix matching is deliberately avoided to prevent collapsing
 	// distinct fields like userId and userEmail into the same group.
-	for concept, variants := range semanticGroups {
+	for _, concept := range semanticGroupKeys {
+		variants := semanticGroups[concept]
 		for _, variant := range variants {
 			if lower == variant {
 				return concept
@@ -115,6 +125,8 @@ func normalizeName(name string) string {
 			break
 		}
 	}
+	// Remove trailing separators left after suffix stripping (e.g., "user_id" -> "user_" not "user")
+	base = strings.TrimRight(base, "_-")
 
 	// Only return the base if it maps to a known semantic group
 	if base != lower && len(base) > 0 {
