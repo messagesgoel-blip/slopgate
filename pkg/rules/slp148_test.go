@@ -41,3 +41,18 @@ diff --git a/service2.js b/service2.js
 		t.Fatalf("expected 0 findings (consistent userId), got %d", len(got))
 	}
 }
+
+func TestSLP148_AllowsDistinctFieldsWithSharedPrefix(t *testing.T) {
+	d := parseDiff(t, `diff --git a/model.js b/model.js
+--- a/model.js
++++ b/model.js
+@@ -1,2 +1,4 @@
+ module.exports = {};
++export const userId = user.id;
++export const userEmail = user.email;
+ `)
+	got := SLP148{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (userId and userEmail are distinct fields), got %d", len(got))
+	}
+}

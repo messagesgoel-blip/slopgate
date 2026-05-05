@@ -13,10 +13,13 @@ import (
 // should have an explanation of why those values are chosen.
 //
 // Detected patterns:
-//   - setTimeout, setInterval with numeric literals
+//   - setTimeout, setInterval with numeric literals (ms)
 //   - fetch/axios/timeout options with ms values
-//   - database/connection timeouts
-//   - HTTP client timeouts
+//   - database/connection timeouts (ms)
+//   - HTTP client timeouts (ms)
+//   - Go: context.WithTimeout, time.After, time.NewTimer (seconds)
+//   - Python: time.sleep (seconds)
+//   - Java: Thread.sleep (ms)
 //
 // Languages: JavaScript, TypeScript, Go, Python, Java
 //
@@ -29,24 +32,30 @@ func (SLP145) Description() string {
 	return "hardcoded timeout value lacks contextual justification"
 }
 
+// timeoutEntry pairs a regex with a unit multiplier (1 = ms, 1000 = seconds).
+type timeoutEntry struct {
+	pattern   *regexp.Regexp
+	unitMs    int // multiplier to convert captured value to ms
+}
+
 // timeoutPatterns matches common timeout usages with numeric literals.
-var timeoutPatterns = []*regexp.Regexp{
-	// setTimeout / setInterval
-	regexp.MustCompile(`setTimeout\s*\(\s*[^,]+,\s*(\d+)\s*\)`),
-	regexp.MustCompile(`setInterval\s*\(\s*[^,]+,\s*(\d+)\s*\)`),
+var timeoutPatterns = []timeoutEntry{
+	// setTimeout / setInterval (ms)
+	{regexp.MustCompile(`setTimeout\s*\(\s*[^,]+,\s*(\d+)\s*\)`), 1},
+	{regexp.MustCompile(`setInterval\s*\(\s*[^,]+,\s*(\d+)\s*\)`), 1},
 	// fetch/axios timeout in ms
-	regexp.MustCompile(`timeout\s*:\s*(\d+)`),
-	regexp.MustCompile(`timeout\s*=\s*(\d+)`),
-	// request/agent options
-	regexp.MustCompile(`(?:socket|connection|request)Timeout\s*[=:]\s*(\d+)`),
-	// context.WithTimeout with numeric literal (Go)
-	regexp.MustCompile(`context\.WithTimeout\s*\(\s*[^,]+,\s*(\d+)\s*\*`),
-	// time.After / time.NewTimer with numeric (non-capturing group for func name)
-	regexp.MustCompile(`time\.(?:After|NewTimer)\s*\(\s*(\d+)\s*`),
-	// Python: time.sleep, requests timeout
-	regexp.MustCompile(`time\.sleep\s*\(\s*(\d+)\s*\)`),
-	// Java: Thread.sleep
-	regexp.MustCompile(`Thread\.sleep\s*\(\s*(\d+)\s*\)`),
+	{regexp.MustCompile(`timeout\s*:\s*(\d+)`), 1},
+	{regexp.MustCompile(`timeout\s*=\s*(\d+)`), 1},
+	// request/agent options (ms)
+	{regexp.MustCompile(`(?:socket|connection|request)Timeout\s*[=:]\s*(\d+)`), 1},
+	// Go: context.WithTimeout with numeric literal * time unit (seconds)
+	{regexp.MustCompile(`context\.WithTimeout\s*\(\s*[^,]+,\s*(\d+)\s*\*`), 1000},
+	// Go: time.After / time.NewTimer with numeric literal (seconds)
+	{regexp.MustCompile(`time\.(?:After|NewTimer)\s*\(\s*(\d+)\s*`), 1000},
+	// Python: time.sleep (seconds)
+	{regexp.MustCompile(`time\.sleep\s*\(\s*(\d+)\s*\)`), 1000},
+	// Java: Thread.sleep (ms)
+	{regexp.MustCompile(`Thread\.sleep\s*\(\s*(\d+)\s*\)`), 1},
 }
 
 // extremeTimeouts defines thresholds (in ms) for flagging.
@@ -88,13 +97,9 @@ func hasJustifyingComment(lines []diff.Line, idx int) bool {
 	return false
 }
 
-// isTimeoutExtreme returns true if value is unusually short or long.
-func isTimeoutExtreme(valueStr string) (bool, error) {
-	value, err := strconv.Atoi(valueStr)
-	if err != nil {
-		return false, err
-	}
-	return value < veryShortTimeout || value > veryLongTimeout, nil
+// isTimeoutExtreme returns true if value (in ms) is unusually short or long.
+func isTimeoutExtreme(valueMs int) bool {
+	return valueMs < veryShortTimeout || valueMs > veryLongTimeout
 }
 
 func (r SLP145) Check(d *diff.Diff) []Finding {
@@ -120,22 +125,23 @@ func (r SLP145) Check(d *diff.Diff) []Finding {
 				}
 				line := ln.Content
 				// Check each timeout pattern
-				for _, pattern := range timeoutPatterns {
-					if matches := pattern.FindStringSubmatch(line); len(matches) > 1 {
-						valueStr := matches[1]
-						// Check if this is an extreme value needing justification
-						if extreme, err := isTimeoutExtreme(valueStr); extreme && err == nil {
-							// Look for justifying comment
-							if !hasJustifyingComment(h.Lines, i) {
-								out = append(out, Finding{
-									RuleID:   r.ID(),
-									Severity: r.DefaultSeverity(),
-									File:     f.Path,
-									Line:     ln.NewLineNo,
-									Message:  "extreme timeout value '" + valueStr + "ms' lacks justification",
-									Snippet:  strings.TrimSpace(line),
-								})
-							}
+				for _, entry := range timeoutPatterns {
+					if matches := entry.pattern.FindStringSubmatch(line); len(matches) > 1 {
+						value, err := strconv.Atoi(matches[1])
+						if err != nil {
+							continue
+						}
+						// Convert to ms using the pattern's unit multiplier
+						valueMs := value * entry.unitMs
+						if isTimeoutExtreme(valueMs) && !hasJustifyingComment(h.Lines, i) {
+							out = append(out, Finding{
+								RuleID:   r.ID(),
+								Severity: r.DefaultSeverity(),
+								File:     f.Path,
+								Line:     ln.NewLineNo,
+								Message:  "extreme timeout value '" + matches[1] + "' lacks justification",
+								Snippet:  strings.TrimSpace(line),
+							})
 						}
 					}
 				}

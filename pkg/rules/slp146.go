@@ -13,9 +13,8 @@ import (
 //
 // Detected patterns:
 //   - array.map(async item => {...}) without Promise.all wrapper
-//   - array.forEach(item => asyncOperation(item)) without await
+//   - array.forEach with async callback without await
 //   - for...of loops with async calls but missing await
-//   - forEach on NodeLists in JS/TS
 //
 // Languages: JavaScript, TypeScript
 //
@@ -36,6 +35,26 @@ var asyncFunctionInMap2 = regexp.MustCompile(`\.(map|forEach|filter|reduce)\s*\(
 
 // forEachPattern matches forEach calls
 var forEachPattern = regexp.MustCompile(`\.forEach\s*\(`)
+
+// promiseReturningPatterns matches function calls that commonly return promises.
+var promiseReturningPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`\b(?:fetch|axios|request)\s*[\.(]`),
+	regexp.MustCompile(`\b(?:create|find|update|delete|save|remove|query|execute)\s*\(`),
+	regexp.MustCompile(`\.\s*(?:then|catch|finally)\s*\(`),
+	regexp.MustCompile(`\bnew\s+Promise\s*\(`),
+	regexp.MustCompile(`\b(?:db|prisma|knex|sequelize|mongoose)\.\w+\s*\(`),
+}
+
+// looksLikePromiseCall checks if a line contains a call that is likely
+// to return a promise, rather than a simple synchronous function call.
+func looksLikePromiseCall(line string) bool {
+	for _, p := range promiseReturningPatterns {
+		if p.MatchString(line) {
+			return true
+		}
+	}
+	return false
+}
 
 // isLoopLine checks if a line contains a loop keyword.
 func isLoopLine(line string) bool {
@@ -97,42 +116,41 @@ func (r SLP146) Check(d *diff.Diff) []Finding {
 					continue
 				}
 
-				// Pattern 2: forEach with function that might return promise
+				// Pattern 2: forEach with async callback that might return promise
 				if forEachPattern.MatchString(line) && strings.Contains(line, "=>") {
-					// This is a heuristic - if forEach callback is an arrow fn
-					// and doesn't contain 'await' keyword, it's likely unawaited
-					if !strings.Contains(line, "await") && !strings.Contains(line, "Promise") {
+					// Only flag if the callback is async or contains a promise-returning call.
+					// Synchronous forEach callbacks are not unawaited promise issues.
+					isAsync := strings.Contains(line, "async")
+					hasAwait := strings.Contains(line, "await") || strings.Contains(line, "Promise")
+					if isAsync && !hasAwait {
 						out = append(out, Finding{
 							RuleID:   r.ID(),
 							Severity: r.DefaultSeverity(),
 							File:     f.Path,
 							Line:     ln.NewLineNo,
-							Message:  "forEach callback may contain unawaited promise",
+							Message:  "async forEach callback without await or Promise.all",
 							Snippet:  strings.TrimSpace(line),
 						})
 					}
 				}
 
-				// Pattern 3: Loop line followed by promise call without await
+				// Pattern 3: Loop line followed by promise-returning call without await.
+				// Only flag lines that look like they return promises (contain awaitable
+				// patterns like fetch, axios, db calls) rather than any line with ().
 				if isLoopLine(line) {
 					// Look at subsequent added lines within the loop body
 					j := i + 1
 					for j < len(h.Lines) && h.Lines[j].Kind == diff.LineAdd {
 						nextLine := h.Lines[j].Content
-						// Simple heuristic: line contains function call but no await
-						if strings.Contains(nextLine, "(") && !lineHasAwait(nextLine) {
-							// Check if this looks like a promise-returning call
-							// (simple heuristic: ends with ) and not followed by await or then)
-							if !strings.Contains(nextLine, ".then(") && !strings.Contains(nextLine, ".catch(") {
-								out = append(out, Finding{
-									RuleID:   r.ID(),
-									Severity: r.DefaultSeverity(),
-									File:     f.Path,
-									Line:     h.Lines[j].NewLineNo,
-									Message:  "potential unawaited promise in loop body",
-									Snippet:  strings.TrimSpace(nextLine),
-								})
-							}
+						if !lineHasAwait(nextLine) && looksLikePromiseCall(nextLine) {
+							out = append(out, Finding{
+								RuleID:   r.ID(),
+								Severity: r.DefaultSeverity(),
+								File:     f.Path,
+								Line:     h.Lines[j].NewLineNo,
+								Message:  "potential unawaited promise in loop body",
+								Snippet:  strings.TrimSpace(nextLine),
+							})
 						}
 						j++
 					}

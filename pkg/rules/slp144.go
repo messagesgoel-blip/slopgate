@@ -8,12 +8,16 @@ import (
 )
 
 // SLP144 flags inconsistent error handling patterns within the same file or
-// route handler group. Mixing res.fail(), res.sendError(), next(err), and
-// throw err creates confusion and can lead to unhandled errors.
+// route handler group. Mixing res.fail(), next(err), and throw err creates
+// confusion and can lead to unhandled errors.
+//
+// Note: res.status/res.json/res.send are success-path response methods and
+// are NOT treated as error handlers. Standard try/catch patterns using
+// res.json in try + next(err) in catch are not flagged.
 //
 // Detected patterns:
-//   - Express route handlers mixing res.fail and res.send/next
-//   - Mixing throw err with res.* patterns in same file
+//   - Express route handlers mixing res.fail and next(err)
+//   - Mixing throw err with res.error patterns in same file
 //
 // Languages: JavaScript, TypeScript
 //
@@ -27,9 +31,12 @@ func (SLP144) Description() string {
 }
 
 // errorPatterns maps error handling patterns we look for.
+// res.status/res.json/res.send are NOT included here because they are
+// success-path response methods, not error handlers. Using res.json in a
+// try block alongside next(err) in a catch block is standard Express practice,
+// not an inconsistency.
 var errorPatterns = map[string]*regexp.Regexp{
 	"res-fail":     regexp.MustCompile(`\bres\.fail\s*\(`),
-	"res-send":     regexp.MustCompile(`\bres\.(send|json|status)\s*\(`),
 	"res-error":    regexp.MustCompile(`\bres\.error\s*\(`),
 	"res-next":     regexp.MustCompile(`\bnext\s*\(\s*(?:err)?\s*\)`),
 	"throw":        regexp.MustCompile(`\bthrow\s+(?:new )?Error\s*\(`),
@@ -119,7 +126,7 @@ func (r SLP144) Check(d *diff.Diff) []Finding {
 				File:     f.Path,
 				Line:     firstLine,
 				Message:  "inconsistent error handling patterns detected: " + strings.Join(patternsFound, ", "),
-				Snippet:  "mixing res.fail, res.send, throw, and/or next(err)",
+				Snippet:  "mixing res.fail, res.error, throw, and/or next(err)",
 			})
 		}
 	}

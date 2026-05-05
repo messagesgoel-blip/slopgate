@@ -88,33 +88,39 @@ var semanticGroups = map[string][]string{
 }
 
 // normalizeName returns a canonical semantic group key for a variable name.
-// It attempts to group related names (e.g., userId, userID, user_id all → "user")
+// It attempts to group true convention variants (e.g., userId, userID, user_id)
+// but NOT distinct fields that share a prefix (e.g., userId vs userEmail).
 func normalizeName(name string) string {
 	lower := strings.ToLower(name)
 
-	// Check each semantic group: match by prefix only (not suffix)
-	// to avoid false matches like "formatUser" -> "user".
+	// Check each semantic group: exact match only.
+	// Prefix matching is deliberately avoided to prevent collapsing
+	// distinct fields like userId and userEmail into the same group.
 	for concept, variants := range semanticGroups {
 		for _, variant := range variants {
-			if lower == variant || strings.HasPrefix(lower, variant) {
+			if lower == variant {
 				return concept
 			}
 		}
 	}
 
-	// Strip common suffixes and return base
+	// Strip common suffixes and return base, but only if the remaining
+	// base is a known semantic group. This prevents "emailId" from
+	// normalizing to "email" (unknown) and then matching other "email*" names.
 	suffixes := []string{"id", "ids", "uid", "uuid", "key", "token", "url", "path", "file", "dir"}
 	base := lower
 	for _, suf := range suffixes {
-		if strings.HasSuffix(lower, suf) {
+		if strings.HasSuffix(lower, suf) && len(lower) > len(suf) {
 			base = strings.TrimSuffix(lower, suf)
 			break
 		}
 	}
 
-	// If we stripped something meaningful, return the base concept
+	// Only return the base if it maps to a known semantic group
 	if base != lower && len(base) > 0 {
-		return base
+		if _, known := semanticGroups[base]; known {
+			return base
+		}
 	}
 
 	return lower
