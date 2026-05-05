@@ -41,8 +41,8 @@ type timeoutEntry struct {
 // timeoutPatterns matches common timeout usages with numeric literals.
 var timeoutPatterns = []timeoutEntry{
 	// setTimeout / setInterval (ms)
-	{regexp.MustCompile(`setTimeout\s*\(\s*[^,]+,\s*(\d+)\s*\)`), 1},
-	{regexp.MustCompile(`setInterval\s*\(\s*[^,]+,\s*(\d+)\s*\)`), 1},
+	{regexp.MustCompile(`\bsetTimeout\s*\(\s*[^,]+,\s*(\d+)\s*\)`), 1},
+	{regexp.MustCompile(`\bsetInterval\s*\(\s*[^,]+,\s*(\d+)\s*\)`), 1},
 	// fetch/axios timeout in ms
 	{regexp.MustCompile(`timeout\s*:\s*(\d+)`), 1},
 	{regexp.MustCompile(`timeout\s*=\s*(\d+)`), 1},
@@ -90,16 +90,18 @@ func hasJustifyingComment(lines []diff.Line, idx int) bool {
 			}
 		}
 	}
-	// Check previous line
+	// Check previous line (post-patch: skip deleted lines)
 	if idx > 0 {
-		prev := lines[idx-1].Content
-		trimmed := strings.TrimSpace(prev)
-		if (strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#")) && len(trimmed) > 5 {
-			return true
+		prev := lines[idx-1]
+		if prev.Kind != diff.LineDelete {
+			trimmed := strings.TrimSpace(prev.Content)
+			if (strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#")) && len(trimmed) > 5 {
+				return true
+			}
 		}
 	}
-	// Check next line
-	if idx+1 < len(lines) && lines[idx+1].Kind == diff.LineAdd {
+	// Check next line (post-patch: accept both added and context lines)
+	if idx+1 < len(lines) && lines[idx+1].Kind != diff.LineDelete {
 		next := lines[idx+1].Content
 		trimmed := strings.TrimSpace(next)
 		if (strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#")) && len(trimmed) > 5 {

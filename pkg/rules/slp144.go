@@ -48,16 +48,20 @@ var errorPatterns = map[string]*regexp.Regexp{
 // expressRoutePattern matches Express route handler definitions.
 var expressRoutePattern = regexp.MustCompile(`(?:app|router)\.(get|post|put|delete|patch|all)\s*\(`)
 
+// hasJSTSExtension checks if the file has a JavaScript/TypeScript extension.
+func hasJSTSExtension(path string) bool {
+	return strings.HasSuffix(path, ".js") ||
+		strings.HasSuffix(path, ".jsx") ||
+		strings.HasSuffix(path, ".ts") ||
+		strings.HasSuffix(path, ".tsx")
+}
+
 // isExpressRouteFile determines if the file contains Express-style routing.
 func isExpressRouteFile(path string, content string) bool {
-	// Check file extension (match the same extensions as Check)
-	if !strings.HasSuffix(path, ".js") &&
-		!strings.HasSuffix(path, ".jsx") &&
-		!strings.HasSuffix(path, ".ts") &&
-		!strings.HasSuffix(path, ".tsx") {
+	if !hasJSTSExtension(path) {
 		return false
 	}
-	// Look for route patterns in the file content (only visible in added lines)
+	// Look for route patterns in the file content (context + added lines)
 	return expressRoutePattern.MatchString(content)
 }
 
@@ -88,10 +92,7 @@ func (r SLP144) Check(d *diff.Diff) []Finding {
 			continue
 		}
 		// Only check JS/TS files
-		if !strings.HasSuffix(f.Path, ".js") &&
-			!strings.HasSuffix(f.Path, ".jsx") &&
-			!strings.HasSuffix(f.Path, ".ts") &&
-			!strings.HasSuffix(f.Path, ".tsx") {
+		if !hasJSTSExtension(f.Path) {
 			continue
 		}
 

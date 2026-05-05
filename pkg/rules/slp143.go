@@ -76,13 +76,17 @@ func hasValidationOnLine(line string) bool {
 	if validationPattern.MatchString(trimmed) {
 		return true
 	}
-	// Check for logical OR default patterns
-	if strings.Contains(trimmed, "||") && strings.Contains(trimmed, "env") {
-		return true
+	// Check for logical OR default patterns (env must be on left of ||)
+	if orIdx := strings.Index(trimmed, "||"); orIdx >= 0 {
+		if strings.Contains(trimmed[:orIdx], "env") {
+			return true
+		}
 	}
-	// Check for nullish coalescing
-	if strings.Contains(trimmed, "??") {
-		return true
+	// Check for nullish coalescing (env must be on left of ??)
+	if ncIdx := strings.Index(trimmed, "??"); ncIdx >= 0 {
+		if strings.Contains(trimmed[:ncIdx], "env") {
+			return true
+		}
 	}
 	// Check for ternary default (both "a ? b : c" and compact "a?b:c")
 	qIdx := strings.Index(trimmed, "?")
@@ -98,6 +102,9 @@ func hasValidationOnLine(line string) bool {
 }
 
 func (r SLP143) Check(d *diff.Diff) []Finding {
+	if d == nil {
+		return nil
+	}
 	var out []Finding
 
 	for _, f := range d.Files {

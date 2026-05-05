@@ -267,6 +267,9 @@ func (r SLP148) Check(d *diff.Diff) []Finding {
 		variantStr := strings.Join(variantList, ", ")
 
 		// Find a representative file/line for the finding
+		if len(variants) == 0 {
+			continue
+		}
 		repFile := variants[0].file
 		repLine := variants[0].lineNo
 
