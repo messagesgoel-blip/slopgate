@@ -138,10 +138,48 @@ func normalizeName(name string) string {
 	return lower
 }
 
-// extractIdentifiers extracts variable/function names from added lines.
+// stripStringsAndComments removes string literals and comments from a line
+// to avoid extracting identifiers from within them.
+func stripStringsAndComments(line string) string {
+	// Remove single-line comments (// and #)
+	if idx := strings.Index(line, "//"); idx >= 0 {
+		line = line[:idx]
+	}
+	if idx := strings.Index(line, "#"); idx >= 0 {
+		line = line[:idx]
+	}
+	// Remove string literals (single and double quoted)
+	var result strings.Builder
+	inStr := false
+	strChar := byte(0)
+	for i := 0; i < len(line); i++ {
+		ch := line[i]
+		if inStr {
+			if ch == '\\' && i+1 < len(line) {
+				i++ // skip escaped char
+				continue
+			}
+			if ch == strChar {
+				inStr = false
+			}
+			continue
+		}
+		if ch == '\'' || ch == '"' || ch == '`' {
+			inStr = true
+			strChar = ch
+			continue
+		}
+		result.WriteByte(ch)
+	}
+	return result.String()
+}
+
+// extractIdentifiers extracts variable/function names from added lines,
+// stripping string literals and comments first to avoid false matches.
 func extractIdentifiers(content string) []string {
+	cleaned := stripStringsAndComments(content)
 	var ids []string
-	for _, match := range identifierPattern.FindAllStringSubmatch(content, -1) {
+	for _, match := range identifierPattern.FindAllStringSubmatch(cleaned, -1) {
 		if len(match) > 1 {
 			name := match[1]
 			// Skip keywords and very short names
@@ -182,7 +220,7 @@ func (r SLP148) Check(d *diff.Diff) []Finding {
 				for _, id := range ids {
 					norm := normalizeName(id)
 					// Only consider normalized forms that aren't empty
-					if norm != "" && norm != id && !ignoreList[id] {
+					if norm != "" && !ignoreList[id] {
 						allNames = append(allNames, nameEntry{
 							name:     id,
 							file:     f.Path,

@@ -11,7 +11,9 @@ import (
 // SLP143 flags direct env var access without validation in critical sections.
 // This catches patterns like:
 //   - process.env.KEY (unchecked)
+//   - process.env["KEY"] (bracket access)
 //   - import.meta.env.KEY (vite)
+//   - import.meta.env['KEY'] (bracket access)
 //   - Deno.env.get() (less common)
 //
 // The rule is context-sensitive: it allows env var usage in test files,
@@ -29,11 +31,15 @@ func (SLP143) Description() string {
 	return "environment variable accessed without validation or default"
 }
 
-// envVarPattern matches direct environment variable access in various forms.
-var envVarPattern = regexp.MustCompile(`(?:process\.env\.|import\.meta\.env\.)\w+`)
+// envVarPattern matches direct environment variable access in various forms
+// including both dot-notation (process.env.KEY) and bracket-notation
+// (process.env["KEY"], import.meta.env['KEY']).
+var envVarPattern = regexp.MustCompile(`(?:process\.env\.|import\.meta\.env\.)(?:\w+|\[(?:["'][^"']+["'])\])`)
 
-// validationPattern matches common validation patterns that make env var usage safe.
-var validationPattern = regexp.MustCompile(`(?:if\s*.+|const\s+\w+\s*=\s*\w+\s*\|\||\?\?|Boolean\()|\.hasOwnProperty|env\[`)
+// validationPattern matches validation patterns that make env var usage safe.
+// Does NOT use the broad `if\s*.+` pattern which would mark any if-statement
+// as validation. Instead relies on specific patterns.
+var validationPattern = regexp.MustCompile(`(?:const\s+\w+\s*=\s*\w+\s*\|\||\?\?|Boolean\()|\.hasOwnProperty|env\[`)
 
 // isTestOrDedicatedConfig reports whether path is a test file or env config.
 func isTestOrDedicatedConfig(path string) bool {
@@ -59,10 +65,11 @@ func isTestOrDedicatedConfig(path string) bool {
 }
 
 // hasValidationOnLine checks if the line contains validation patterns.
-// It's a simple heuristic: looks for if-checks, default operators, Boolean wrappers.
+// It's a simple heuristic: looks for default operators, nullish coalescing,
+// Boolean wrappers, hasOwnProperty, and env bracket access with validation.
 func hasValidationOnLine(line string) bool {
 	trimmed := strings.TrimSpace(line)
-	// Check for common validation patterns
+	// Check for specific validation patterns (not broad if-statements)
 	if validationPattern.MatchString(trimmed) {
 		return true
 	}
@@ -78,6 +85,10 @@ func hasValidationOnLine(line string) bool {
 	qIdx := strings.Index(trimmed, "?")
 	cIdx := strings.Index(trimmed, ":")
 	if qIdx >= 0 && cIdx >= 0 && qIdx < cIdx {
+		return true
+	}
+	// Check for if-statements that specifically inspect env vars
+	if strings.Contains(trimmed, "if") && strings.Contains(trimmed, "env") {
 		return true
 	}
 	return false

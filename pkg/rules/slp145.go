@@ -68,24 +68,29 @@ const (
 // comment that explains why this timeout value is chosen.
 func hasJustifyingComment(lines []diff.Line, idx int) bool {
 	// Check current line for trailing comment (but not URLs like http://)
+	// Use LastIndex to find the rightmost "//" so comments after URLs are detected.
 	current := lines[idx].Content
-	if commentIdx := strings.Index(current, "//"); commentIdx >= 0 {
+	if commentIdx := strings.LastIndex(current, "//"); commentIdx >= 0 {
 		// Skip if "//" is part of a URL scheme (e.g., "http://", "https://")
 		if !(commentIdx > 0 && current[commentIdx-1] == ':') {
-			parts := strings.SplitAfter(current, "//")
-			if len(parts) > 1 {
-				comment := strings.TrimSpace(parts[1])
-				if len(comment) > 5 { // meaningful comment
-					return true
-				}
+			comment := strings.TrimSpace(current[commentIdx+2:])
+			if len(comment) > 5 { // meaningful comment
+				return true
 			}
+		}
+	}
+	// Also check for Python/shell-style "#" comments
+	if hashIdx := strings.Index(current, "#"); hashIdx >= 0 {
+		comment := strings.TrimSpace(current[hashIdx+1:])
+		if len(comment) > 5 {
+			return true
 		}
 	}
 	// Check previous line
 	if idx > 0 {
 		prev := lines[idx-1].Content
 		trimmed := strings.TrimSpace(prev)
-		if strings.HasPrefix(trimmed, "//") && len(trimmed) > 5 {
+		if (strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#")) && len(trimmed) > 5 {
 			return true
 		}
 	}
@@ -93,7 +98,7 @@ func hasJustifyingComment(lines []diff.Line, idx int) bool {
 	if idx+1 < len(lines) && lines[idx+1].Kind == diff.LineAdd {
 		next := lines[idx+1].Content
 		trimmed := strings.TrimSpace(next)
-		if strings.HasPrefix(trimmed, "//") && len(trimmed) > 5 {
+		if (strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#")) && len(trimmed) > 5 {
 			return true
 		}
 	}

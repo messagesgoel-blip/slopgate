@@ -82,6 +82,9 @@ func hasPrecedingGuard(h diff.Hunk, idx int) bool {
 }
 
 func (r SLP147) Check(d *diff.Diff) []Finding {
+	if d == nil {
+		return nil
+	}
 	var out []Finding
 
 	for _, f := range d.Files {

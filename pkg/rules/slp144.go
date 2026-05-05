@@ -2,6 +2,7 @@ package rules
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
@@ -38,7 +39,7 @@ func (SLP144) Description() string {
 var errorPatterns = map[string]*regexp.Regexp{
 	"res-fail":     regexp.MustCompile(`\bres\.fail\s*\(`),
 	"res-error":    regexp.MustCompile(`\bres\.error\s*\(`),
-	"next-err":     regexp.MustCompile(`\b(?:return\s+)?next\s*\(\s*(?:err)?\s*\)`),
+	"next-err":     regexp.MustCompile(`\b(?:return\s+)?next\s*\(\s*[A-Za-z_$][A-Za-z0-9_$]*\s*\)`),
 	"throw":        regexp.MustCompile(`\bthrow\s+(?:new )?Error\s*\(`),
 	"throw-err":    regexp.MustCompile(`\bthrow\s+err\b`),
 	"callback-err": regexp.MustCompile(`\bcb\s*\(\s*err\s*\)`),
@@ -61,7 +62,7 @@ func isExpressRouteFile(path string, content string) bool {
 }
 
 // detectMixedPatterns checks if multiple error handling patterns appear in
-// the same file, suggesting inconsistency.
+// the same file, suggesting inconsistency. Results are sorted for determinism.
 func detectMixedPatterns(addedLines []string) []string {
 	var found []string
 	for name, pattern := range errorPatterns {
@@ -72,6 +73,7 @@ func detectMixedPatterns(addedLines []string) []string {
 			}
 		}
 	}
+	sort.Strings(found)
 	return found
 }
 
@@ -96,8 +98,17 @@ func (r SLP144) Check(d *diff.Diff) []Finding {
 			addedLines = append(addedLines, ln.Content)
 		}
 
-		// Check if this is an Express route file
-		allContent := strings.Join(addedLines, "\n")
+		// Build visible content from context + added lines so route
+		// declarations in unchanged code are still detected.
+		var visibleLines []string
+		for _, h := range f.Hunks {
+			for _, ln := range h.Lines {
+				if ln.Kind == diff.LineContext || ln.Kind == diff.LineAdd {
+					visibleLines = append(visibleLines, ln.Content)
+				}
+			}
+		}
+		allContent := strings.Join(visibleLines, "\n")
 		if !isExpressRouteFile(f.Path, allContent) {
 			continue
 		}
