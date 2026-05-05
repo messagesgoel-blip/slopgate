@@ -78,6 +78,9 @@ func detectMixedPatterns(addedLines []string) []string {
 }
 
 func (r SLP144) Check(d *diff.Diff) []Finding {
+	if d == nil {
+		return nil
+	}
 	var out []Finding
 
 	for _, f := range d.Files {

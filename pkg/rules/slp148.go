@@ -141,14 +141,8 @@ func normalizeName(name string) string {
 // stripStringsAndComments removes string literals and comments from a line
 // to avoid extracting identifiers from within them.
 func stripStringsAndComments(line string) string {
-	// Remove single-line comments (// and #)
-	if idx := strings.Index(line, "//"); idx >= 0 {
-		line = line[:idx]
-	}
-	if idx := strings.Index(line, "#"); idx >= 0 {
-		line = line[:idx]
-	}
-	// Remove string literals (single and double quoted)
+	// Remove string literals and comments by scanning character-by-character.
+	// This correctly handles // and # inside string literals.
 	var result strings.Builder
 	inStr := false
 	strChar := byte(0)
@@ -163,6 +157,13 @@ func stripStringsAndComments(line string) string {
 				inStr = false
 			}
 			continue
+		}
+		// Check for comment start
+		if ch == '/' && i+1 < len(line) && line[i+1] == '/' {
+			break // rest is comment
+		}
+		if ch == '#' {
+			break // rest is comment
 		}
 		if ch == '\'' || ch == '"' || ch == '`' {
 			inStr = true
@@ -183,7 +184,7 @@ func extractIdentifiers(content string) []string {
 		if len(match) > 1 {
 			name := match[1]
 			// Skip keywords and very short names
-			if len(name) < 2 || ignoreList[name] {
+			if len(name) < 2 || ignoreList[strings.ToLower(name)] {
 				continue
 			}
 			ids = append(ids, name)
@@ -193,6 +194,9 @@ func extractIdentifiers(content string) []string {
 }
 
 func (r SLP148) Check(d *diff.Diff) []Finding {
+	if d == nil {
+		return nil
+	}
 	var out []Finding
 
 	// Collect all added identifiers across all files
@@ -220,7 +224,7 @@ func (r SLP148) Check(d *diff.Diff) []Finding {
 				for _, id := range ids {
 					norm := normalizeName(id)
 					// Only consider normalized forms that aren't empty
-					if norm != "" && !ignoreList[id] {
+					if norm != "" && !ignoreList[strings.ToLower(id)] {
 						allNames = append(allNames, nameEntry{
 							name:     id,
 							file:     f.Path,

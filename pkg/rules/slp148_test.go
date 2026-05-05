@@ -127,6 +127,13 @@ diff --git a/b.js b/b.js
 	}
 }
 
+func TestSLP148_NilDiffReturnsNoFindings(t *testing.T) {
+	got := SLP148{}.Check(nil)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings for nil diff, got %d", len(got))
+	}
+}
+
 func containsAll(s string, substrs ...string) bool {
 	for _, sub := range substrs {
 		if !strings.Contains(s, sub) {

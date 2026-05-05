@@ -80,10 +80,14 @@ func hasJustifyingComment(lines []diff.Line, idx int) bool {
 		}
 	}
 	// Also check for Python/shell-style "#" comments
+	// Only treat # as a comment delimiter when it starts a line or follows
+	// whitespace, not when it's part of a URL fragment or string content.
 	if hashIdx := strings.Index(current, "#"); hashIdx >= 0 {
-		comment := strings.TrimSpace(current[hashIdx+1:])
-		if len(comment) > 5 {
-			return true
+		if hashIdx == 0 || current[hashIdx-1] == ' ' || current[hashIdx-1] == '\t' {
+			comment := strings.TrimSpace(current[hashIdx+1:])
+			if len(comment) > 5 {
+				return true
+			}
 		}
 	}
 	// Check previous line
@@ -111,6 +115,9 @@ func isTimeoutExtreme(valueMs int) bool {
 }
 
 func (r SLP145) Check(d *diff.Diff) []Finding {
+	if d == nil {
+		return nil
+	}
 	var out []Finding
 
 	for _, f := range d.Files {

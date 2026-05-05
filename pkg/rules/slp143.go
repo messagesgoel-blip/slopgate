@@ -34,12 +34,15 @@ func (SLP143) Description() string {
 // envVarPattern matches direct environment variable access in various forms
 // including both dot-notation (process.env.KEY) and bracket-notation
 // (process.env["KEY"], import.meta.env['KEY']).
-var envVarPattern = regexp.MustCompile(`(?:process\.env\.|import\.meta\.env\.)(?:\w+|\[(?:["'][^"']+["'])\])`)
+var envVarPattern = regexp.MustCompile(`(?:process\.env|import\.meta\.env)(?:\.\w+|\[(?:["'][^"']+["'])\])`)
 
 // validationPattern matches validation patterns that make env var usage safe.
 // Does NOT use the broad `if\s*.+` pattern which would mark any if-statement
 // as validation. Instead relies on specific patterns.
-var validationPattern = regexp.MustCompile(`(?:const\s+\w+\s*=\s*\w+\s*\|\||\?\?|Boolean\()|\.hasOwnProperty|env\[`)
+var validationPattern = regexp.MustCompile(`(?:const\s+\w+\s*=\s*\w+\s*\|\||\?\?|Boolean\()|\.hasOwnProperty`)
+
+// envGuardPattern matches if-statements that explicitly check env vars.
+var envGuardPattern = regexp.MustCompile(`\bif\s*\([^)]*(?:process\.env|import\.meta\.env)[^)]*\)`)
 
 // isTestOrDedicatedConfig reports whether path is a test file or env config.
 func isTestOrDedicatedConfig(path string) bool {
@@ -88,7 +91,7 @@ func hasValidationOnLine(line string) bool {
 		return true
 	}
 	// Check for if-statements that specifically inspect env vars
-	if strings.Contains(trimmed, "if") && strings.Contains(trimmed, "env") {
+	if envGuardPattern.MatchString(trimmed) {
 		return true
 	}
 	return false
