@@ -22,15 +22,15 @@ func TestSLP144_AllowsConsistentPatterns(t *testing.T) {
 	d := parseDiff(t, `diff --git a/routes/auth.js b/routes/auth.js
 --- a/routes/auth.js
 +++ b/routes/auth.js
-@@ -5,3 +5,7 @@
- router.post('/login', (req, res) => {
+@@ -5,3 +5,8 @@
++router.post('/login', (req, res) => {
 +	try {
 +		const token = await authenticate(req.body);
 +		res.json({token});
 +	} catch (err) {
 +		next(err);
 +	}
- });
++});
  `)
 	got := SLP144{}.Check(d)
 	if len(got) != 0 {
@@ -42,12 +42,12 @@ func TestSLP144_AllowsResJsonWithNext(t *testing.T) {
 	d := parseDiff(t, `diff --git a/routes/user.js b/routes/user.js
 --- a/routes/user.js
 +++ b/routes/user.js
-@@ -5,3 +5,6 @@
- router.get('/users', (req, res) => {
+@@ -5,3 +5,7 @@
++router.get('/users', (req, res) => {
 +	const users = await User.findAll();
 +	res.json(users);
 +	next(err);
- });
++});
  `)
 	got := SLP144{}.Check(d)
 	if len(got) != 0 {

@@ -90,3 +90,34 @@ func TestSLP146_FiresOnPromiseCallInLoop(t *testing.T) {
 		t.Fatalf("expected 1 finding (fetch in loop), got %d: %+v", len(got), got)
 	}
 }
+
+func TestSLP146_DoesNotFlagPromiseAfterLoopEnds(t *testing.T) {
+	d := parseDiff(t, `diff --git a/processor.js b/processor.js
+--- a/processor.js
++++ b/processor.js
+@@ -10,2 +10,6 @@
+ processItems();
++for (const id of ids) {
++	console.log(id);
++}
++fetch('/outside-loop');
+ `)
+	got := SLP146{}.Check(d)
+	if len(got) != 0 {
+		t.Fatalf("expected 0 findings (promise call outside loop), got %d: %+v", len(got), got)
+	}
+}
+
+func TestSLP146_FiresOnOneLineLoopBodyPromiseCall(t *testing.T) {
+	d := parseDiff(t, `diff --git a/processor.js b/processor.js
+--- a/processor.js
++++ b/processor.js
+@@ -10,2 +10,3 @@
+ processItems();
++for (const id of ids) fetch('/api/' + id);
+ `)
+	got := SLP146{}.Check(d)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding (one-line loop body promise call), got %d: %+v", len(got), got)
+	}
+}

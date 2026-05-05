@@ -80,6 +80,9 @@ func lineHasAwait(line string) bool {
 }
 
 func (r SLP146) Check(d *diff.Diff) []Finding {
+	if d == nil {
+		return nil
+	}
 	var out []Finding
 
 	for _, f := range d.Files {
@@ -138,10 +141,26 @@ func (r SLP146) Check(d *diff.Diff) []Finding {
 				// Only flag lines that look like they return promises (contain awaitable
 				// patterns like fetch, axios, db calls) rather than any line with ().
 				if isLoopLine(line) {
+					// Handle single-line loop bodies: for (...) fetch(...)
+					if !lineHasAwait(line) && looksLikePromiseCall(line) {
+						out = append(out, Finding{
+							RuleID:   r.ID(),
+							Severity: r.DefaultSeverity(),
+							File:     f.Path,
+							Line:     ln.NewLineNo,
+							Message:  "potential unawaited promise in loop body",
+							Snippet:  strings.TrimSpace(line),
+						})
+					}
+
+					// Track brace depth to constrain scanning to the loop body
+					braceDepth := strings.Count(line, "{") - strings.Count(line, "}")
+
 					// Look at subsequent added lines within the loop body
 					j := i + 1
 					for j < len(h.Lines) && h.Lines[j].Kind == diff.LineAdd {
 						nextLine := h.Lines[j].Content
+
 						if !lineHasAwait(nextLine) && looksLikePromiseCall(nextLine) {
 							out = append(out, Finding{
 								RuleID:   r.ID(),
@@ -152,6 +171,18 @@ func (r SLP146) Check(d *diff.Diff) []Finding {
 								Snippet:  strings.TrimSpace(nextLine),
 							})
 						}
+
+						// Stop when we leave the current braced loop block
+						if braceDepth > 0 {
+							braceDepth += strings.Count(nextLine, "{") - strings.Count(nextLine, "}")
+							if braceDepth <= 0 {
+								break
+							}
+						} else {
+							// Non-braced loop body: inspect only next added statement
+							break
+						}
+
 						j++
 					}
 				}
