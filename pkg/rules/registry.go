@@ -146,5 +146,12 @@ func Default() *Registry {
 	r.Register(SLP140{})
 	r.Register(SLP141{})
 	r.Register(SLP142{})
+	// New rules: enhanced bug detection coverage
+	r.Register(SLP143{})
+	r.Register(SLP144{})
+	r.Register(SLP145{})
+	r.Register(SLP146{})
+	r.Register(SLP147{})
+	r.Register(SLP148{})
 	return r
 }
