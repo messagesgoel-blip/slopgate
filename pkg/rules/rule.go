@@ -1,7 +1,3 @@
-// Package rules defines the slopgate rule interface, the Finding type,
-// the severity levels, and a minimal Registry that fires each registered
-// rule against a parsed diff. This file also defines the SemanticRule
-// interface for AST-aware rules.
 package rules
 
 import (
@@ -140,6 +136,19 @@ func (r *Registry) HasSemanticRules() bool {
 func (r *Registry) Run(d *diff.Diff, cfg *config.Config) []Finding {
 	var out []Finding
 
+	// Determine global minimum severity threshold from config.
+	minSev := SeverityInfo - 1 // no filter by default
+	if cfg != nil && cfg.MinSeverity != "" {
+		switch cfg.MinSeverity {
+		case "block":
+			minSev = SeverityBlock
+		case "warn":
+			minSev = SeverityWarn
+		case "info":
+			minSev = SeverityInfo
+		}
+	}
+
 	// Run regex rules.
 	for _, rule := range r.rules {
 		// Check if rule is globally ignored via config.
@@ -181,12 +190,15 @@ func (r *Registry) Run(d *diff.Diff, cfg *config.Config) []Finding {
 			} else if f.Severity == SeverityInfo && def != SeverityInfo {
 				f.Severity = def
 			}
+			// Apply global minimum severity filter.
+			if f.Severity < minSev {
+				continue
+			}
 			out = append(out, f)
 		}
 	}
 
 	// Run semantic rules if AST is available.
-	// Only run semantic rules on Go files.
 	if r.HasSemanticRules() && diff.HasGoFiles(d, true) {
 		astResult := diff.LoadASTAnalysis(d)
 		if len(astResult.Files) > 0 {
@@ -220,6 +232,10 @@ func (r *Registry) Run(d *diff.Diff, cfg *config.Config) []Finding {
 						}
 					} else if f.Severity == SeverityInfo && def != SeverityInfo {
 						f.Severity = def
+					}
+					// Apply global minimum severity filter.
+					if f.Severity < minSev {
+						continue
 					}
 					out = append(out, f)
 				}

@@ -1,0 +1,41 @@
+# Slopgate configuration — tuned for reduced noise while keeping high-value signals.
+#
+# Quick start:
+#   cp .slopgate.toml.example .slopgate.toml
+#   # edit to disable/enable specific rules
+#
+# Global severity floor: findings below this severity are discarded.
+#   block — only blocking findings
+#   warn  — block + warn (recommended for pre-commit)
+#   info  — all findings (default: no floor)
+min_severity = "warn"
+
+# Per-rule configuration — overrides default severity or disables rules entirely.
+[rules.SLP017]
+  # Magic number detection — noisy in tests/config. Severity already info,
+  # but can also be disabled entirely if preferred.
+  # severity = "info"
+  # ignore = false
+
+[rules.SLP070]
+  # Diff touches many top-level dirs — raised for monorepos
+  # severity = "info"
+
+[rules.SLP148]
+  # Inconsistent naming across modules — over-aggressive grouping fixed,
+  # but can be disabled if still noisy in your codebase.
+  # severity = "warn"
+
+[rules.SLP035]
+  # Code quality/style (console, TODOs, long lines) — skip test files done
+  # in code; severity is info after tuning.
+  # severity = "info"
+
+# Per-rule path globs — exclude noisy file patterns
+[rules.SLP035]
+  ignore_paths = ["**/*_test.go", "**/test/**", "**/tests/**"]
+
+[rules.SLP010]
+  # Test assertion rule — only run on test files (default), but can
+  # further exclude integration or e2e test folders if needed.
+  ignore_paths = ["**/testdata/**", "**/*.golden"]
