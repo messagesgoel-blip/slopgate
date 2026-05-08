@@ -44,13 +44,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 
 	var (
-		staged     bool
-		base       string
-		repoDir    string
-		format     string
-		noColor    bool
-		configPath string
-		listRules  bool
+		staged       bool
+		base         string
+		repoDir      string
+		format       string
+		noColor      bool
+		configPath   string
+		listRules    bool
+		minSeverity  string
 	)
 	fs.BoolVar(&staged, "staged", false, "scan the staged diff (pre-commit mode)")
 	fs.StringVar(&base, "base", "", "scan the diff against this base revision (e.g. main)")
@@ -59,6 +60,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.BoolVar(&noColor, "no-color", false, "disable ANSI colors in text output")
 	fs.StringVar(&configPath, "config", "", "path to .slopgate.toml config file")
 	fs.BoolVar(&listRules, "list-rules", false, "list all registered rules and exit")
+	fs.StringVar(&minSeverity, "min-severity", "", "minimum severity to report: block|warn|info (default all)")
 
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "slopgate: catches AI-generated code slop on staged or branch diffs")
@@ -67,6 +69,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+
+	// Environment variable overrides flag default.
+	if minSeverity == "" {
+		minSeverity = os.Getenv("SLOPGATE_MIN_SEVERITY")
 	}
 
 	// Handle --list-rules early — no diff or config needed.
@@ -153,6 +160,19 @@ func run(args []string, stdout, stderr io.Writer) int {
 				fmt.Fprintf(stderr, "slopgate: load config %s: %v\n", discovered, err)
 				return 2
 			}
+		}
+	}
+
+	// Apply --min-severity flag override (highest precedence).
+	if minSeverity != "" {
+		if cfg == nil {
+			cfg = &config.Config{}
+		}
+		cfg.MinSeverity = minSeverity
+		// Validate the flag value.
+		if err := cfg.Validate(); err != nil {
+			fmt.Fprintf(stderr, "slopgate: %v\n", err)
+			return 2
 		}
 	}
 

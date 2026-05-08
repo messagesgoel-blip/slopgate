@@ -41,7 +41,7 @@ func (r SLP070) Check(d *diff.Diff) []Finding {
 		modified = append(modified, f)
 		unique[topLevelDir(f.Path)] = true
 	}
-	if len(unique) < 3 {
+	if len(unique) < 6 {
 		return out
 	}
 	msg := fmt.Sprintf("diff touches %d top-level directories — consider splitting into focused PRs", len(unique))

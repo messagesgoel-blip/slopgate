@@ -41,6 +41,42 @@ class GhApiJsonTest(unittest.TestCase):
                 benchmark_review.gh_api_json(["repos/example/repo/pulls/20/comments", "--paginate"])
 
 
+class ReviewCommentIngestionTest(unittest.TestCase):
+    def test_collect_sentry_pr_comments_reads_sentry_bot_review_comments(self) -> None:
+        comments = [
+            {
+                "id": 101,
+                "user": {"login": "sentry[bot]"},
+                "path": "api/src/app.js",
+                "line": 10,
+                "body": "**Bug:** invalid sample rate parses to NaN",
+            },
+            {
+                "id": 102,
+                "user": {"login": "coderabbitai[bot]"},
+                "path": "api/src/app.js",
+                "line": 12,
+                "body": "_⚠️ Potential issue_",
+            },
+            {
+                "id": 103,
+                "user": {"login": "sentry[bot]"},
+                "path": "api/src/app.js",
+                "body": "missing line should be ignored",
+            },
+        ]
+
+        with patch.object(benchmark_review, "gh_api_json", return_value=comments) as gh_api_json:
+            findings = benchmark_review.collect_sentry_pr_comments("messagesgoel-blip/whimsy", 268)
+
+        gh_api_json.assert_called_once_with(["repos/messagesgoel-blip/whimsy/pulls/268/comments", "--paginate"])
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].path, "api/src/app.js")
+        self.assertEqual(findings[0].line, 10)
+        self.assertEqual(findings[0].source, "sentry")
+        self.assertEqual(findings[0].item_id, "101")
+
+
 class RunCmdTest(unittest.TestCase):
     def test_run_cmd_strips_hook_git_env_for_git_commands(self) -> None:
         with patch.dict(

@@ -18,7 +18,7 @@ import (
 type SLP035 struct{}
 
 func (SLP035) ID() string                { return "SLP035" }
-func (SLP035) DefaultSeverity() Severity { return SeverityWarn }
+func (SLP035) DefaultSeverity() Severity { return SeverityInfo }
 func (SLP035) Description() string {
 	return "code quality or style issue detected"
 }
@@ -41,6 +41,10 @@ func (r SLP035) Check(d *diff.Diff) []Finding {
 		}
 		isDoc := isDocFile(f.Path)
 		checkLongLine := !isDoc && isSourceLikeFile(f.Path)
+		// Skip test files — console/TODO/debugger are often intentional in tests
+		if isTestFile(f.Path) {
+			continue
+		}
 
 		for _, h := range f.Hunks {
 			for _, ln := range h.Lines {

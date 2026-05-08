@@ -392,6 +392,32 @@ def collect_coderabbit_all(owner_repo_name: str, pr_number: int) -> list[ReviewF
     return findings
 
 
+def collect_sentry_pr_comments(owner_repo_name: str, pr_number: int) -> list[ReviewFinding]:
+    """Collect Sentry bot review comments from GitHub PR review comments."""
+    comments_raw = gh_api_json([f"repos/{owner_repo_name}/pulls/{pr_number}/comments", "--paginate"])
+    findings: list[ReviewFinding] = []
+    for item in comments_raw:
+        login = ((item.get("user") or {}).get("login") or "").lower()
+        if login != "sentry[bot]":
+            continue
+        line = item.get("line") or item.get("original_line")
+        path = item.get("path")
+        if not path or line is None:
+            continue
+        findings.append(
+            ReviewFinding(
+                path=path,
+                line=int(line),
+                body=trim_body(item.get("body", "")),
+                item_id=str(item.get("id", "")),
+                source="sentry",
+                meta={"resolved": None},
+            )
+        )
+    print(f"Sentry PR:  {len(findings)} review comments", file=sys.stderr)
+    return findings
+
+
 def collect_coderabbit_actionable(owner_repo_name: str, pr_number: int) -> list[ReviewFinding]:
     owner, repo = owner_repo_name.split("/", 1)
     query = """
@@ -714,6 +740,14 @@ def main() -> int:
             args.sentry_query,
             context.worktree_path,
         )
+        sentry_pr_findings = collect_sentry_pr_comments(slug, args.pr_number)
+        # Merge Sentry API findings with Sentry GitHub bot comments, deduplicating by (path, line)
+        sentry_by_location: dict[tuple[str, int], ReviewFinding] = {}
+        for item in sentry_findings + sentry_pr_findings:
+            key = (item.path, item.line)
+            if key not in sentry_by_location:
+                sentry_by_location[key] = item
+        sentry_findings = list(sentry_by_location.values())
         combined_actionable = combine_streams_by_location(actionable_comments + sentry_findings)
 
         all_result = match_stream(sg_findings, all_comments, args.fuzzy_range)

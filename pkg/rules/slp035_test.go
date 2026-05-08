@@ -162,6 +162,42 @@ func TestSLP035(t *testing.T) {
 			},
 			wantFindings: 1,
 		},
+		{
+			name: "Console log in test file skipped",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "Component.test.tsx",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "console.log('debugging');"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
+		},
+		{
+			name: "Debugger in spec file skipped",
+			input: &diff.Diff{
+				Files: []diff.File{
+					{
+						Path: "utils.spec.js",
+						Hunks: []diff.Hunk{
+							{
+								Lines: []diff.Line{
+									{Kind: diff.LineAdd, NewLineNo: 1, Content: "debugger;"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantFindings: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -175,5 +211,10 @@ func TestSLP035(t *testing.T) {
 				}
 			}
 		})
+	}
+
+	var r SLP035
+	if r.DefaultSeverity() != SeverityInfo {
+		t.Errorf("SLP035 default severity should be info, got %v", r.DefaultSeverity())
 	}
 }

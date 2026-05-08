@@ -12,7 +12,8 @@ import (
 
 // Config represents the top-level .slopgate.toml structure.
 type Config struct {
-	Rules map[string]RuleConfig `toml:"rules"`
+	Rules       map[string]RuleConfig `toml:"rules"`
+	MinSeverity string                `toml:"min_severity"` // global severity floor: "block", "warn", "info"
 }
 
 // RuleConfig configures a single rule's behaviour.
@@ -47,6 +48,9 @@ func (c *Config) Validate() error {
 		if rule.Severity != "" && !validSeverity[rule.Severity] {
 			return fmt.Errorf("config: rule %q: invalid severity %q (want block|warn|info|off)", ruleID, rule.Severity)
 		}
+	}
+	if c.MinSeverity != "" && !validSeverity[c.MinSeverity] {
+		return fmt.Errorf("config: min_severity %q invalid (want block|warn|info)", c.MinSeverity)
 	}
 	return nil
 }
