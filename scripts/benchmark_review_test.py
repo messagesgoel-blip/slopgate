@@ -71,10 +71,11 @@ class ReviewCommentIngestionTest(unittest.TestCase):
 
         gh_api_json.assert_called_once_with(["repos/messagesgoel-blip/whimsy/pulls/268/comments", "--paginate"])
         self.assertEqual(len(findings), 1)
-        self.assertEqual(findings[0].path, "api/src/app.js")
-        self.assertEqual(findings[0].line, 10)
-        self.assertEqual(findings[0].source, "sentry")
-        self.assertEqual(findings[0].item_id, "101")
+        finding = findings[0]
+        self.assertEqual(finding.path, "api/src/app.js")
+        self.assertEqual(finding.line, 10)
+        self.assertEqual(finding.source, "sentry")
+        self.assertEqual(finding.item_id, "101")
 
 
 class RunCmdTest(unittest.TestCase):
