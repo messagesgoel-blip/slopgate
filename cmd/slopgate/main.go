@@ -44,14 +44,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 
 	var (
-		staged       bool
-		base         string
-		repoDir      string
-		format       string
-		noColor      bool
-		configPath   string
-		listRules    bool
-		minSeverity  string
+		staged      bool
+		base        string
+		repoDir     string
+		format      string
+		noColor     bool
+		configPath  string
+		listRules   bool
+		minSeverity string
 	)
 	fs.BoolVar(&staged, "staged", false, "scan the staged diff (pre-commit mode)")
 	fs.StringVar(&base, "base", "", "scan the diff against this base revision (e.g. main)")
