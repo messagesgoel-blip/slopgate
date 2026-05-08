@@ -71,7 +71,7 @@ class ReviewCommentIngestionTest(unittest.TestCase):
 
         gh_api_json.assert_called_once_with(["repos/messagesgoel-blip/whimsy/pulls/268/comments", "--paginate"])
         self.assertEqual(len(findings), 1)
-        finding = findings[0]
+        [finding] = findings
         self.assertEqual(finding.path, "api/src/app.js")
         self.assertEqual(finding.line, 10)
         self.assertEqual(finding.source, "sentry")
