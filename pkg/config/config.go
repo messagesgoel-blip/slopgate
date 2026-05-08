@@ -49,7 +49,8 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("config: rule %q: invalid severity %q (want block|warn|info|off)", ruleID, rule.Severity)
 		}
 	}
-	if c.MinSeverity != "" && !validSeverity[c.MinSeverity] {
+	validMinSev := map[string]bool{"block": true, "warn": true, "info": true}
+	if c.MinSeverity != "" && !validMinSev[c.MinSeverity] {
 		return fmt.Errorf("config: min_severity %q invalid (want block|warn|info)", c.MinSeverity)
 	}
 	return nil
