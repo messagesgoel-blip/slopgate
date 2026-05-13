@@ -155,5 +155,7 @@ func Default() *Registry {
 	r.Register(SLP148{})
 	// P1: Close Sentry bug gap — null dereference guard.
 	r.Register(SLP202{})
+	// P1: Close Sentry bug gap — DB constraint violation.
+	r.Register(SLP203{})
 	return r
 }
