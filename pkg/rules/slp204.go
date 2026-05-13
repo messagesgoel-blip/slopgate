@@ -46,6 +46,14 @@ var successReturnPattern = regexp.MustCompile(
 var inlineErrCheckPattern = regexp.MustCompile(
 	`(?i)(?:if|switch)\s*\(?.*\berr\w*\b.*\{`)
 
+// reOkSuccess matches JS/TS object returns where ok is truthy.
+var reOkSuccess = regexp.MustCompile(
+	`\bok:\s*(true|1)\b|['"]ok['"]:\s*(true|1)`)
+
+// reSuccessSuccess matches JS/TS object returns where success is truthy.
+var reSuccessSuccess = regexp.MustCompile(
+	`\bsuccess:\s*(true|1)\b|['"]success['"]:\s*(true|1)`)
+
 // ---------------------------------------------------------------------------
 // Check
 // ---------------------------------------------------------------------------
@@ -58,7 +66,11 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		ext := strings.ToLower(f.Path[strings.LastIndex(f.Path, "."):])
+		idx := strings.LastIndex(f.Path, ".")
+		if idx < 0 {
+			continue
+		}
+		ext := strings.ToLower(f.Path[idx:])
 		if !slp204SupportedExt(ext) {
 			continue
 		}
@@ -184,11 +196,17 @@ func isSuccessReturn(content string) bool {
 		return true
 	}
 	// JS/TS object returns: return { ok: true } or return { success: true }
+	// Require truthy values — "success: false" / "ok: false" are NOT success returns.
 	lower := strings.ToLower(content)
-	if strings.Contains(lower, "return") && strings.Contains(lower, "{") &&
-		(strings.Contains(lower, `"ok"`) || strings.Contains(lower, "'ok'") ||
-			strings.Contains(lower, "ok:") || strings.Contains(lower, "success:")) {
-		return true
+	if strings.Contains(lower, "return") && strings.Contains(lower, "{") {
+		// Match "ok: true/1" or "\"ok\"/\"'ok'": true/1
+		if reOkSuccess.MatchString(lower) {
+			return true
+		}
+		// Match "success: true/1" or "\"success\"": true/1
+		if reSuccessSuccess.MatchString(lower) {
+			return true
+		}
 	}
 	return false
 }

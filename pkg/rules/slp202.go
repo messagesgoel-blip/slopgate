@@ -85,7 +85,11 @@ func (r SLP202) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
-		ext := strings.ToLower(f.Path[strings.LastIndex(f.Path, "."):])
+		idx := strings.LastIndex(f.Path, ".")
+		if idx < 0 {
+			continue
+		}
+		ext := strings.ToLower(f.Path[idx:])
 		if !supportedExt(ext) {
 			continue
 		}
