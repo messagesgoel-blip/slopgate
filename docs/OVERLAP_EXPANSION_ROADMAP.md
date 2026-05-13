@@ -12,8 +12,8 @@ These catch production crashes before they reach Sentry.
 
 | Task ID | Rule | Description | Effort | Expected Impact |
 |---------|------|-------------|--------|-----------------|
-| **SLO-202** | SLP202 | Null-deref before property access — detect `obj.prop` where `obj` is nullable without guard | Low | High — Sentry's #1 bug class (~5–10 overlap/100runs) |
-| **SLO-203** | SLP203 | DB constraint violation risk — INSERT/UPDATE without ON CONFLICT on unique keys | Medium | High — Sentry DB errors #2 (~3–5 overlap) |
+| **SLO-202** | SLP202 | Null-deref before property access — detect `obj.prop` where `obj` is nullable without guard | Low | High — Sentry's #1 bug class (~5–10 overlap/100runs) | **✅ Done** |
+| **SLO-203** | SLP203 | DB constraint violation risk — INSERT/UPDATE without ON CONFLICT on unique keys | Medium | High — Sentry DB errors #2 (~3–5 overlap) | **✅ Done** |
 | **SLO-204** | SLP204 | Silent promise failure mask — catch returns success masking inner error | Medium-High | Medium — data loss bugs |
 | **SLO-207** | SLP207 | Transaction missing explicit rollback — BEGIN without ROLLBACK error path | Medium | Low-Medium |
 
@@ -105,8 +105,8 @@ These slopgate-only rules are its competitive advantage.
 
 | ID | Phase | Rule | Status |
 |----|-------|------|--------|
-| SLO-202 | P1 | Null-deref guard | 🚧 Not started |
-| SLO-203 | P1 | DB constraint violation | 🚧 Not started |
+| SLO-202 | P1 | Null-deref guard | ✅ Complete (committed) |
+| SLO-203 | P1 | DB constraint violation | ✅ Complete (committed) |
 | SLO-204 | P1 | Silent promise mask | 🚧 Not started |
 | SLO-207 | P1 | Transaction rollback | 🚧 Not started |
 | SLO-098-expand | P2 | Route w/o test (broadened) | 🚧 Not started |
@@ -119,4 +119,4 @@ These slopgate-only rules are its competitive advantage.
 | SLO-035-narrow | P4 | General quality specificity | 🚧 Not started |
 | SLO-070-deprio | P4 | Too-many-dirs severity downgrade | 🚧 Not started |
 
-**Next session pick-up:** Start with **SLO-202** (P1, null-deref guard) — highest Sentry overlap potential, lowest effort.
+**Next session pick-up:** Start with **SLO-204** (P1, silent promise mask) — SLO-202 and SLO-203 are complete.
