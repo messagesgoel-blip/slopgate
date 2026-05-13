@@ -44,7 +44,7 @@ var successReturnPattern = regexp.MustCompile(
 // inlineErrCheckPattern matches inline error checks on the same line
 // as the assignment (e.g., Go if-initialization).
 var inlineErrCheckPattern = regexp.MustCompile(
-	`(?i)(?:if|switch)\s*\(.*\berr\w*\b.*\{`)
+	`(?i)(?:if|switch)\s*\(?.*\berr\w*\b.*\{`)
 
 // ---------------------------------------------------------------------------
 // Check
@@ -218,7 +218,11 @@ func isSlp204Skippable(content string) bool {
 func isErrNameBlacklisted(varName, content string) bool {
 	// Skip if this is a reassignment to nil inside a guard.
 	// e.g. } else { err = nil } — not a new error capture.
-	if strings.Contains(content, "= nil") || strings.Contains(content, "= null") {
+	// Uses regex to avoid matching "!=" in expressions like "if err := f(x != nil)".
+	if matched, _ := regexp.MatchString(`\berr\w*\s*=\s*nil\b`, content); matched {
+		return true
+	}
+	if matched, _ := regexp.MatchString(`\berr\w*\s*=\s*null\b`, content); matched {
 		return true
 	}
 	// Skip if the line is a simple err declaration without assignment.

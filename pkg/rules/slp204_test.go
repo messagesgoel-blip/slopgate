@@ -292,6 +292,54 @@ func TestSLP204_UncheckedErrorBeforeReturn(t *testing.T) {
  }`,
 			want: 1,
 		},
+		// Bug fix: inlineErrCheckPattern must match Go if-init without parens.
+		// The `if err := f(); err != nil {` pattern has `err` but no outer
+		// paren wrapping the entire condition. Previously this was silently
+		// skipped, leaving err in pending and producing a false positive on
+		// the later `return nil`.
+		{
+			name: "go_if_init_err_checked_no_false_positive",
+			diff: `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,3 +1,5 @@
+ func process() error {
+-	fmt.Println("ok")
++	if err := doSomething(); err != nil {
++		return err
++	}
++	return nil
+ }`,
+			want: 0,
+		},
+		// Bug fix: isErrNameBlacklisted must not treat "!=" as "=" via substring match.
+		// `err := someFunc(x != nil)` contains "= nil" as a substring inside "!=",
+		// but the error IS captured and must not be blacklisted.
+		{
+			name: "go_err_assigned_with_neq_nil_in_args_not_blacklisted",
+			diff: `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,4 +1,5 @@
+ func process() error {
+-	fmt.Println("ok")
++	err := doSomething(x != nil)
++	return nil
+ }`,
+			want: 1,
+		},
+		{
+			name: "python_err_assigned_with_neq_none_in_args_not_blacklisted",
+			diff: `diff --git a/handler.py b/handler.py
+--- a/handler.py
++++ b/handler.py
+@@ -1,4 +1,5 @@
+ def process():
+-    print("ok")
++    err = do_something(x is not None)
++    return None`,
+			want: 1,
+		},
 	}
 
 	for _, tt := range tests {
