@@ -157,5 +157,7 @@ func Default() *Registry {
 	r.Register(SLP202{})
 	// P1: Close Sentry bug gap — DB constraint violation.
 	r.Register(SLP203{})
+	// P1: Close Sentry bug gap — silent promise failure mask.
+	r.Register(SLP204{})
 	return r
 }
