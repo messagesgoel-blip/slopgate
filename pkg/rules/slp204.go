@@ -150,7 +150,7 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 				// Check for error assignment.
 				if m := assignPattern.FindStringSubmatch(content); len(m) > 1 {
 					varName := m[1]
-					if !isErrNameBlacklisted(varName, content) {
+					if !isErrNameBlacklisted(content) {
 						pending[varName] = ln.NewLineNo
 					}
 				}
@@ -252,7 +252,7 @@ func isSlp204Skippable(content string) bool {
 
 // isErrNameBlacklisted excludes assignments that are not actual error
 // captures — e.g., re-assigning inside an existing guard block.
-func isErrNameBlacklisted(varName, content string) bool {
+func isErrNameBlacklisted(content string) bool {
 	// Skip if this is a reassignment to nil/null inside a guard.
 	// e.g. } else { err = nil } — not a new error capture.
 	clean := stripStringLiterals(content)
