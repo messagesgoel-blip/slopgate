@@ -107,7 +107,7 @@ func (r SLP203) Check(d *diff.Diff) []Finding {
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
 					Line:     ln.NewLineNo,
-					Message:  fmt.Sprintf("INSERT without conflict handling — table %q may violate unique constraint", table),
+					Message:  fmt.Sprintf("conflict handling missing — table %q may violate unique constraint", table),
 					Snippet:  content,
 				})
 			}

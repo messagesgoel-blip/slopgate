@@ -35,7 +35,7 @@ func (r SLP058) Check(d *diff.Diff) []Finding {
 			// (e.g. regexp.MustCompile backtick strings that contain SQL keywords).
 			locs := sqlConcatPattern.FindAllStringSubmatchIndex(ln.Content, -1)
 			for _, loc := range locs {
-				if loc[0] < 0 {
+				if len(loc) > 0 && loc[0] < 0 {
 					continue
 				}
 				prefix := ln.Content[:loc[0]]
