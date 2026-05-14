@@ -36,7 +36,7 @@ func (SLP204) Description() string {
 // Requires a trailing "(" on the RHS to ensure only function/method calls are
 // matched, not plain variable assignments like "err := someVar".
 var assignPattern = regexp.MustCompile(
-	`(?i)(?:const|let|var)?\s*(\berr\w*\b)\s*(?::=|=)\s*(?:await\s+)?\w[\w.]*\s*\(`)
+	`(?i)(?:const|let|var)?\s*(\berr\w*\b)\s*(?::=|=)\s*(?:await\s+)?\b\w[\w.]*\s*\(`)
 
 // successReturnPattern matches return statements returning a success
 // value that would mask an unchecked error.
@@ -56,12 +56,22 @@ var reOkSuccess = regexp.MustCompile(
 var reSuccessSuccess = regexp.MustCompile(
 	`\bsuccess:\s*(true|1)\b|['"]success['"]:\s*(true|1)`)
 
+// errAssignNil matches re-assignment of an error variable to nil.
+var errAssignNil = regexp.MustCompile(`\berr\w*\s*=\s*nil\b`)
+
+// errAssignNull matches re-assignment of an error variable to null.
+var errAssignNull = regexp.MustCompile(`\berr\w*\s*=\s*null\b`)
+
 // ---------------------------------------------------------------------------
 // Check
 // ---------------------------------------------------------------------------
 
 func (r SLP204) Check(d *diff.Diff) []Finding {
 	var out []Finding
+
+	if d == nil {
+		return out
+	}
 
 	for _, f := range d.Files {
 		if f.IsDelete {
@@ -85,6 +95,8 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 			// Track error variables found in added lines.
 			// errName -> line number of assignment.
 			pending := map[string]int{}
+			// Cache compiled per-errName regexes for isErrChecked.
+			errCheckCache := map[string][]*regexp.Regexp{}
 
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
@@ -102,12 +114,12 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 					// line (e.g. `if (err)` in JS, `if (err != null)` in
 					// Java) so that later success returns don't false-flag
 					// them.
-					slp204ClearCheckedErrors(content, pending)
+					slp204ClearCheckedErrors(content, pending, errCheckCache)
 					continue
 				}
 
 				// Check for proper error checks and remove cleared errors from pending.
-				cleared := slp204ClearCheckedErrors(content, pending)
+				cleared := slp204ClearCheckedErrors(content, pending, errCheckCache)
 				if cleared > 0 {
 					continue
 				}
@@ -145,10 +157,10 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 
 // slp204ClearCheckedErrors removes error variables from pending that are
 // properly checked on this line. Returns the number of cleared errors.
-func slp204ClearCheckedErrors(content string, pending map[string]int) int {
+func slp204ClearCheckedErrors(content string, pending map[string]int, cache map[string][]*regexp.Regexp) int {
 	cleared := 0
 	for en := range pending {
-		if isErrChecked(en, content) {
+		if isErrChecked(en, content, cache) {
 			delete(pending, en)
 			cleared++
 		}
@@ -157,31 +169,24 @@ func slp204ClearCheckedErrors(content string, pending map[string]int) int {
 }
 
 // isErrChecked returns true if the line shows the error variable is properly
-// checked/handled.
-func isErrChecked(errName, content string) bool {
-	// Go: if err != nil { / if err == nil { / if _, err := f(); err != nil {
-	if regexp.MustCompile(fmt.Sprintf(`\b%s\s*[!=]==?\s*nil`, errName)).MatchString(content) {
-		return true
+// checked/handled. Compiled regexes are cached per errName.
+func isErrChecked(errName, content string, cache map[string][]*regexp.Regexp) bool {
+	reList, ok := cache[errName]
+	if !ok {
+		reList = []*regexp.Regexp{
+			regexp.MustCompile(fmt.Sprintf(`\b%s\s*[!=]==?\s*nil`, errName)),      // Go nil check
+			regexp.MustCompile(fmt.Sprintf(`\b%s\s+is\s+(not\s+)?None`, errName)), // Python None
+			regexp.MustCompile(fmt.Sprintf(`\bif\s*\(?\s*!?%s\s*\)?`, errName)),   // Python/JS truthy
+			regexp.MustCompile(fmt.Sprintf(`\breturn\s+%s\b`, errName)),           // return propagation
+			regexp.MustCompile(fmt.Sprintf(`\b%s\s*!=\s*null`, errName)),          // Java null
+			regexp.MustCompile(fmt.Sprintf(`\b(?:raise|throw)\s+%s\b`, errName)),  // raise/throw
+		}
+		cache[errName] = reList
 	}
-	// Python: if err is not None: / if err is None:
-	if regexp.MustCompile(fmt.Sprintf(`\b%s\s+is\s+(not\s+)?None`, errName)).MatchString(content) {
-		return true
-	}
-	// Python/JS: if err: / if (!err): / if (err):
-	if regexp.MustCompile(fmt.Sprintf(`\bif\s*\(?\s*!?%s\s*\)?`, errName)).MatchString(content) {
-		return true
-	}
-	// Any language: return err (propagating the error)
-	if regexp.MustCompile(fmt.Sprintf(`\breturn\s+%s\b`, errName)).MatchString(content) {
-		return true
-	}
-	// Java: if (err != null)
-	if regexp.MustCompile(fmt.Sprintf(`\b%s\s*!=\s*null`, errName)).MatchString(content) {
-		return true
-	}
-	// raise / throw with err (Python: raise err, JS: throw err)
-	if regexp.MustCompile(fmt.Sprintf(`\b(?:raise|throw)\s+%s\b`, errName)).MatchString(content) {
-		return true
+	for _, re := range reList {
+		if re.MatchString(content) {
+			return true
+		}
 	}
 	return false
 }
@@ -189,6 +194,9 @@ func isErrChecked(errName, content string) bool {
 // isSuccessReturn returns true if the line returns a success value that would
 // mask an unchecked error.
 func isSuccessReturn(content string) bool {
+	if content == "" {
+		return false
+	}
 	// Simple success values: nil, true, null, None
 	if successReturnPattern.MatchString(content) {
 		return true
@@ -232,18 +240,14 @@ func isSlp204Skippable(content string) bool {
 // isErrNameBlacklisted excludes assignments that are not actual error
 // captures — e.g., re-assigning inside an existing guard block.
 func isErrNameBlacklisted(varName, content string) bool {
-	// Skip if this is a reassignment to nil inside a guard.
+	// Skip if this is a reassignment to nil/null inside a guard.
 	// e.g. } else { err = nil } — not a new error capture.
-	// Uses regex to avoid matching "!=" in expressions like "if err := f(x != nil)".
-	if matched, _ := regexp.MatchString(`\berr\w*\s*=\s*nil\b`, content); matched {
-		return true
-	}
-	if matched, _ := regexp.MatchString(`\berr\w*\s*=\s*null\b`, content); matched {
+	if errAssignNil.MatchString(content) || errAssignNull.MatchString(content) {
 		return true
 	}
 	// Skip if the line is a simple err declaration without assignment.
 	// e.g. var err error — not capturing a specific error.
-	if strings.Contains(content, "var err ") && !strings.Contains(content, "=") {
+	if strings.Contains(content, "var err ") {
 		return true
 	}
 	return false
