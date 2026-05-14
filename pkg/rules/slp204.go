@@ -251,10 +251,5 @@ func isErrNameBlacklisted(varName, content string) bool {
 	if reNilAssign.MatchString(content) || reNullAssign.MatchString(content) {
 		return true
 	}
-	// Skip if the line is a simple err declaration without assignment.
-	// e.g. var err error — not capturing a specific error.
-	if strings.Contains(content, "var err ") {
-		return true
-	}
 	return false
 }
