@@ -7,6 +7,7 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
+// parseDiff204 parses a unified diff string into a Diff for SLP204 tests.
 func parseDiff204(t *testing.T, s string) *diff.Diff {
 	t.Helper()
 	d, err := diff.Parse(strings.NewReader(s))
@@ -16,6 +17,8 @@ func parseDiff204(t *testing.T, s string) *diff.Diff {
 	return d
 }
 
+// TestSLP204_UncheckedErrorBeforeReturn tests detection of error variables
+// assigned from function calls but never checked before returning success.
 func TestSLP204_UncheckedErrorBeforeReturn(t *testing.T) {
 	tests := []struct {
 		name string
@@ -224,7 +227,8 @@ func TestSLP204_UncheckedErrorBeforeReturn(t *testing.T) {
 --- a/handler_test.go
 +++ b/handler_test.go
 @@ -1,4 +1,5 @@
- func TestProcess(t *testing.T) {
+ // TestProcess validates SLP204's comment-line filtering.
+func TestProcess(t *testing.T) {
 -	t.Parallel()
 +	err := doSomething()
 +	_ = err
@@ -354,6 +358,7 @@ func TestSLP204_UncheckedErrorBeforeReturn(t *testing.T) {
 	}
 }
 
+// TestSLP204_IDAndDescription verifies SLP204's ID and default severity.
 func TestSLP204_IDAndDescription(t *testing.T) {
 	var r SLP204
 	if r.ID() != "SLP204" {
