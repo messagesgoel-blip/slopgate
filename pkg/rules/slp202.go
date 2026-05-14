@@ -129,17 +129,18 @@ func (r SLP202) Check(d *diff.Diff) []Finding {
 				for _, pat := range nilCheckPatterns {
 					sm := pat.FindStringSubmatch(ln.Content)
 					if sm != nil {
-						var vars map[string]bool
-						if len(sm) > 2 {
-							// Pattern has capture groups — use them directly.
-							vars = map[string]bool{}
+						vars := map[string]bool{}
+						if len(sm) >= 2 {
 							for _, cap := range sm[1:] {
 								if cap != "" {
 									vars[cap] = true
 								}
 							}
-						} else {
-							vars = extractGuardVars(ln.Content)
+						}
+						// Fall back to token-based extraction for non-capture
+						// patterns (Go/JS/TS/Python/Java) or as a safety net.
+						for v := range extractGuardVars(ln.Content) {
+							vars[v] = true
 						}
 						indent := slp202LeadingSpaces(ln.Content)
 						for v := range vars {
