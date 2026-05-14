@@ -207,11 +207,7 @@ func isSuccessReturn(content string) bool {
 	// Reject multi-value returns like "return nil, err" where a comma
 	// follows the value — those are error-propagating, not success returns.
 	if m := successReturnPattern.FindStringSubmatchIndex(content); m != nil && len(m) > 2 {
-		after := content[m[1]:]
-		if strings.HasPrefix(after, ",") {
-			return false
-		}
-		return true
+		return !strings.HasPrefix(content[m[1]:], ",")
 	}
 	// JS/TS object returns: return { ok: true } or return { success: true }
 	// Require truthy values — "success: false" / "ok: false" are NOT success returns.

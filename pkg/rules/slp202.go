@@ -48,6 +48,7 @@ var nilCheckPatterns = []*regexp.Regexp{
 	// JS/TS
 	regexp.MustCompile(`\bif\s*\(?\w+\s*[!=]==?\s*(null|undefined)\)?`),
 	regexp.MustCompile(`\bif\s*\(?\w+\s*&&\s*\w+`),
+	regexp.MustCompile(`\bif\s*\(?\s*!\s*\w+\s*\)?`),
 	regexp.MustCompile(`\bif\s*\(?!(null|undefined)\s*\w+\)?`),
 	// Python
 	regexp.MustCompile(`\bif\s+\w+\s+is\s+not\s+None`),
@@ -58,9 +59,9 @@ var nilCheckPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bif\s*\(\s*\w+\s*==\s*null\s*\)`),
 	regexp.MustCompile(`Objects\.requireNonNull`),
 	// Rust
-	regexp.MustCompile(`\bif\s+\w+\.is_some\(\)`),
-	regexp.MustCompile(`\bif\s+\w+\.is_none\(\)`),
-	regexp.MustCompile(`\bif\s+let\s+Some\(`),
+	regexp.MustCompile(`\bif\s+(\w+)\.is_some\(\)`),
+	regexp.MustCompile(`\bif\s+(\w+)\.is_none\(\)`),
+	regexp.MustCompile(`\bif\s+let\s+Some\((\w+)\)\s*=\s*(\w+)`),
 }
 
 // derefPatterns match lines that access a variable's field, method, or index.
@@ -126,8 +127,20 @@ func (r SLP202) Check(d *diff.Diff) []Finding {
 					continue
 				}
 				for _, pat := range nilCheckPatterns {
-					if pat.MatchString(ln.Content) {
-						vars := extractGuardVars(ln.Content)
+					sm := pat.FindStringSubmatch(ln.Content)
+					if sm != nil {
+						var vars map[string]bool
+						if len(sm) > 2 {
+							// Pattern has capture groups — use them directly.
+							vars = map[string]bool{}
+							for _, cap := range sm[1:] {
+								if cap != "" {
+									vars[cap] = true
+								}
+							}
+						} else {
+							vars = extractGuardVars(ln.Content)
+						}
 						indent := slp202LeadingSpaces(ln.Content)
 						for v := range vars {
 							if cur, ok := removedGuards[v]; !ok || indent < cur {
@@ -216,6 +229,8 @@ func extractGuardVars(line string) map[string]bool {
 	fields := strings.Fields(line)
 	for i, tok := range fields {
 		tok = strings.Trim(tok, "(,)[")
+		// Strip leading negation (!) so !user becomes user.
+		tok = strings.TrimLeft(tok, "!")
 		if isLikelyVariable(tok) {
 			out[tok] = true
 		}
@@ -223,12 +238,14 @@ func extractGuardVars(line string) map[string]bool {
 		if isComparison(tok) {
 			if i > 0 {
 				prev := strings.Trim(fields[i-1], "(,)[")
+				prev = strings.TrimLeft(prev, "!")
 				if isLikelyVariable(prev) {
 					out[prev] = true
 				}
 			}
 			if i+1 < len(fields) {
 				next := strings.Trim(strings.TrimRight(fields[i+1], ",){:;"), "(,)[")
+				next = strings.TrimLeft(next, "!")
 				if isLikelyVariable(next) {
 					out[next] = true
 				}
@@ -255,7 +272,7 @@ func isLikelyVariable(s string) bool {
 		case "if", "for", "return", "nil", "null", "none", "true", "false",
 			"this", "self", "defer", "go", "func", "var",
 			"let", "const", "with", "as", "of", "in", "and", "or", "not",
-			"is", "instanceof", "typeof", "require", "objects":
+			"is", "instanceof", "typeof", "require":
 			return false
 		}
 		c := s[0]

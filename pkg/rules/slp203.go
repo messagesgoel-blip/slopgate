@@ -89,6 +89,16 @@ func (r SLP203) Check(d *diff.Diff) []Finding {
 		}
 
 		for _, h := range f.Hunks {
+			// Collect all added lines in the hunk to support multi-line
+			// SQL statements where ON CONFLICT / UPSERT appears on a
+			// different line than the INSERT.
+			allAdded := ""
+			for _, ln := range h.Lines {
+				if ln.Kind == diff.LineAdd {
+					allAdded += " " + strings.TrimSpace(ln.Content)
+				}
+			}
+
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
 					continue
@@ -103,7 +113,7 @@ func (r SLP203) Check(d *diff.Diff) []Finding {
 					continue
 				}
 
-				if hasUpsertClause(content) {
+				if hasUpsertClause(allAdded) {
 					continue
 				}
 
