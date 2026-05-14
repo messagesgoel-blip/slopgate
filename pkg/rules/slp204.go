@@ -186,6 +186,7 @@ func isErrChecked(errName, content string, cache map[string][]*regexp.Regexp) bo
 			regexp.MustCompile(fmt.Sprintf(`\breturn\s+%s\b`, errName)),           // return propagation
 			regexp.MustCompile(fmt.Sprintf(`\b%s\s*!=\s*null`, errName)),          // Java null
 			regexp.MustCompile(fmt.Sprintf(`\b(?:raise|throw)\s+%s\b`, errName)),  // raise/throw
+			regexp.MustCompile(fmt.Sprintf(`\bswitch\s+%s\s*\{`, errName)),        // Go switch on err
 		}
 		cache[errName] = reList
 	}
