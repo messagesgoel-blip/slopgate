@@ -35,22 +35,24 @@ func (r SLP058) Check(d *diff.Diff) []Finding {
 			// (e.g. regexp.MustCompile backtick strings that contain SQL keywords).
 			locs := sqlConcatPattern.FindAllStringSubmatchIndex(ln.Content, -1)
 			for _, loc := range locs {
-				if len(loc) > 0 && loc[0] < 0 {
-					continue
+				if len(loc) > 0 {
+					if loc[0] < 0 {
+						continue
+					}
+					prefix := ln.Content[:loc[0]]
+					if strings.Count(prefix, "`")%2 == 1 {
+						continue
+					}
+					out = append(out, Finding{
+						RuleID:   r.ID(),
+						Severity: r.DefaultSeverity(),
+						File:     f.Path,
+						Line:     ln.NewLineNo,
+						Message:  "SQL built with string concatenation — use parameterized queries",
+						Snippet:  strings.TrimSpace(ln.Content),
+					})
+					break
 				}
-				prefix := ln.Content[:loc[0]]
-				if strings.Count(prefix, "`")%2 == 1 {
-					continue
-				}
-				out = append(out, Finding{
-					RuleID:   r.ID(),
-					Severity: r.DefaultSeverity(),
-					File:     f.Path,
-					Line:     ln.NewLineNo,
-					Message:  "SQL built with string concatenation — use parameterized queries",
-					Snippet:  strings.TrimSpace(ln.Content),
-				})
-				break
 			}
 		}
 	}
