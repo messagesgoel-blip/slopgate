@@ -56,11 +56,11 @@ var reOkSuccess = regexp.MustCompile(
 var reSuccessSuccess = regexp.MustCompile(
 	`\bsuccess:\s*(true|1)\b|['"]success['"]:\s*(true|1)`)
 
-// errAssignNil matches re-assignment of an error variable to nil.
-var errAssignNil = regexp.MustCompile(`\berr\w*\s*=\s*nil\b`)
+// reNilAssign matches re-assignment of an error variable to nil.
+var reNilAssign = regexp.MustCompile(`\berr\w*\s*=\s*nil\b`)
 
-// errAssignNull matches re-assignment of an error variable to null.
-var errAssignNull = regexp.MustCompile(`\berr\w*\s*=\s*null\b`)
+// reNullAssign matches re-assignment of an error variable to null.
+var reNullAssign = regexp.MustCompile(`\berr\w*\s*=\s*null\b`)
 
 // ---------------------------------------------------------------------------
 // Check
@@ -198,7 +198,13 @@ func isSuccessReturn(content string) bool {
 		return false
 	}
 	// Simple success values: nil, true, null, None
-	if successReturnPattern.MatchString(content) {
+	// Reject multi-value returns like "return nil, err" where a comma
+	// follows the value — those are error-propagating, not success returns.
+	if m := successReturnPattern.FindStringSubmatchIndex(content); m != nil {
+		after := content[m[1]:]
+		if strings.HasPrefix(after, ",") {
+			return false
+		}
 		return true
 	}
 	// JS/TS object returns: return { ok: true } or return { success: true }
@@ -242,7 +248,7 @@ func isSlp204Skippable(content string) bool {
 func isErrNameBlacklisted(varName, content string) bool {
 	// Skip if this is a reassignment to nil/null inside a guard.
 	// e.g. } else { err = nil } — not a new error capture.
-	if errAssignNil.MatchString(content) || errAssignNull.MatchString(content) {
+	if reNilAssign.MatchString(content) || reNullAssign.MatchString(content) {
 		return true
 	}
 	// Skip if the line is a simple err declaration without assignment.
