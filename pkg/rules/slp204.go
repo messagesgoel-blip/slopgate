@@ -203,15 +203,19 @@ func isSuccessReturn(content string) bool {
 	if content == "" {
 		return false
 	}
+	// Strip string/char literals so "return true" inside string
+	// content (e.g. log messages, SQL) doesn't cause a false positive.
+	clean := stripStringLiterals(content)
+
 	// Simple success values: nil, true, null, None
 	// Reject multi-value returns like "return nil, err" where a comma
 	// follows the value — those are error-propagating, not success returns.
-	if m := successReturnPattern.FindStringSubmatchIndex(content); m != nil && len(m) > 2 {
+	if m := successReturnPattern.FindStringSubmatchIndex(clean); m != nil && len(m) > 2 {
 		return !strings.HasPrefix(content[m[1]:], ",")
 	}
 	// JS/TS object returns: return { ok: true } or return { success: true }
 	// Require truthy values — "success: false" / "ok: false" are NOT success returns.
-	lower := strings.ToLower(content)
+	lower := strings.ToLower(clean)
 	if strings.Contains(lower, "return") && strings.Contains(lower, "{") {
 		// Match "ok: true/1" or "\"ok\"/\"'ok'": true/1
 		if reOkSuccess.MatchString(lower) {
@@ -250,7 +254,8 @@ func isSlp204Skippable(content string) bool {
 func isErrNameBlacklisted(varName, content string) bool {
 	// Skip if this is a reassignment to nil/null inside a guard.
 	// e.g. } else { err = nil } — not a new error capture.
-	if reNilAssign.MatchString(content) || reNullAssign.MatchString(content) {
+	clean := stripStringLiterals(content)
+	if reNilAssign.MatchString(clean) || reNullAssign.MatchString(clean) {
 		return true
 	}
 	return false
