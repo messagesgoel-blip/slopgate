@@ -33,8 +33,10 @@ func (SLP204) Description() string {
 
 // errAssignPattern matches when an error variable (name starting with "err")
 // is assigned from a function call or await expression.
+// Requires a trailing "(" on the RHS to ensure only function/method calls are
+// matched, not plain variable assignments like "err := someVar".
 var assignPattern = regexp.MustCompile(
-	`(?i)(?:const|let|var)?\s*(\berr\w*\b)\s*(?::=|=)\s*(?:await\s+)?\w`)
+	`(?i)(?:const|let|var)?\s*(\berr\w*\b)\s*(?::=|=)\s*(?:await\s+)?\w[\w.]*\s*\(`)
 
 // successReturnPattern matches return statements returning a success
 // value that would mask an unchecked error.

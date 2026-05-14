@@ -29,6 +29,10 @@ func (SLP202) Description() string {
 // Regex library
 // ---------------------------------------------------------------------------
 
+// requireNonNullPattern extracts the variable name from
+// Objects.requireNonNull(varName) calls.
+var requireNonNullPattern = regexp.MustCompile(`Objects\.requireNonNull\(([a-zA-Z_]\w*)`)
+
 // nilCheckPatterns match common nil/sentinel guard lines.
 var nilCheckPatterns = []*regexp.Regexp{
 	// Go
@@ -187,6 +191,13 @@ func supportedExt(ext string) bool {
 // over missed detections.
 func extractGuardVars(line string) map[string]bool {
 	out := map[string]bool{}
+
+	// Handle Objects.requireNonNull(varName) — single-token call that
+	// strings.Fields would not split further.
+	if m := requireNonNullPattern.FindStringSubmatch(line); len(m) > 1 {
+		out[m[1]] = true
+	}
+
 	fields := strings.Fields(line)
 	for i, tok := range fields {
 		tok = strings.Trim(tok, "(,)[")
@@ -263,9 +274,19 @@ func hasInlineNilGuard(content string) bool {
 	if strings.Contains(content, "??") || strings.Contains(content, "?:") {
 		return true
 	}
+	// Go: if err != nil { / Python: if x is None
 	if strings.Contains(content, "if") && strings.Contains(content, "nil") {
 		return true
 	}
+	// JS/TS/Java: if (x !== null) / if (x != null) / if (x == null)
+	if strings.Contains(content, "if") && strings.Contains(content, "null") {
+		return true
+	}
+	// JS/TS: if (typeof x !== 'undefined') / if (x !== undefined)
+	if strings.Contains(content, "if") && strings.Contains(content, "undefined") {
+		return true
+	}
+	// Python: if x is not None / if x is not none
 	if strings.Contains(content, "is not None") || strings.Contains(content, "is not none") {
 		return true
 	}

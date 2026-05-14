@@ -14,7 +14,7 @@ These catch production crashes before they reach Sentry.
 |---------|------|-------------|--------|-----------------|--------|
 | **SLO-202** | SLP202 | Null-deref before property access — detect `obj.prop` where `obj` is nullable without guard | Low | High — Sentry's #1 bug class (~5–10 overlap/100runs) | ✅ Done |
 | **SLO-203** | SLP203 | DB constraint violation risk — INSERT/UPDATE without ON CONFLICT on unique keys | Medium | High — Sentry DB errors #2 (~3–5 overlap) | ✅ Done |
-| **SLO-204** | SLP204 | Silent promise failure mask — catch returns success masking inner error | Medium-High | Medium — data loss bugs | ✅ Merged |
+| **SLO-204** | SLP204 | Silent promise failure mask — catch returns success masking inner error | Medium-High | Medium — data loss bugs | 🚧 In review |
 | **SLO-207** | SLP207 | Transaction missing explicit rollback — BEGIN without ROLLBACK error path | Medium | Low-Medium | 🔜 Next |
 
 **Validation:** Verify Sentry-only findings drop by ~30% within 2 weeks of deploying SLO-202 + SLO-203.

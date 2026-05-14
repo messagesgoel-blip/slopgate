@@ -344,6 +344,35 @@ func TestProcess(t *testing.T) {
 +    return None`,
 			want: 1,
 		},
+		// err assigned from a for-range clause is not a function-call
+		// capture and must not be flagged.
+		{
+			name: "go_err_from_range_not_flagged",
+			diff: `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,3 +1,4 @@
+ func process() {
+-	fmt.Println("ok")
++	for _, err := range pending { return nil }
+ }`,
+			want: 0,
+		},
+		// err assigned from a plain variable (not a function call) must
+		// not be flagged.
+		{
+			name: "go_err_assigned_non_call_not_flagged",
+			diff: `diff --git a/handler.go b/handler.go
+--- a/handler.go
++++ b/handler.go
+@@ -1,4 +1,5 @@
+ func process() error {
+-	fmt.Println("ok")
++	err := someVar
++	return nil
+ }`,
+			want: 0,
+		},
 	}
 
 	for _, tt := range tests {
