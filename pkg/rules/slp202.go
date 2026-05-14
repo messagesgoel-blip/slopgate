@@ -171,9 +171,6 @@ func (r SLP202) Check(d *diff.Diff) []Finding {
 				if isSkippableLine(content) {
 					continue
 				}
-				if hasInlineNilGuard(content) {
-					continue
-				}
 
 				indent := slp202LeadingSpaces(ln.Content)
 
@@ -184,6 +181,11 @@ func (r SLP202) Check(d *diff.Diff) []Finding {
 						if len(sm) >= 2 {
 							varName := sm[1]
 							if guardIndent, ok := removedGuards[varName]; ok && indent <= guardIndent {
+								// Skip if this specific variable is
+								// protected by an inline guard.
+								if hasInlineNilGuard(varName, content) {
+									continue
+								}
 								out = append(out, Finding{
 									RuleID:   r.ID(),
 									Severity: r.DefaultSeverity(),
@@ -232,8 +234,9 @@ func extractGuardVars(line string) map[string]bool {
 	fields := strings.Fields(line)
 	for i, tok := range fields {
 		tok = strings.Trim(tok, "(,:);[]{}")
-		// Strip leading negation (!) so !user becomes user.
-		tok = strings.TrimLeft(tok, "!")
+		// Strip leading pointer and negation (!, *) so *err and !user
+		// both resolve to the variable name.
+		tok = strings.TrimLeft(tok, "!*")
 		if isLikelyVariable(tok) {
 			out[tok] = true
 		}
@@ -241,14 +244,14 @@ func extractGuardVars(line string) map[string]bool {
 		if isComparison(tok) {
 			if i > 0 {
 				prev := strings.Trim(fields[i-1], "(,:);[]{}")
-				prev = strings.TrimLeft(prev, "!")
+				prev = strings.TrimLeft(prev, "!*")
 				if isLikelyVariable(prev) {
 					out[prev] = true
 				}
 			}
 			if i+1 < len(fields) {
 				next := strings.Trim(strings.TrimRight(fields[i+1], ",):;[]{}"), "(,:);[]{}")
-				next = strings.TrimLeft(next, "!")
+				next = strings.TrimLeft(next, "!*")
 				if isLikelyVariable(next) {
 					out[next] = true
 				}
@@ -303,6 +306,8 @@ func isSkippableLine(content string) bool {
 // inlineNilGuardPatterns are regex patterns that match inline nil/null/undefined
 // guards on a single line. These use proper word boundaries instead of substring
 // checks to avoid false positives (e.g. "notify" being treated as "not"+"if").
+// Patterns with a capture group extract the guarded variable name; patterns
+// without one fall back to a proximity check against the matched text.
 var inlineNilGuardPatterns = []*regexp.Regexp{
 	// Go: if x != nil { / if x == nil {
 	regexp.MustCompile(`\bif\s+\w+\s*[!=]==?\s*nil\b`),
@@ -312,25 +317,50 @@ var inlineNilGuardPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bif\s*\(?\w+\s*[!=]==?\s*undefined\s*\)?`),
 	// Python: if x is not None
 	regexp.MustCompile(`\bif\s+\w+\s+is\s+not\s+None\b`),
+	// Python: if x: (bare truthy guard on same line)
+	regexp.MustCompile(`\bif\s+(\w+)\s*:`),
 }
 
-// hasInlineNilGuard returns true if the line itself contains a nil guard
-// that would protect any dereference on the same line.
-func hasInlineNilGuard(content string) bool {
-	if strings.Contains(content, "?!") || strings.Contains(content, "?.") {
+// hasInlineNilGuard returns true if the line contains a nil guard that
+// protects the specific dereferenced variable. Previously this was a
+// line-level check that suppressed ALL dereferences if ANY guard existed,
+// which caused false negatives when the guard protected a different variable.
+func hasInlineNilGuard(varName, content string) bool {
+	// Optional chaining is variable-specific: "v?.prop" only guards v.
+	if strings.Contains(content, varName+"?.") || strings.Contains(content, varName+"?!") {
 		return true
 	}
-	if strings.Contains(content, "??") || strings.Contains(content, "?:") {
+	// Nullish coalescing is variable-specific: "v ?? x" only guards v.
+	if strings.Contains(content, varName+"??") || strings.Contains(content, varName+"?:") {
 		return true
 	}
+	// Match standard nil-check patterns and verify the captured group
+	// (the guarded variable) is the one that lost its guard.
 	for _, pat := range inlineNilGuardPatterns {
-		if pat.MatchString(content) {
-			return true
+		sm := pat.FindStringSubmatch(content)
+		if sm != nil {
+			// If the pattern has capture groups, check the captured
+			// variable name for a match.
+			captured := false
+			for _, cap := range sm[1:] {
+				if cap == varName {
+					return true
+				}
+				captured = true
+			}
+			// Patterns without capture groups: fall back to a proximity
+			// check — if varName appears in the full matched text, it is
+			// likely guarded.
+			if !captured && strings.Contains(sm[0], varName) {
+				return true
+			}
 		}
 	}
-	// Python inline truthy check: if x: x.prop
+	// Python inline truthy check: "if x: x.prop"
 	if strings.Contains(content, "is not None") || strings.Contains(content, "is not none") {
-		return true
+		if strings.Contains(content, varName) {
+			return true
+		}
 	}
 	return false
 }

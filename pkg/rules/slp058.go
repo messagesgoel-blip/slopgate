@@ -53,8 +53,7 @@ func (r SLP058) Check(d *diff.Diff) []Finding {
 						if strings.Count(prefix, "`")%2 == 1 {
 							continue
 						}
-						if strings.Contains(prefix, "regexp.MustCompile(") ||
-							strings.Contains(prefix, "regexp.Compile(") {
+						if isInsideRegexpCall(prefix, loc[0]) {
 							continue
 						}
 					}
@@ -72,4 +71,27 @@ func (r SLP058) Check(d *diff.Diff) []Finding {
 		}
 	}
 	return out
+}
+
+// isInsideRegexpCall checks whether the match at position matchPos in the
+// line is actually inside a regexp.MustCompile() or regexp.Compile() call.
+// Uses parentheses balancing so that a SQL match on the same line *after*
+// the closing ) of the regexp call is not incorrectly suppressed.
+func isInsideRegexpCall(prefix string, matchPos int) bool {
+	for _, pat := range []string{"regexp.MustCompile(", "regexp.Compile("} {
+		pos := strings.LastIndex(prefix, pat)
+		if pos < 0 {
+			continue
+		}
+		// Content between the opening paren of the regexp call and the match.
+		between := prefix[pos+len(pat):]
+		opens := strings.Count(between, "(")
+		closes := strings.Count(between, ")")
+		// If there are no unmatched closing parens, the match is inside the
+		// regexp call (or nested inside a deeper call within it).
+		if opens >= closes {
+			return true
+		}
+	}
+	return false
 }
