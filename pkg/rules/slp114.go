@@ -7,6 +7,7 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
+// SLP114 checks for error-returning function calls used as statements without error handling.
 type SLP114 struct{}
 
 func (SLP114) ID() string                { return "SLP114" }

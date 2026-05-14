@@ -6,6 +6,7 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
+// SLP115 checks for narrow file extension usage without broader related extension coverage.
 type SLP115 struct{}
 
 func (SLP115) ID() string                { return "SLP115" }

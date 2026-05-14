@@ -6,6 +6,7 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
+// SLP120 checks for discarded values using the blank identifier in assignments.
 type SLP120 struct{}
 
 func (SLP120) ID() string                { return "SLP120" }

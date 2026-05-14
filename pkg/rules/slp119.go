@@ -7,6 +7,7 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
+// SLP119 checks for TrimSuffix/TrimPrefix results used without verifying the suffix/prefix was present.
 type SLP119 struct{}
 
 func (SLP119) ID() string                { return "SLP119" }
