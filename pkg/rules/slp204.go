@@ -53,6 +53,10 @@ var successReturnPattern = regexp.MustCompile(
 var inlineErrCheckPattern = regexp.MustCompile(
 	`(?i)(?:if|switch)\s*\(?.*\berr\w*\b.*\{`)
 
+// reDirectReturnObject matches a direct return of an object literal,
+// not a function call that passes an object as argument.
+var reDirectReturnObject = regexp.MustCompile(`(?i)\breturn\s*\{`)
+
 // reOkSuccess matches JS/TS object returns where ok is truthy.
 var reOkSuccess = regexp.MustCompile(
 	`\bok:\s*(true|1)\b|['"]ok['"]:\s*(true|1)`)
@@ -114,23 +118,35 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 					continue
 				}
 
-				// Check for inline error checks (e.g., Go if-initialization).
-				if inlineErrCheckPattern.MatchString(content) {
-					// Still clear pending errors that are checked on this
-					// line (e.g. `if (err)` in JS, `if (err != null)` in
-					// Java) so that later success returns don't false-flag
-					// them.
-					slp204ClearCheckedErrors(content, pending, errCheckCache)
-					continue
+				// 1. Record error assignments first so same-line checks
+				//    (e.g. "const err = f(); return nil") register the
+				//    variable before evaluating the return.
+				if m := assignPattern.FindStringSubmatch(content); len(m) > 1 {
+					varName := m[1]
+					if !isErrNameBlacklisted(content) {
+						pending[varName] = ln.NewLineNo
+					}
 				}
 
-				// Check for proper error checks and remove cleared errors from pending.
+				// 2. Check for inline error checks (e.g., Go if-initialization).
+				// Only clear and skip when an error is actually verified as
+				// checked; otherwise fall through to handle assignments.
+				if inlineErrCheckPattern.MatchString(content) {
+					cleared := slp204ClearCheckedErrors(content, pending, errCheckCache)
+					if cleared > 0 {
+						continue
+					}
+				}
+
+				// 3. Check for proper error checks and remove cleared errors
+				//    from pending.
 				cleared := slp204ClearCheckedErrors(content, pending, errCheckCache)
 				if cleared > 0 {
 					continue
 				}
 
-				// Check for success return while there are pending unchecked errors.
+				// 4. Check for success return while there are pending
+				//    unchecked errors.
 				if len(pending) > 0 && isSuccessReturn(content) {
 					for errName, lineNo := range pending {
 						out = append(out, Finding{
@@ -145,14 +161,6 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 					// Clear pending after flagging to avoid duplicate findings per return.
 					pending = map[string]int{}
 					continue
-				}
-
-				// Check for error assignment.
-				if m := assignPattern.FindStringSubmatch(content); len(m) > 1 {
-					varName := m[1]
-					if !isErrNameBlacklisted(content) {
-						pending[varName] = ln.NewLineNo
-					}
 				}
 			}
 		}
@@ -182,7 +190,7 @@ func isErrChecked(errName, content string, cache map[string][]*regexp.Regexp) bo
 		reList = []*regexp.Regexp{
 			regexp.MustCompile(fmt.Sprintf(`\b%s\s*[!=]==?\s*nil`, errName)),      // Go nil check
 			regexp.MustCompile(fmt.Sprintf(`\b%s\s+is\s+(not\s+)?None`, errName)), // Python None
-			regexp.MustCompile(fmt.Sprintf(`\bif\s*\(?\s*!?%s\s*\)?`, errName)),   // Python/JS truthy
+			regexp.MustCompile(fmt.Sprintf(`\bif\s*\(?\s*!?%s\s*\)?`, errName)), // Python/JS truthy
 			regexp.MustCompile(fmt.Sprintf(`\breturn\s+%s\b`, errName)),           // return propagation
 			regexp.MustCompile(fmt.Sprintf(`\b%s\s*!=\s*null`, errName)),          // Java null
 			regexp.MustCompile(fmt.Sprintf(`\b(?:raise|throw)\s+%s\b`, errName)),  // raise/throw
@@ -190,8 +198,15 @@ func isErrChecked(errName, content string, cache map[string][]*regexp.Regexp) bo
 		}
 		cache[errName] = reList
 	}
-	for _, re := range reList {
+	for i, re := range reList {
 		if re.MatchString(content) {
+			// Pattern index 2 is the broad truthy check (e.g. "if err")
+			// which also matches assignment forms like "if err := f()".
+			// Reject when the line contains "errName :=" to avoid treating
+			// Go if-initialization as a guard check.
+			if i == 2 && strings.Contains(content, errName+" :=") {
+				continue
+			}
 			return true
 		}
 	}
@@ -216,8 +231,9 @@ func isSuccessReturn(content string) bool {
 	}
 	// JS/TS object returns: return { ok: true } or return { success: true }
 	// Require truthy values — "success: false" / "ok: false" are NOT success returns.
+	// Only match direct object-literal returns, not function calls like "return foo({ ok: true })".
 	lower := strings.ToLower(clean)
-	if strings.Contains(lower, "return") && strings.Contains(lower, "{") {
+	if reDirectReturnObject.MatchString(clean) {
 		// Match "ok: true/1" or "\"ok\"/\"'ok'": true/1
 		if reOkSuccess.MatchString(lower) {
 			return true

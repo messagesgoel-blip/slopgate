@@ -47,7 +47,9 @@ var nilCheckPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bif\s+nil\s*==\s*\w+`),
 	// JS/TS
 	regexp.MustCompile(`\bif\s*\(?\w+\s*[!=]==?\s*(null|undefined)\)?`),
-	regexp.MustCompile(`\bif\s*\(?\w+\s*&&\s*\w+`),
+	// Tightened to require property access after && to avoid matching
+	// bare boolean checks in Go/Java (e.g. "if user && condition").
+	regexp.MustCompile(`\bif\s*\(?\w+\s*&&\s*\w+\.\w+`),
 	regexp.MustCompile(`\bif\s*\(?\s*!\s*\w+\s*\)?`),
 	regexp.MustCompile(`\bif\s*\(?!(null|undefined)\s*\w+\)?`),
 	// Python
@@ -229,7 +231,7 @@ func extractGuardVars(line string) map[string]bool {
 
 	fields := strings.Fields(line)
 	for i, tok := range fields {
-		tok = strings.Trim(tok, "(,)[")
+		tok = strings.Trim(tok, "(,:);[]{}")
 		// Strip leading negation (!) so !user becomes user.
 		tok = strings.TrimLeft(tok, "!")
 		if isLikelyVariable(tok) {
@@ -238,14 +240,14 @@ func extractGuardVars(line string) map[string]bool {
 		// Comparison operators bracket the variable name.
 		if isComparison(tok) {
 			if i > 0 {
-				prev := strings.Trim(fields[i-1], "(,)[")
+				prev := strings.Trim(fields[i-1], "(,:);[]{}")
 				prev = strings.TrimLeft(prev, "!")
 				if isLikelyVariable(prev) {
 					out[prev] = true
 				}
 			}
 			if i+1 < len(fields) {
-				next := strings.Trim(strings.TrimRight(fields[i+1], ",){:;"), "(,)[")
+				next := strings.Trim(strings.TrimRight(fields[i+1], ",):;[]{}"), "(,:);[]{}")
 				next = strings.TrimLeft(next, "!")
 				if isLikelyVariable(next) {
 					out[next] = true
