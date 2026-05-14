@@ -33,15 +33,20 @@ func (r SLP058) Check(d *diff.Diff) []Finding {
 		for _, ln := range f.AddedLines() {
 			// Skip matches inside Go backtick raw string literals
 			// (e.g. regexp.MustCompile backtick strings that contain SQL keywords).
+			// Only apply to Go files — JS/TS template literals also use backticks
+			// but contain ${} interpolation that should still be flagged.
+			isGo := strings.HasSuffix(strings.ToLower(f.Path), ".go")
 			locs := sqlConcatPattern.FindAllStringSubmatchIndex(ln.Content, -1)
 			for _, loc := range locs {
 				if len(loc) > 0 {
 					if loc[0] < 0 {
 						continue
 					}
-					prefix := ln.Content[:loc[0]]
-					if strings.Count(prefix, "`")%2 == 1 {
-						continue
+					if isGo {
+						prefix := ln.Content[:loc[0]]
+						if strings.Count(prefix, "`")%2 == 1 {
+							continue
+						}
 					}
 					out = append(out, Finding{
 						RuleID:   r.ID(),

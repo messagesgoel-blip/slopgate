@@ -74,7 +74,6 @@ var skipLinePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`^\s*\*/`),      // block comment end
 	regexp.MustCompile(`^\s*\*.+`),     // doc comment line
 	regexp.MustCompile(`^\s*$`),        // blank/whitespace-only line
-	regexp.MustCompile(`\bas\s+\w+\b`), // Go type assertion
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +107,16 @@ func (r SLP202) Check(d *diff.Diff) []Finding {
 			removedGuards := map[string]int{}
 			for _, ln := range h.Lines {
 				if ln.Kind != diff.LineDelete {
+					continue
+				}
+				trimmed := strings.TrimSpace(ln.Content)
+				// Skip blank lines and comment-only lines so deleted
+				// comments like "// if user != nil" aren't treated as
+				// removed guard blocks.
+				if trimmed == "" || strings.HasPrefix(trimmed, "//") ||
+					strings.HasPrefix(trimmed, "#") ||
+					strings.HasPrefix(trimmed, "/*") ||
+					strings.HasPrefix(trimmed, "*") {
 					continue
 				}
 				for _, pat := range nilCheckPatterns {
@@ -265,6 +274,20 @@ func isSkippableLine(content string) bool {
 	return false
 }
 
+// inlineNilGuardPatterns are regex patterns that match inline nil/null/undefined
+// guards on a single line. These use proper word boundaries instead of substring
+// checks to avoid false positives (e.g. "notify" being treated as "not"+"if").
+var inlineNilGuardPatterns = []*regexp.Regexp{
+	// Go: if x != nil { / if x == nil {
+	regexp.MustCompile(`\bif\s+\w+\s*[!=]==?\s*nil\b`),
+	// JS/TS/Java: if (x !== null) / if (x != null) / if (x == null) / if (x === null)
+	regexp.MustCompile(`\bif\s*\(?\w+\s*[!=]==?\s*null\s*\)?`),
+	// JS/TS: if (typeof x !== 'undefined') / if (x !== undefined)
+	regexp.MustCompile(`\bif\s*\(?\w+\s*[!=]==?\s*undefined\s*\)?`),
+	// Python: if x is not None
+	regexp.MustCompile(`\bif\s+\w+\s+is\s+not\s+None\b`),
+}
+
 // hasInlineNilGuard returns true if the line itself contains a nil guard
 // that would protect any dereference on the same line.
 func hasInlineNilGuard(content string) bool {
@@ -274,19 +297,12 @@ func hasInlineNilGuard(content string) bool {
 	if strings.Contains(content, "??") || strings.Contains(content, "?:") {
 		return true
 	}
-	// Go: if err != nil { / Python: if x is None
-	if strings.Contains(content, "if") && strings.Contains(content, "nil") {
-		return true
+	for _, pat := range inlineNilGuardPatterns {
+		if pat.MatchString(content) {
+			return true
+		}
 	}
-	// JS/TS/Java: if (x !== null) / if (x != null) / if (x == null)
-	if strings.Contains(content, "if") && strings.Contains(content, "null") {
-		return true
-	}
-	// JS/TS: if (typeof x !== 'undefined') / if (x !== undefined)
-	if strings.Contains(content, "if") && strings.Contains(content, "undefined") {
-		return true
-	}
-	// Python: if x is not None / if x is not none
+	// Python inline truthy check: if x: x.prop
 	if strings.Contains(content, "is not None") || strings.Contains(content, "is not none") {
 		return true
 	}

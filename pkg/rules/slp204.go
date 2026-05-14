@@ -130,7 +130,7 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 				}
 
 				// Check for error assignment.
-				if m := assignPattern.FindStringSubmatch(content); m != nil && len(m) > 1 {
+				if m := assignPattern.FindStringSubmatch(content); len(m) > 1 {
 					varName := m[1]
 					if !isErrNameBlacklisted(varName, content) {
 						pending[varName] = ln.NewLineNo
@@ -168,10 +168,6 @@ func isErrChecked(errName, content string) bool {
 		return true
 	}
 	// Python/JS: if err: / if (!err): / if (err):
-	if regexp.MustCompile(fmt.Sprintf(`\bif\s*\(?\s*!?%s\s*\)?`, errName)).MatchString(content) {
-		return true
-	}
-	// JS: if (err) { / if (!err) {
 	if regexp.MustCompile(fmt.Sprintf(`\bif\s*\(?\s*!?%s\s*\)?`, errName)).MatchString(content) {
 		return true
 	}
