@@ -107,7 +107,7 @@ These slopgate-only rules are its competitive advantage.
 |----|-------|------|--------|
 | SLO-202 | P1 | Null-deref guard | ✅ Complete (committed) |
 | SLO-203 | P1 | DB constraint violation | ✅ Complete (committed) |
-| SLO-204 | P1 | Silent promise mask | ✅ Complete |
+| SLO-204 | P1 | Silent promise mask | 🚧 In review |
 | SLO-207 | P1 | Transaction rollback | 🚧 Not started |
 | SLO-098-expand | P2 | Route w/o test (broadened) | 🚧 Not started |
 | SLO-099-expand | P2 | Response field changed test | 🚧 Not started |
@@ -119,4 +119,4 @@ These slopgate-only rules are its competitive advantage.
 | SLO-035-narrow | P4 | General quality specificity | 🚧 Not started |
 | SLO-070-deprio | P4 | Too-many-dirs severity downgrade | 🚧 Not started |
 
-**Next session pick-up:** Start with **SLO-207** (P1: transaction rollback) — SLO-202, SLO-203, and SLO-204 are complete.
+**Next session pick-up:** Follow up on CR review of **SLO-204** (PR #26), then start **SLO-207** (P1: transaction rollback) — SLO-202 and SLO-203 are complete, SLO-204 pending merge.
