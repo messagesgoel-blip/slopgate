@@ -12,9 +12,9 @@ These catch production crashes before they reach Sentry.
 
 | Task ID | Rule | Description | Effort | Expected Impact | Status |
 |---------|------|-------------|--------|-----------------|--------|
-| **SLO-202** | SLP202 | Null-deref before property access — detect `obj.prop` where `obj` is nullable without guard | Low | High — Sentry's #1 bug class (~5–10 overlap/100runs) | ✅ Done |
-| **SLO-203** | SLP203 | DB constraint violation risk — INSERT/UPDATE without ON CONFLICT on unique keys | Medium | High — Sentry DB errors #2 (~3–5 overlap) | ✅ Done |
-| **SLO-204** | SLP204 | Silent promise failure mask — catch returns success masking inner error | Medium-High | Medium — data loss bugs | 🚧 In review |
+| **SLO-202** | SLP202 | Null-deref before property access — detect `obj.prop` where `obj` is nullable without guard | Low | High — Sentry's #1 bug class (~5–10 overlap/100runs) | ✅ Complete (committed + variable-aware guard fix) |
+| **SLO-203** | SLP203 | DB constraint violation risk — INSERT/UPDATE without ON CONFLICT on unique keys | Medium | High — Sentry DB errors #2 (~3–5 overlap) | ✅ Complete (committed) |
+| **SLO-204** | SLP204 | Silent promise failure mask — catch returns success masking inner error | Medium-High | Medium — data loss bugs | ✅ Complete (CI passed, awaiting CR re-review) |
 | **SLO-207** | SLP207 | Transaction missing explicit rollback — BEGIN without ROLLBACK error path | Medium | Low-Medium | 🔜 Next |
 
 **Validation:** Verify Sentry-only findings drop by ~30% within 2 weeks of deploying SLO-202 + SLO-203.
@@ -105,10 +105,11 @@ These slopgate-only rules are its competitive advantage.
 
 | ID | Phase | Rule | Status |
 |----|-------|------|--------|
-| SLO-202 | P1 | Null-deref guard | ✅ Complete (committed) |
+| SLO-202 | P1 | Null-deref guard | ✅ Complete (committed + inline guard fix) |
 | SLO-203 | P1 | DB constraint violation | ✅ Complete (committed) |
-| SLO-204 | P1 | Silent promise mask | 🚧 In review |
+| SLO-204 | P1 | Silent promise mask | ✅ Complete (awaiting CR re-review of PR #26) |
 | SLO-207 | P1 | Transaction rollback | 🚧 Not started |
+| SLO-058-tune | P1 | SQL concat regexp scoping fix | ✅ Complete (committed) |
 | SLO-098-expand | P2 | Route w/o test (broadened) | 🚧 Not started |
 | SLO-099-expand | P2 | Response field changed test | 🚧 Not started |
 | SLO-100-broaden | P2 | Stub returns (broadened) | 🚧 Not started |
@@ -119,4 +120,4 @@ These slopgate-only rules are its competitive advantage.
 | SLO-035-narrow | P4 | General quality specificity | 🚧 Not started |
 | SLO-070-deprio | P4 | Too-many-dirs severity downgrade | 🚧 Not started |
 
-**Next session pick-up:** Follow up on CR review of **SLO-204** (PR #26), then start **SLO-207** (P1: transaction rollback) — SLO-202 and SLO-203 are complete, SLO-204 pending merge.
+**Next session pick-up:** Follow up on CR re-review of **SLO-204** (PR #26 — code complete, CI passed, awaiting CR re-analysis). Then start **SLO-207** (P1: transaction rollback). SLO-202, SLO-203, and SLO-058 tuning are complete.
