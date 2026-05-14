@@ -68,12 +68,12 @@ var derefPatterns = []*regexp.Regexp{
 
 // skipLinePatterns are lines we should never flag.
 var skipLinePatterns = []*regexp.Regexp{
-	regexp.MustCompile(`^\s*//`),       // Go/JS/TS/Java comment
-	regexp.MustCompile(`^\s*#`),        // Python comment
-	regexp.MustCompile(`^\s*/\*`),      // block comment start
-	regexp.MustCompile(`^\s*\*/`),      // block comment end
-	regexp.MustCompile(`^\s*\*.+`),     // doc comment line
-	regexp.MustCompile(`^\s*$`),        // blank/whitespace-only line
+	regexp.MustCompile(`^\s*//`),   // Go/JS/TS/Java comment
+	regexp.MustCompile(`^\s*#`),    // Python comment
+	regexp.MustCompile(`^\s*/\*`),  // block comment start
+	regexp.MustCompile(`^\s*\*/`),  // block comment end
+	regexp.MustCompile(`^\s*\*.+`), // doc comment line
+	regexp.MustCompile(`^\s*$`),    // blank/whitespace-only line
 }
 
 // ---------------------------------------------------------------------------

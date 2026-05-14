@@ -47,6 +47,10 @@ func (r SLP058) Check(d *diff.Diff) []Finding {
 						if strings.Count(prefix, "`")%2 == 1 {
 							continue
 						}
+						if strings.Contains(prefix, "regexp.MustCompile(") ||
+							strings.Contains(prefix, "regexp.Compile(") {
+							continue
+						}
 					}
 					out = append(out, Finding{
 						RuleID:   r.ID(),
