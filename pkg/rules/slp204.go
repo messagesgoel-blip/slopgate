@@ -21,8 +21,13 @@ import (
 // Scope: diff only — scans added lines within each file hunk.
 type SLP204 struct{}
 
-func (SLP204) ID() string                { return "SLP204" }
+// ID returns the rule identifier: "SLP204".
+func (SLP204) ID() string { return "SLP204" }
+
+// DefaultSeverity returns this rule's default severity.
 func (SLP204) DefaultSeverity() Severity { return SeverityBlock }
+
+// Description returns a short description of the SLP204 rule.
 func (SLP204) Description() string {
 	return "error variable assigned but never checked before returning success"
 }
@@ -66,6 +71,7 @@ var reNullAssign = regexp.MustCompile(`\berr\w*\s*=\s*null\b`)
 // Check
 // ---------------------------------------------------------------------------
 
+// Check implements the diff-aware SLP204 rule for unchecked errors before success returns.
 func (r SLP204) Check(d *diff.Diff) []Finding {
 	var out []Finding
 

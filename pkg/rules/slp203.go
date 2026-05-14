@@ -19,8 +19,13 @@ import (
 // Scope: diff only — scans added lines within each file hunk.
 type SLP203 struct{}
 
-func (SLP203) ID() string                { return "SLP203" }
+// ID returns the rule identifier: "SLP203".
+func (SLP203) ID() string { return "SLP203" }
+
+// DefaultSeverity returns this rule's default severity.
 func (SLP203) DefaultSeverity() Severity { return SeverityBlock }
+
+// Description returns a short description of the SLP203 rule.
 func (SLP203) Description() string {
 	return "INSERT without conflict handling — may cause unique-constraint violation at runtime"
 }
@@ -61,6 +66,7 @@ var slp203SkipLinePatterns = []*regexp.Regexp{
 // Check
 // ---------------------------------------------------------------------------
 
+// Check implements the diff-aware SLP203 rule for INSERT without conflict handling.
 func (r SLP203) Check(d *diff.Diff) []Finding {
 	var out []Finding
 

@@ -19,8 +19,13 @@ import (
 // Scope: diff only — looks at added/deleted lines within the same file hunk.
 type SLP202 struct{}
 
-func (SLP202) ID() string                { return "SLP202" }
+// ID returns the rule identifier: "SLP202".
+func (SLP202) ID() string { return "SLP202" }
+
+// DefaultSeverity returns this rule's default severity.
 func (SLP202) DefaultSeverity() Severity { return SeverityBlock }
+
+// Description returns a short description of the SLP202 rule.
 func (SLP202) Description() string {
 	return "possible nil/null dereference — missing guard before property/method access"
 }
@@ -80,6 +85,7 @@ var skipLinePatterns = []*regexp.Regexp{
 // Check
 // ---------------------------------------------------------------------------
 
+// Check implements the diff-aware SLP202 rule for nil-deref guard detection.
 func (r SLP202) Check(d *diff.Diff) []Finding {
 	var out []Finding
 
