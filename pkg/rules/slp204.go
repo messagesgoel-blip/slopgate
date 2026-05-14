@@ -33,7 +33,7 @@ func (SLP204) Description() string {
 
 // errAssignPattern matches when an error variable (name starting with "err")
 // is assigned from a function call or await expression.
-var errAssignPattern = regexp.MustCompile(
+var assignPattern = regexp.MustCompile(
 	`(?i)(?:const|let|var)?\s*(\berr\w*\b)\s*(?::=|=)\s*(?:await\s+)?\w`)
 
 // successReturnPattern matches return statements returning a success
@@ -128,7 +128,7 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 				}
 
 				// Check for error assignment.
-				if m := errAssignPattern.FindStringSubmatch(content); m != nil {
+				if m := assignPattern.FindStringSubmatch(content); m != nil && len(m) > 1 {
 					varName := m[1]
 					if !isErrNameBlacklisted(varName, content) {
 						pending[varName] = ln.NewLineNo
@@ -145,9 +145,9 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 // properly checked on this line. Returns the number of cleared errors.
 func slp204ClearCheckedErrors(content string, pending map[string]int) int {
 	cleared := 0
-	for errName := range pending {
-		if isErrChecked(errName, content) {
-			delete(pending, errName)
+	for en := range pending {
+		if isErrChecked(en, content) {
+			delete(pending, en)
 			cleared++
 		}
 	}
