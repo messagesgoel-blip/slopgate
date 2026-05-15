@@ -112,7 +112,18 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 			continue
 		}
 
+		// Check both added and deleted lines to catch field additions, removals, and renames
 		for _, ln := range f.AddedLines() {
+			content := strings.TrimSpace(ln.Content)
+			if matchesSlp099FieldLine(f.Path, content) {
+				if hasResponseKeyword(f.Path) {
+					changedFiles[f.Path] = true
+				}
+			}
+		}
+
+		// Also flag on field removals (response structure changed)
+		for _, ln := range f.DeletedLines() {
 			content := strings.TrimSpace(ln.Content)
 			if matchesSlp099FieldLine(f.Path, content) {
 				if hasResponseKeyword(f.Path) {
@@ -129,6 +140,8 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 		if testMatchesResponse(f.Path, changedTestFiles) {
 			continue
 		}
+
+		// Report both added and deleted field changes
 		for _, ln := range f.AddedLines() {
 			content := strings.TrimSpace(ln.Content)
 			if matchesSlp099FieldLine(f.Path, content) {
@@ -138,6 +151,20 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 					File:     f.Path,
 					Line:     ln.NewLineNo,
 					Message:  "response field added/changed without test update — verify tests still match",
+					Snippet:  content,
+				})
+			}
+		}
+
+		for _, ln := range f.DeletedLines() {
+			content := strings.TrimSpace(ln.Content)
+			if matchesSlp099FieldLine(f.Path, content) {
+				out = append(out, Finding{
+					RuleID:   r.ID(),
+					Severity: r.DefaultSeverity(),
+					File:     f.Path,
+					Line:     ln.OldLineNo,
+					Message:  "response field removed/changed without test update — verify tests still match",
 					Snippet:  content,
 				})
 			}

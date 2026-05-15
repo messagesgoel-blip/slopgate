@@ -222,6 +222,12 @@ var jsAssertTokens = []string{
 	"expect(", "assert.", "assert(",
 	// Chai
 	"should.",
+	// Common assertions
+	"toBe(", "toEqual(", "toStrictEqual(", "toMatch(", "toContain(",
+	"toBeDefined(", "toBeUndefined(", "toBeNull(", "toBeTruthy(", "toBeFalsy(",
+	"toThrow(", "toHaveBeenCalled(", "toHaveBeenCalledWith(",
+	// Mocha/Chai style
+	".ok(", ".true(", ".false(", ".equal(", ".deepEqual(", ".include(",
 }
 
 // scanHunkForJSTests walks a single hunk looking for added JS/TS test
@@ -328,8 +334,9 @@ var pyTestFuncSignature = regexp.MustCompile(`^\s*def\s+(test\w+)\s*\(`)
 var pyAssertTokens = []string{
 	"assert ", "self.assert", "self.assertEqual", "self.assertTrue",
 	"self.assertFalse", "self.assertIsNone", "self.assertIsNotNone",
-	"self.assertIn", "self.assertRaises",
-	"pytest.raises(",
+	"self.assertIn", "self.assertRaises", "self.fail(",
+	"pytest.raises(", "pytest.approx(", "mock.assert",
+	"assertEqual(", "assertTrue(", "assertFalse(", "assertIsNone(",
 }
 
 // scanHunkForPyTests walks a hunk looking for added Python test function
@@ -416,7 +423,9 @@ var javaTestMethod = regexp.MustCompile(`^\s*(public\s+)?(static\s+)?void\s+(tes
 var javaAssertTokens = []string{
 	"assertEquals(", "assertTrue(", "assertFalse(", "assertNotNull(",
 	"assertNull(", "assertSame(", "assertThat(", "Assertions.",
-	"assert ", "fail(", "Mockito.",
+	"assert ", "fail(", "Mockito.", "verify(",
+	"assertThrows(", "assertThrowsExactly(", "assertDoesNotThrow(",
+	"assertArrayEquals(", "assertIterableEquals(", "assertLinesMatch(",
 }
 
 // scanHunkForJavaTests walks a hunk looking for added Java test methods.
@@ -513,7 +522,8 @@ var rustTestFunc = regexp.MustCompile(`^\s*(pub\s+)?fn\s+(\w+)\s*\(`)
 // rustAssertTokens are assertion tokens for Rust test frameworks.
 var rustAssertTokens = []string{
 	"assert!(", "assert_eq!(", "assert_ne!",
-	"panic!(", "should_panic",
+	"panic!(", "should_panic", "debug_assert!(", "debug_assert_eq!(",
+	"expect(", "unwrap(", "expect_err(", "unwrap_err(",
 }
 
 // scanHunkForRustTests walks a hunk looking for added Rust test functions.

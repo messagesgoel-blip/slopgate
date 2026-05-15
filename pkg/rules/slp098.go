@@ -21,12 +21,28 @@ func (SLP098) Description() string {
 }
 
 var slp098RoutePatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)(?:app|router|r)\.(?:get|post|put|delete|patch|head|options)\s*\(`),
+	// Express.js and general Node.js routers
+	regexp.MustCompile(`(?i)(?:app|router|r)\.(?:get|post|put|delete|patch|head|options|use|all)\s*\(`),
+	// Express.js route parameter handlers
+	regexp.MustCompile(`(?i)(?:app|router|r)\.param\s*\(`),
+	// Express.js static file serving
+	regexp.MustCompile(`(?i)(?:app|router|r)\.static\s*\(`),
+	// Next.js API route handlers - function declaration form (HTTP method names only)
+	regexp.MustCompile(`(?i)export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s*\(`),
+	// Next.js API route handlers - default function (export default function handler)
+	regexp.MustCompile(`(?i)export\s+default\s+(?:async\s+)?function\s+handler\s*\(`),
+	// Next.js API route handlers - assignment form (const/let/var with HTTP method names)
+	regexp.MustCompile(`(?i)export\s+(?:const|let|var)\s+(?:GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|handler)\s*=`),
+	// Java/Spring annotations
 	regexp.MustCompile(`(?i)@(?:Get|Post|Put|Delete|Patch|RequestMapping)\s*\(`),
+	// Go HTTP handlers
 	regexp.MustCompile(`(?i)\.(?:HandleFunc|Handle)\s*\(`),
 	regexp.MustCompile(`(?i)(?:mux|router)\.(?:HandleFunc|Handle|NewRoute)\s*\(`),
+	// Generic route group/router patterns
 	regexp.MustCompile(`(?i)(?:group|route)\s*\(\s*["'\x60]/`),
+	// Python/Flask patterns
 	regexp.MustCompile(`(?i)@(?:route|app\.route|blueprint\.route)\s*\(`),
+	// Various handler patterns
 	regexp.MustCompile(`(?i)\.(?:AddRoute|MapPath|HandlePath)\s*\(`),
 }
 

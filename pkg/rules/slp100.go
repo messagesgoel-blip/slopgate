@@ -23,6 +23,9 @@ var slp100FuncStart = regexp.MustCompile(`(?i)(?:func\s+(?:\([^)]*\)\s+)?|functi
 var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return(?:\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None))?\s*[;]?\s*$`)
 var slp100NonEmptyStringReturn = regexp.MustCompile(`^\s*return\s+(?:"(?:[^"\\]|\\.)+"|'(?:[^'\\]|\\.)+')\s*;?\s*$`)
 
+// Stub markers: TODO, FIXME, WIP, STUB, NotImplemented, not implemented, not done, etc. (with word boundaries)
+var slp100StubMarker = regexp.MustCompile(`(?i)\b(?:todo|fixme|wip|stub|not\s+implemented|not\s+done|notimplemented|unimplemented|notdone)\b`)
+
 func slp100CodeBeforeTrailingComment(line string) string {
 	var quote byte
 	var b strings.Builder
@@ -61,10 +64,54 @@ func slp100CodeBeforeTrailingComment(line string) string {
 	return b.String()
 }
 
+// slp100ExtractComments extracts all comment text from a line (both // and /* */).
+func slp100ExtractComments(line string) string {
+	var comments strings.Builder
+	var quote byte
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		if quote != 0 {
+			if quote != '`' && c == '\\' && i+1 < len(line) {
+				i++
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch {
+		case c == '"' || c == '\'' || c == '`':
+			quote = c
+		case c == '/' && i+1 < len(line) && line[i+1] == '/':
+			// Single-line comment: add everything from here to end
+			comments.WriteString(line[i:])
+			return comments.String()
+		case c == '/' && i+1 < len(line) && line[i+1] == '*':
+			// Block comment: find closing */
+			end := strings.Index(line[i+2:], "*/")
+			if end < 0 {
+				comments.WriteString(line[i:])
+				return comments.String()
+			}
+			comments.WriteString(line[i : i+end+4]) // Include /* and */
+			i += end + 3
+		}
+	}
+	return comments.String()
+}
+
 func hasSideEffect(line string) bool {
 	stripped := stripCommentAndStrings(line)
 	trimmed := strings.TrimSpace(stripped)
 	if strings.HasPrefix(trimmed, "return") {
+		// Check if return has a stub marker in comments (TODO, FIXME, WIP, NotImplemented, etc.)
+		// This must be checked BEFORE non-empty string check so "return "placeholder" // TODO" is flagged as stub
+		// Extract all comments (both // and /* */) and check for stub markers
+		allComments := slp100ExtractComments(line)
+		if allComments != "" && slp100StubMarker.MatchString(allComments) {
+			return false
+		}
 		returnLine := strings.TrimSpace(slp100CodeBeforeTrailingComment(line))
 		if slp100NonEmptyStringReturn.MatchString(returnLine) {
 			return true

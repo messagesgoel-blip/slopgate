@@ -81,6 +81,19 @@ func (f File) AddedLines() []Line {
 	return out
 }
 
+// DeletedLines returns just the deleted lines across all hunks of a file, in order.
+func (f File) DeletedLines() []Line {
+	var out []Line
+	for _, h := range f.Hunks {
+		for _, ln := range h.Lines {
+			if ln.Kind == LineDelete {
+				out = append(out, ln)
+			}
+		}
+	}
+	return out
+}
+
 // Parse reads a unified diff from r and returns a Diff.
 // It is forgiving: unknown header lines are ignored. An empty input
 // yields an empty Diff with no error.
