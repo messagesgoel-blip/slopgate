@@ -7,6 +7,7 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
+// SLP116 checks for regex patterns with nested quantifiers that could cause ReDoS.
 type SLP116 struct{}
 
 func (SLP116) ID() string                { return "SLP116" }

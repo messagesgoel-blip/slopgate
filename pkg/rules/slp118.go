@@ -8,6 +8,7 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
+// SLP118 checks for numeric index access without a length guard that may panic on empty collections.
 type SLP118 struct{}
 
 func (SLP118) ID() string                { return "SLP118" }

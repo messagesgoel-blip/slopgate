@@ -7,6 +7,7 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
+// SLP113 checks for source files changed without a corresponding test update.
 type SLP113 struct{}
 
 func (SLP113) ID() string                { return "SLP113" }

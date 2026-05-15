@@ -7,6 +7,7 @@ import (
 	"github.com/messagesgoel-blip/slopgate/pkg/diff"
 )
 
+// SLP117 checks for unanchored regex patterns that could match unintended substrings.
 type SLP117 struct{}
 
 func (SLP117) ID() string                { return "SLP117" }
