@@ -50,7 +50,9 @@ var nilCheckPatterns = []*regexp.Regexp{
 	// Tightened to require property access after && to avoid matching
 	// bare boolean checks in Go/Java (e.g. "if user && condition").
 	regexp.MustCompile(`\bif\s*\(?(\w+)\s*&&\s*\w+\.\w+`),
-	regexp.MustCompile(`\bif\s*\(?\s*!\s*(\w+)\s*\)?`),
+	// Negation pattern similarly tightened to avoid matching Go/Java
+	// boolean checks like "if (!authenticated)".
+	regexp.MustCompile(`\bif\s*\(?\s*!\s*(\w+)\s*\.\w+`),
 	regexp.MustCompile(`\bif\s*\(?!(null|undefined)\s*(\w+)\)?`),
 	// Python
 	regexp.MustCompile(`\bif\s+\w+\s+is\s+not\s+None`),
