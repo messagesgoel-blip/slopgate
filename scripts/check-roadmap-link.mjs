@@ -8,7 +8,19 @@ if (!eventPath) {
   process.exit(2);
 }
 
-const event = JSON.parse(fs.readFileSync(eventPath, "utf8"));
+if (!fs.existsSync(eventPath)) {
+  console.error(`Event payload does not exist at ${eventPath}`);
+  process.exit(2);
+}
+
+let event;
+try {
+  event = JSON.parse(fs.readFileSync(eventPath, "utf8"));
+} catch (error) {
+  console.error(`Unable to read or parse event payload at ${eventPath}: ${error.message}`);
+  process.exit(2);
+}
+
 const pr = event.pull_request;
 if (!pr) {
   process.exit(0);
