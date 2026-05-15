@@ -88,9 +88,8 @@ var txCommitPatterns = []*regexp.Regexp{
 // These distinguish "Begin failed, return err" (benign) from
 // "Begin succeeded, ran queries, then returned error without rollback" (bug).
 var txOpPatterns = []*regexp.Regexp{
-	// Go: tx.Exec(...), tx.ExecContext(...), tx.Query(...), tx.QueryRow(...),
-	// tx.Call(...), tx.Prepare(...), etc.  The \w* suffix catches *Context
-	// variants (ExecContext, QueryContext, QueryRowContext, PrepareContext).
+	// Go: tx.Exec/Query/QueryRow/Call/Prepare (incl. *Context variants).
+	// Pattern uses \w* suffix to match both Exec and ExecContext, etc.
 	regexp.MustCompile(`(?i)\.(Exec|Query|QueryRow|Call|Prepare)\w*\s*\(`),
 	// Python: cursor.execute(...)
 	regexp.MustCompile(`(?i)\bexecute\s*\(`),

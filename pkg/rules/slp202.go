@@ -351,7 +351,11 @@ func hasInlineNilGuard(varName, content string) bool {
 			// Patterns without capture groups: fall back to a proximity
 			// check — if varName appears in the full matched text, it is
 			// likely guarded.
-			if !captured && strings.Contains(sm[0], varName) {
+			fullMatch := ""
+			if len(sm) > 0 {
+				fullMatch = sm[0]
+			}
+			if !captured && strings.Contains(fullMatch, varName) {
 				return true
 			}
 		}
