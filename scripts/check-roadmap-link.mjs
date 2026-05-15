@@ -21,7 +21,7 @@ if (labels.includes("no-roadmap-task")) {
 
 const body = pr.body || "";
 const closingKeyword =
-  /\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+((messagesgoel-blip\/[A-Za-z0-9_.-]+)?#\d+)/gi;
+  /\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+((messagesgoel-blip\/slopgate)?#\d+)/gi;
 const matches = [...body.matchAll(closingKeyword)];
 
 if (matches.length !== 1) {
