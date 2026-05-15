@@ -190,7 +190,7 @@ func isErrChecked(errName, content string, cache map[string][]*regexp.Regexp) bo
 		reList = []*regexp.Regexp{
 			regexp.MustCompile(fmt.Sprintf(`\b%s\s*[!=]==?\s*nil`, errName)),      // Go nil check
 			regexp.MustCompile(fmt.Sprintf(`\b%s\s+is\s+(not\s+)?None`, errName)), // Python None
-			regexp.MustCompile(fmt.Sprintf(`\bif\s*\(?\s*!?%s\s*\)?`, errName)), // Python/JS truthy
+			regexp.MustCompile(fmt.Sprintf(`\bif\s*\(?\s*!?%s\s*\)?`, errName)),   // Python/JS truthy
 			regexp.MustCompile(fmt.Sprintf(`\breturn\s+%s\b`, errName)),           // return propagation
 			regexp.MustCompile(fmt.Sprintf(`\b%s\s*!=\s*null`, errName)),          // Java null
 			regexp.MustCompile(fmt.Sprintf(`\b(?:raise|throw)\s+%s\b`, errName)),  // raise/throw
