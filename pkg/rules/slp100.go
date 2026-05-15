@@ -23,8 +23,8 @@ var slp100FuncStart = regexp.MustCompile(`(?i)(?:func\s+(?:\([^)]*\)\s+)?|functi
 var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return(?:\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None))?\s*[;]?\s*$`)
 var slp100NonEmptyStringReturn = regexp.MustCompile(`^\s*return\s+(?:"(?:[^"\\]|\\.)+"|'(?:[^'\\]|\\.)+')\s*;?\s*$`)
 
-// Stub markers: TODO, FIXME, WIP, STUB, NotImplemented, etc. (with word boundaries)
-var slp100StubMarker = regexp.MustCompile(`(?i)\b(?:todo|fixme|wip|stub|notimplemented|unimplemented|notdone)\b`)
+// Stub markers: TODO, FIXME, WIP, STUB, NotImplemented, not implemented, not done, etc. (with word boundaries)
+var slp100StubMarker = regexp.MustCompile(`(?i)\b(?:todo|fixme|wip|stub|not\s+implemented|not\s+done|notimplemented|unimplemented|notdone)\b`)
 
 func slp100CodeBeforeTrailingComment(line string) string {
 	var quote byte
@@ -68,16 +68,16 @@ func hasSideEffect(line string) bool {
 	stripped := stripCommentAndStrings(line)
 	trimmed := strings.TrimSpace(stripped)
 	if strings.HasPrefix(trimmed, "return") {
-		returnLine := strings.TrimSpace(slp100CodeBeforeTrailingComment(line))
-		if slp100NonEmptyStringReturn.MatchString(returnLine) {
-			return true
-		}
 		// Check if return has a stub marker in comments (TODO, FIXME, WIP, NotImplemented, etc.)
-		// Extract comment portion (everything after //) to avoid matching identifiers
+		// This must be checked BEFORE non-empty string check so "return "placeholder" // TODO" is flagged as stub
 		if idx := strings.Index(line, "//"); idx >= 0 {
 			if slp100StubMarker.MatchString(line[idx:]) {
 				return false
 			}
+		}
+		returnLine := strings.TrimSpace(slp100CodeBeforeTrailingComment(line))
+		if slp100NonEmptyStringReturn.MatchString(returnLine) {
+			return true
 		}
 		return !slp100ZeroReturn.MatchString(returnLine)
 	}
