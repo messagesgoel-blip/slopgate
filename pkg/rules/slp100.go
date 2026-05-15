@@ -23,6 +23,9 @@ var slp100FuncStart = regexp.MustCompile(`(?i)(?:func\s+(?:\([^)]*\)\s+)?|functi
 var slp100ZeroReturn = regexp.MustCompile(`(?i)^\s*return(?:\s+(nil|null|0|false|""|''|\[\]|\{\}|undefined|None))?\s*[;]?\s*$`)
 var slp100NonEmptyStringReturn = regexp.MustCompile(`^\s*return\s+(?:"(?:[^"\\]|\\.)+"|'(?:[^'\\]|\\.)+')\s*;?\s*$`)
 
+// Stub markers: TODO, FIXME, WIP, STUB, NotImplemented, etc.
+var slp100StubMarker = regexp.MustCompile(`(?i)(?:todo|fixme|wip|stub|not\s*implemented|unimplemented|not\s*done)`)
+
 func slp100CodeBeforeTrailingComment(line string) string {
 	var quote byte
 	var b strings.Builder
@@ -68,6 +71,10 @@ func hasSideEffect(line string) bool {
 		returnLine := strings.TrimSpace(slp100CodeBeforeTrailingComment(line))
 		if slp100NonEmptyStringReturn.MatchString(returnLine) {
 			return true
+		}
+		// Check if return has a stub marker (TODO, FIXME, WIP, NotImplemented, etc.)
+		if slp100StubMarker.MatchString(line) {
+			return false
 		}
 		return !slp100ZeroReturn.MatchString(returnLine)
 	}
