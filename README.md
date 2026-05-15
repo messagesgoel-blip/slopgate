@@ -202,6 +202,7 @@ Reserved IDs: **SLP004, SLP028, SLP029, SLP105**
 | Core diff slop checks | `SLP001`–`SLP070` | test quality, code hygiene, safety, API/data smells |
 | AST semantic checks | `SLP071`–`SLP080` | Go semantic hazards (nil, SQLi, races, ignored errors) |
 | Extended parity checks | `SLP081`–`SLP142` | React/API/auth/audit/pagination/concurrency and newer overlap-driven checks |
+| Multi-language semantic rules | `SLP202`–`SLP207` | High-signal bug detection (nil dereference, DB constraints, promise failures, transactions) |
 
 
 For the complete authoritative list (ID + severity + description), run:
@@ -209,6 +210,30 @@ For the complete authoritative list (ID + severity + description), run:
 ```bash
 slopgate --list-rules
 ```
+
+---
+
+## Phase 2: CodeRabbit Parity Enhancements
+
+Recent improvements to reach 45%+ CodeRabbit overlap:
+
+**SLP001/SLP010 — Assertion expansion** (Jest, pytest, JUnit, Rust matchers)
+- Detects `toBe`, `toEqual`, `toThrow`, `mock.assert`, `assertThrows`, `expect()`, `unwrap()`
+- Catches untested code in both new and incremental test additions
+
+**SLP098 — Route/handler detection** (Express, Next.js, Flask, Go)
+- Express: `app.use()`, `app.param()`, `app.static()`
+- Next.js: `export async function GET(...)`, `export const GET = ...`, `export default function handler(...)`
+- Matches HTTP methods: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
+
+**SLP099 — Response field changes** (additions AND deletions)
+- Detects renamed, added, or removed response fields in API contracts
+- Flags unmatched test updates on both additions and removals
+
+**SLP100 — Stub detection** (with comment analysis)
+- Recognizes TODO, FIXME, WIP, NotImplemented markers in both `//` and `/* */` comments
+- Detects `return "placeholder" // TODO` patterns (placeholder strings with stub comments)
+- Handles spaced phrases like "not implemented" and "not done"
 
 ---
 
