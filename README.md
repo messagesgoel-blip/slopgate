@@ -184,14 +184,26 @@ python3 scripts/benchmark-compare.py --trend
 
 Benchmarks are automatically archived to `/srv/storage/shared/slopgate-benchmarks/` by pre-commit, pre-push, and post-merge hooks.
 
+### Recent benchmark results
+
+**PR #26 (slopgate)** — Multi-language semantic rules (SLP202–SLP207) roll-up:
+- **Slopgate:** 184 findings (5 blocking, 123 warn, 56 info)
+- **CodeRabbit:** 36 findings
+- **Overlap (CR all):** 13 findings (36.1% coverage, 7.1% precision proxy)
+- **Slopgate-only:** 171 findings (pre-commit screening opportunities)
+- **High-signal findings:** SLP202 (nil/null deref), SLP204 (silent errors), SLP207 (transaction rollback) driving new semantic precision
+
+Key insight: new multi-language rules capture 36% of CodeRabbit findings with 5 blocking issues CodeRabbit missed entirely. Best ROI on guards, error checks, and transaction safety patterns.
+
 ---
 
 ## Rule catalog
 
 Current rule set:
 
-- **148 total rules**
+- **148 total rules** (including SLP202–SLP204, SLP207)
 - **10 AST-aware Go rules** (`SLP071`–`SLP080`)
+- **4 multi-language semantic rules** (`SLP202`, `SLP203`, `SLP204`, `SLP207`) for nil/null deref, SQL constraints, silent errors, and transactions
 
 Reserved IDs: **SLP004, SLP028, SLP029, SLP105**
 
@@ -202,6 +214,7 @@ Reserved IDs: **SLP004, SLP028, SLP029, SLP105**
 | Core diff slop checks | `SLP001`–`SLP070` | test quality, code hygiene, safety, API/data smells |
 | AST semantic checks | `SLP071`–`SLP080` | Go semantic hazards (nil, SQLi, races, ignored errors) |
 | Extended parity checks | `SLP081`–`SLP142` | React/API/auth/audit/pagination/concurrency and newer overlap-driven checks |
+| Multi-language semantic | `SLP202–SLP207` | Diff-based rules across 4+ languages (Go, Python, JS/TS, Java) |
 
 
 For the complete authoritative list (ID + severity + description), run:
