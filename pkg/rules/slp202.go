@@ -310,13 +310,13 @@ func isSkippableLine(content string) bool {
 // without one fall back to a proximity check against the matched text.
 var inlineNilGuardPatterns = []*regexp.Regexp{
 	// Go: if x != nil { / if x == nil {
-	regexp.MustCompile(`\bif\s+\w+\s*[!=]==?\s*nil\b`),
+	regexp.MustCompile(`\bif\s+(\w+)\s*[!=]==?\s*nil\b`),
 	// JS/TS/Java: if (x !== null) / if (x != null) / if (x == null) / if (x === null)
-	regexp.MustCompile(`\bif\s*\(?\w+\s*[!=]==?\s*null\s*\)?`),
+	regexp.MustCompile(`\bif\s*\(?(\w+)\s*[!=]==?\s*null\s*\)?`),
 	// JS/TS: if (typeof x !== 'undefined') / if (x !== undefined)
-	regexp.MustCompile(`\bif\s*\(?\w+\s*[!=]==?\s*undefined\s*\)?`),
+	regexp.MustCompile(`\bif\s*\(?(\w+)\s*[!=]==?\s*undefined\s*\)?`),
 	// Python: if x is not None
-	regexp.MustCompile(`\bif\s+\w+\s+is\s+not\s+None\b`),
+	regexp.MustCompile(`\bif\s+(\w+)\s+is\s+not\s+None\b`),
 	// Python: if x: (bare truthy guard on same line)
 	regexp.MustCompile(`\bif\s+(\w+)\s*:`),
 }
@@ -358,12 +358,6 @@ func hasInlineNilGuard(varName, content string) bool {
 			if !captured && strings.Contains(fullMatch, varName) {
 				return true
 			}
-		}
-	}
-	// Python inline truthy check: "if x: x.prop"
-	if strings.Contains(content, "is not None") || strings.Contains(content, "is not none") {
-		if strings.Contains(content, varName) {
-			return true
 		}
 	}
 	return false

@@ -129,21 +129,15 @@ func (r SLP204) Check(d *diff.Diff) []Finding {
 				}
 
 				// 2. Check for inline error checks (e.g., Go if-initialization).
-				// Only clear and skip when an error is actually verified as
-				// checked; otherwise fall through to handle assignments.
+				// Clear checked errors but continue processing for potential
+				// success returns on the same line.
 				if inlineErrCheckPattern.MatchString(content) {
-					cleared := slp204ClearCheckedErrors(content, pending, errCheckCache)
-					if cleared > 0 {
-						continue
-					}
+					slp204ClearCheckedErrors(content, pending, errCheckCache)
 				}
 
 				// 3. Check for proper error checks and remove cleared errors
 				//    from pending.
-				cleared := slp204ClearCheckedErrors(content, pending, errCheckCache)
-				if cleared > 0 {
-					continue
-				}
+				slp204ClearCheckedErrors(content, pending, errCheckCache)
 
 				// 4. Check for success return while there are pending
 				//    unchecked errors.
@@ -226,7 +220,7 @@ func isSuccessReturn(content string) bool {
 	// Simple success values: nil, true, null, None
 	// Reject multi-value returns like "return nil, err" where a comma
 	// follows the value — those are error-propagating, not success returns.
-	if m := successReturnPattern.FindStringSubmatchIndex(clean); m != nil && len(m) > 2 {
+	if m := successReturnPattern.FindStringSubmatchIndex(clean); len(m) > 2 {
 		return !strings.HasPrefix(content[m[1]:], ",")
 	}
 	// JS/TS object returns: return { ok: true } or return { success: true }

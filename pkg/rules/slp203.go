@@ -89,17 +89,7 @@ func (r SLP203) Check(d *diff.Diff) []Finding {
 		}
 
 		for _, h := range f.Hunks {
-			// Collect all added lines in the hunk to support multi-line
-			// SQL statements where ON CONFLICT / UPSERT appears on a
-			// different line than the INSERT.
-			allAdded := ""
-			for _, ln := range h.Lines {
-				if ln.Kind == diff.LineAdd {
-					allAdded += " " + strings.TrimSpace(ln.Content)
-				}
-			}
-
-			for _, ln := range h.Lines {
+			for i, ln := range h.Lines {
 				if ln.Kind != diff.LineAdd {
 					continue
 				}
@@ -113,7 +103,23 @@ func (r SLP203) Check(d *diff.Diff) []Finding {
 					continue
 				}
 
-				if hasUpsertClause(allAdded) {
+				// Build statement-scoped string by concatenating consecutive
+				// added lines until we hit a semicolon or a non-added line.
+				stmt := content
+				for j := i + 1; j < len(h.Lines); j++ {
+					nextLn := h.Lines[j]
+					if nextLn.Kind != diff.LineAdd {
+						break
+					}
+					nextContent := strings.TrimSpace(nextLn.Content)
+					stmt += " " + nextContent
+					// Stop if this line ends a statement (contains semicolon).
+					if strings.Contains(nextContent, ";") {
+						break
+					}
+				}
+
+				if hasUpsertClause(stmt) {
 					continue
 				}
 
