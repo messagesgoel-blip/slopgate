@@ -27,8 +27,10 @@ var slp098RoutePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(?:app|router|r)\.param\s*\(`),
 	// Express.js static file serving
 	regexp.MustCompile(`(?i)(?:app|router|r)\.static\s*\(`),
-	// Next.js API route handlers (export default / export const)
-	regexp.MustCompile(`(?i)export\s+(?:const|default|async\s+(?:const|function))\s+(?:GET|POST|PUT|DELETE|PATCH|handler|api)\s*=`),
+	// Next.js API route handlers - function declaration form
+	regexp.MustCompile(`(?i)export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH|handler)\s*\(`),
+	// Next.js API route handlers - assignment form (const/let/var)
+	regexp.MustCompile(`(?i)export\s+(?:const|let|var|default)\s+(?:GET|POST|PUT|DELETE|PATCH|handler)\s*=`),
 	// Java/Spring annotations
 	regexp.MustCompile(`(?i)@(?:Get|Post|Put|Delete|Patch|RequestMapping)\s*\(`),
 	// Go HTTP handlers

@@ -163,7 +163,7 @@ func (r SLP099) Check(d *diff.Diff) []Finding {
 					RuleID:   r.ID(),
 					Severity: r.DefaultSeverity(),
 					File:     f.Path,
-					Line:     ln.NewLineNo,
+					Line:     ln.OldLineNo,
 					Message:  "response field removed/changed without test update — verify tests still match",
 					Snippet:  content,
 				})
