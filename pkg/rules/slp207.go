@@ -130,12 +130,12 @@ var txSkipPatterns = []*regexp.Regexp{
 //
 // Two conditions trigger a finding:
 //
-// 1. Error-path rollback gap: BEGIN + DB operations + error return, without ROLLBACK.
-//    Catches the common Sentry bug where a transaction is started, queries run,
-//    and an error is returned without rolling back.
+//  1. Error-path rollback gap: BEGIN + DB operations + error return, without ROLLBACK.
+//     Catches the common Sentry bug where a transaction is started, queries run,
+//     and an error is returned without rolling back.
 //
-// 2. Abandoned transaction: BEGIN without any COMMIT or ROLLBACK in the same hunk.
-//    Catches forgotten transactions where no cleanup is attempted at all.
+//  2. Abandoned transaction: BEGIN without any COMMIT or ROLLBACK in the same hunk.
+//     Catches forgotten transactions where no cleanup is attempted at all.
 func (r SLP207) Check(d *diff.Diff) []Finding {
 	var out []Finding
 
