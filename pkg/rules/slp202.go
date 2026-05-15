@@ -46,12 +46,12 @@ var nilCheckPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bif\s+nil\s*!=\s*\w+`),
 	regexp.MustCompile(`\bif\s+nil\s*==\s*\w+`),
 	// JS/TS
-	regexp.MustCompile(`\bif\s*\(?\w+\s*[!=]==?\s*(null|undefined)\)?`),
+	regexp.MustCompile(`\bif\s*\(?(\w+)\s*[!=]==?\s*(null|undefined)\)?`),
 	// Tightened to require property access after && to avoid matching
 	// bare boolean checks in Go/Java (e.g. "if user && condition").
-	regexp.MustCompile(`\bif\s*\(?\w+\s*&&\s*\w+\.\w+`),
-	regexp.MustCompile(`\bif\s*\(?\s*!\s*\w+\s*\)?`),
-	regexp.MustCompile(`\bif\s*\(?!(null|undefined)\s*\w+\)?`),
+	regexp.MustCompile(`\bif\s*\(?(\w+)\s*&&\s*\w+\.\w+`),
+	regexp.MustCompile(`\bif\s*\(?\s*!\s*(\w+)\s*\)?`),
+	regexp.MustCompile(`\bif\s*\(?!(null|undefined)\s*(\w+)\)?`),
 	// Python
 	regexp.MustCompile(`\bif\s+\w+\s+is\s+not\s+None`),
 	regexp.MustCompile(`\bif\s+\w+\s+is\s+None`),
