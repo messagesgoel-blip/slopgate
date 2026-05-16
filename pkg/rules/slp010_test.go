@@ -194,8 +194,8 @@ func TestSLP010_Description(t *testing.T) {
 	if r.Description() == "" {
 		t.Errorf("Description is empty")
 	}
-	if r.DefaultSeverity() != SeverityWarn {
-		t.Errorf("DefaultSeverity = %v, want SeverityWarn", r.DefaultSeverity())
+	if r.DefaultSeverity() != SeverityInfo {
+		t.Errorf("DefaultSeverity = %v, want SeverityInfo", r.DefaultSeverity())
 	}
 }
 
