@@ -10,7 +10,7 @@ func assertSLP108Fires(t *testing.T, got []Finding) {
 	if got[0].RuleID != "SLP108" {
 		t.Errorf("RuleID = %q", got[0].RuleID)
 	}
-	if got[0].Severity != SeverityBlock {
+	if got[0].Severity != SeverityWarn {
 		t.Errorf("Severity = %v", got[0].Severity)
 	}
 }
@@ -114,7 +114,7 @@ func TestSLP108_Description(t *testing.T) {
 	if r.Description() == "" {
 		t.Errorf("Description is empty")
 	}
-	if r.DefaultSeverity() != SeverityBlock {
-		t.Errorf("default severity should be block")
+	if r.DefaultSeverity() != SeverityWarn {
+		t.Errorf("default severity should be warn")
 	}
 }

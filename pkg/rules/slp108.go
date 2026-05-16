@@ -16,7 +16,7 @@ import (
 type SLP108 struct{}
 
 func (SLP108) ID() string                { return "SLP108" }
-func (SLP108) DefaultSeverity() Severity { return SeverityBlock }
+func (SLP108) DefaultSeverity() Severity { return SeverityWarn }
 func (SLP108) Description() string {
 	return "open/connect without defer close or timeout — resources will leak on panic"
 }

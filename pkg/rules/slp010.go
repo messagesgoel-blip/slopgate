@@ -21,7 +21,7 @@ import (
 type SLP010 struct{}
 
 func (SLP010) ID() string                { return "SLP010" }
-func (SLP010) DefaultSeverity() Severity { return SeverityWarn }
+func (SLP010) DefaultSeverity() Severity { return SeverityInfo }
 func (SLP010) Description() string {
 	return "added lines in existing test contain no assertion"
 }
