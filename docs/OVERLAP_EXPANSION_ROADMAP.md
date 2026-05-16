@@ -29,7 +29,7 @@ Rules SLP081–100 were added for CR parity but underperform.
 |---------|------|----------------|-------------|------------|
 | **SLO-098-expand** | SLP098 | 3 | Detect new express/next route + missing test file | +3–5 overlap | ✅ Complete — added Fastify, FastAPI, Gin, Echo, Fiber, Django, tRPC patterns + file-based route detection (10 new tests) |
 | **SLO-099-expand** | SLP099 | 5 | Track response field rename/removal + test not updated | +2–4 overlap | ✅ Complete — added Python dataclass/Pydantic, body/reply/envelope keywords, parallel test dirs, utility suffix rejection (8 new tests) |
-| **SLO-100-broaden** | SLP100 | 0 | Add patterns: `return nil`, `return ""`, stubs with TODO comment | +2–6 overlap |
+| **SLO-100-broaden** | SLP100 | 0 | Add patterns: `return nil`, `return ""`, stubs with TODO comment | +2–6 overlap | ✅ Complete — added Python pass/raise, arrow functions, throw/panic, console.log stubs, void 0 (8 new tests) |
 
 Also: **broaden SLP010** (test no assertion: 9→~30 overlap) — detect test functions that call unimplemented code.
 
